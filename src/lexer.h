@@ -64,10 +64,10 @@ class Lexer {
    private:
     std::string source;
     size_t pos = 0;
-    int paren_depth = 0;
     int brace_depth = 0;
+    int paren_depth = 0;
 
-    void Next(int n = 1) { pos += n; }
+    void Next() { pos++; }
     char Peek() { return source[pos]; }
 
     bool IsComment() {
@@ -102,10 +102,10 @@ const std::map<char, TokenType> ONE_CHAR_TOKENS = {
     {'<', TokenType::LT},     {'>', TokenType::GT}};
 
 const std::set<TokenType> CONTINUATION_TOKENS = {
-    TokenType::ARROW, TokenType::ASSIGN, TokenType::COLON, TokenType::COMMA,
-    TokenType::PLUS,  TokenType::MINUS,  TokenType::STAR,  TokenType::SLASH,
-    TokenType::EQ,    TokenType::NEQ,    TokenType::LT,    TokenType::LTE,
-    TokenType::GT,    TokenType::GTE};
+    TokenType::ARROW, TokenType::ASSIGN, TokenType::LBRACE, TokenType::RBRACE,
+    TokenType::COLON, TokenType::COMMA,  TokenType::PLUS,   TokenType::MINUS,
+    TokenType::STAR,  TokenType::SLASH,  TokenType::EQ,     TokenType::NEQ,
+    TokenType::LT,    TokenType::LTE,    TokenType::GT,     TokenType::GTE};
 
 const std::map<TokenType, std::string> TOKEN_TYPE_NAMES = {
     {TokenType::TERMINATOR, "TERMINATOR"},

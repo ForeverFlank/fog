@@ -1,10 +1,9 @@
 #include "lexer.h"
 
+#include <iostream>
 #include <map>
 #include <optional>
-#include <set>
 #include <stdexcept>
-#include <iostream>
 
 namespace fog {
 
@@ -29,17 +28,17 @@ Token Lexer::ParseWord() {
 
 Token Lexer::ParseNumber() {
     size_t begin = pos;
-    std::string word;
+    std::string num;
 
     bool decimal = false;
     // bool float64 = false;
 
     char c = Peek();
     while (isdigit(c) || c == '.') {
-        word += c;
+        num += c;
         Next();
         c = Peek();
-        
+
         if (c == '.') {
             if (!decimal)
                 decimal = true;
@@ -55,11 +54,11 @@ Token Lexer::ParseNumber() {
     //     Get();
     // }
 
-    if (!decimal) {
-        return Token(TokenType::INT, word, begin);
+    if (decimal) {
+        return Token(TokenType::FLOAT, num, begin);
     }
 
-    return Token(TokenType::FLOAT, word, begin);
+    return Token(TokenType::INT, num, begin);
 }
 
 std::optional<Token> Lexer::ParseTwoCharSymbol() {
@@ -70,7 +69,8 @@ std::optional<Token> Lexer::ParseTwoCharSymbol() {
 
     auto it = TWO_CHAR_TOKENS.find(sym);
     if (it != TWO_CHAR_TOKENS.end()) {
-        Next(2);
+        Next();
+        Next();
         return Token(it->second, sym, begin);
     }
 
@@ -91,12 +91,17 @@ std::optional<Token> Lexer::ParseOneCharSymbol() {
 }
 
 std::vector<Token> Lexer::Tokenize() {
+    pos = 0;
+    brace_depth = 0;
+    paren_depth = 0;
+
     size_t len = source.size();
     std::vector<Token> tokens;
 
     char c;
     while (pos < len) {
         c = Peek();
+        std::cout << c;
 
         if (paren_depth < 0)
             throw std::runtime_error("Parentheses depth cannot be negative");
@@ -121,10 +126,11 @@ std::vector<Token> Lexer::Tokenize() {
         }
 
         std::optional<Token> res;
-        
+
         res = ParseTwoCharSymbol();
         if (res.has_value()) {
             tokens.push_back(res.value());
+            continue;
         }
 
         res = ParseOneCharSymbol();
@@ -132,17 +138,17 @@ std::vector<Token> Lexer::Tokenize() {
             tokens.push_back(res.value());
 
             switch (res.value().type) {
-                case TokenType::LPAREN:
-                    paren_depth++;
-                    break;
-                case TokenType::RPAREN:
-                    paren_depth--;
-                    break;
                 case TokenType::LBRACE:
                     brace_depth++;
                     break;
                 case TokenType::RBRACE:
                     brace_depth--;
+                    break;
+                case TokenType::LPAREN:
+                    paren_depth++;
+                    break;
+                case TokenType::RPAREN:
+                    paren_depth--;
                     break;
                 default:
                     break;
@@ -150,7 +156,8 @@ std::vector<Token> Lexer::Tokenize() {
             continue;
         }
 
-        if (c == '\n' && !CONTINUATION_TOKENS.contains(tokens.back().type)) {
+        if (c == '\n' && paren_depth == 0 &&
+            !CONTINUATION_TOKENS.contains(tokens.back().type)) {
             tokens.push_back(Token(TokenType::TERMINATOR, "", pos));
             Next();
             continue;
