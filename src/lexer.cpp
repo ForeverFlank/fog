@@ -1,6 +1,7 @@
+#pragma once
+
 #include "lexer.h"
 
-#include <iostream>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -101,7 +102,6 @@ std::vector<Token> Lexer::Tokenize() {
     char c;
     while (pos < len) {
         c = Peek();
-        std::cout << c;
 
         if (paren_depth < 0)
             throw std::runtime_error("Parentheses depth cannot be negative");
