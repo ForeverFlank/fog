@@ -12,24 +12,39 @@ struct ASTNode {
 
 struct NodeBlock : ASTNode {
     std::vector<std::unique_ptr<ASTNode>> nodes;
+
+    NodeBlock(std::vector<std::unique_ptr<ASTNode>> nodes) : nodes{nodes} {}
 };
 
-struct NodeDeclaration : ASTNode {
+struct NodeDeclare : ASTNode {
     bool is_const = false;
     std::unique_ptr<NodeVariable> var;
     std::unique_ptr<NodeType> type;
     std::unique_ptr<NodeExpr> value;
+
+    NodeDeclare(bool is_const, std::unique_ptr<NodeVariable> var,
+                std::unique_ptr<NodeType> type, std::unique_ptr<NodeExpr> value)
+        : is_const{is_const},
+          var{std::move(var)},
+          type{std::move(type)},
+          value{std::move(value)} {}
 };
 
-struct NodeAssignment : ASTNode {
+struct NodeAssign : ASTNode {
     std::unique_ptr<NodeVariable> var;
     std::unique_ptr<NodeExpr> value;
+
+    NodeAssign(std::unique_ptr<NodeVariable> var,
+               std::unique_ptr<NodeExpr> value)
+        : var{std::move(var)}, value{std::move(value)} {}
 };
 
 struct NodeType : ASTNode {};
 
 struct NodePrimitiveType : NodeType {
     std::string name;
+
+    NodePrimitiveType(std::string name) : name{name} {};
 };
 
 struct NodeTupleType : NodeType {
