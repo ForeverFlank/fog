@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "lexer.h"
+#include "ast_nodes.h"
+#include "ast_parser.h"
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -28,10 +30,17 @@ int main(int argc, char* argv[]) {
 
     fog::Lexer lexer(source);
     std::vector<fog::Token> tokens = lexer.Tokenize();
-    for (auto tkn : tokens) {
-        std::cout << std::setw(12) << fog::TOKEN_TYPE_NAMES.at(tkn.type)
-                  << " | " << tkn.value << std::endl;
-    }
+    // for (auto tkn : tokens) {
+    //     std::cout << std::setw(12) << fog::TOKEN_TYPE_NAMES.at(tkn.type)
+    //               << " | " << tkn.value << std::endl;
+    // }
+    
+    fog::ASTParser ast_parser(tokens);
+    auto block = ast_parser.ParseMain();
+    // std::cout << (block == nullptr) << std::endl;
+    // for (auto &node : block->nodes) {
+    //     std::cout << node.get() << std::endl;
+    // }
 
     return 0;
 }

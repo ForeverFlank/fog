@@ -1,23 +1,5 @@
 let a : int := 1
 let b : int := 2
 
-a := b + 1
-
-let f : int -> int
-f(x) := {
-    if x mod 2 = 0 {
-        return x / 2
-    } 
-    return 3 * x + 1
-}
-
-let F : (int -> int, int) -> int
-F(f, n) := f(n)
-
-let c : int := f(a)
-print(c)
-
-let g : int -> int
-g(n) := g(f, n)
-
-print(g(5))
+let c : int
+c := a + b
