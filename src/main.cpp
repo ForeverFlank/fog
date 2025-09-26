@@ -12,37 +12,37 @@
 #include "lexer.h"
 
 const std::map<fog::TokenType, std::string> TOKEN_TYPE_NAMES = {
-    {fog::TokenType::TERMINATOR, "TERMINATOR"},
-    {fog::TokenType::ASSIGN, "ASSIGN"},
-    {fog::TokenType::LBRACE, "LBRACE"},
-    {fog::TokenType::RBRACE, "RBRACE"},
-    {fog::TokenType::LPAREN, "LPAREN"},
-    {fog::TokenType::RPAREN, "RPAREN"},
-    {fog::TokenType::IDENTIFIER, "IDENTIFIER"},
-    {fog::TokenType::LET, "LET"},
-    {fog::TokenType::CONST, "CONST"},
-    {fog::TokenType::INT, "INT"},
-    {fog::TokenType::FLOAT, "FLOAT"},
-    {fog::TokenType::STRING, "STRING"},
-    {fog::TokenType::TRUE, "TRUE"},
-    {fog::TokenType::FALSE, "FALSE"},
-    {fog::TokenType::ARROW, "ARROW"},
-    {fog::TokenType::COLON, "COLON"},
-    {fog::TokenType::COMMA, "COMMA"},
-    {fog::TokenType::RETURN, "RETURN"},
-    {fog::TokenType::IF, "IF"},
-    {fog::TokenType::ELSE, "ELSE"},
-    {fog::TokenType::WHILE, "WHILE"},
-    {fog::TokenType::PLUS, "PLUS"},
-    {fog::TokenType::MINUS, "MINUS"},
-    {fog::TokenType::STAR, "STAR"},
-    {fog::TokenType::SLASH, "SLASH"},
-    {fog::TokenType::EQ, "EQ"},
-    {fog::TokenType::NEQ, "NEQ"},
-    {fog::TokenType::LT, "LT"},
-    {fog::TokenType::LTE, "LTE"},
-    {fog::TokenType::GT, "GT"},
-    {fog::TokenType::GTE, "GTE"}
+    {fog::TokenType::TERMINATOR,    "TERMINATOR"},
+    {fog::TokenType::ASSIGN,        "ASSIGN"},
+    {fog::TokenType::LBRACE,        "LBRACE"},
+    {fog::TokenType::RBRACE,        "RBRACE"},
+    {fog::TokenType::LPAREN,        "LPAREN"},
+    {fog::TokenType::RPAREN,        "RPAREN"},
+    {fog::TokenType::IDENTIFIER,    "IDENTIFIER"},
+    {fog::TokenType::LET,           "LET"},
+    {fog::TokenType::CONST,         "CONST"},
+    {fog::TokenType::INT,           "INT"},
+    {fog::TokenType::FLOAT,         "FLOAT"},
+    {fog::TokenType::STRING,        "STRING"},
+    {fog::TokenType::TRUE,          "TRUE"},
+    {fog::TokenType::FALSE,         "FALSE"},
+    {fog::TokenType::ARROW,         "ARROW"},
+    {fog::TokenType::COLON,         "COLON"},
+    {fog::TokenType::COMMA,         "COMMA"},
+    {fog::TokenType::RETURN,        "RETURN"},
+    {fog::TokenType::IF,            "IF"},
+    {fog::TokenType::ELSE,          "ELSE"},
+    {fog::TokenType::WHILE,         "WHILE"},
+    {fog::TokenType::PLUS,          "PLUS"},
+    {fog::TokenType::MINUS,         "MINUS"},
+    {fog::TokenType::STAR,          "STAR"},
+    {fog::TokenType::SLASH,         "SLASH"},
+    {fog::TokenType::EQ,            "EQ"},
+    {fog::TokenType::NEQ,           "NEQ"},
+    {fog::TokenType::LT,            "LT"},
+    {fog::TokenType::LTE,           "LTE"},
+    {fog::TokenType::GT,            "GT"},
+    {fog::TokenType::GTE,           "GTE"}
 };
 
 void print_tokens(std::vector<fog::Token> &tokens) {
@@ -99,6 +99,14 @@ void print_ast(const fog::ASTNode *node, int level = 0) {
         std::cout << "op: " << casted->op << ")" << std::endl;
         print_ast(casted->lhs.get(), level + 1);
         print_ast(casted->rhs.get(), level + 1);
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeFunctionCall *>(node)) {
+        std::cout << prefix << "FunctionCall (";
+        std::cout << "name: " << casted->name << ")" << std::endl;
+        for (auto &child : casted->args) {
+            print_ast(child.get(), level + 1);
+        }
     }
 
     if (auto casted = dynamic_cast<const fog::NodeInt64Literal *>(node)) {

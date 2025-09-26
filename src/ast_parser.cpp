@@ -107,13 +107,21 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
     }
 
     if (tkn.type == TokenType::IDENTIFIER) {
-        // if (match(TokenType::LPAREN)) {
-            //     std::vector<ASTNode> args;
-            //     while (!match(TokenType::RPAREN)) {
-                //         parse_expr(0);
-                //         expect(TokenType::COMMA, "Expected ','");
-                //     }
-                // }
+        if (match(TokenType::LPAREN)) {
+            next();
+
+            std::vector<std::unique_ptr<NodeExpr>> args;
+            args.push_back(parse_expr());
+
+            while (match(TokenType::COMMA)) {
+                next();
+                args.push_back(parse_expr());
+            }
+            expect(TokenType::RPAREN, "Expected ')'");
+            next();
+
+            return std::make_unique<NodeFunctionCall>(tkn.value, std::move(args));
+        }
         return std::make_unique<NodeVariable>(tkn.value);
     }
 
@@ -130,20 +138,6 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
         ss >> val;
         return std::make_unique<NodeFloatLiteral>(val);
     }
-
-    // if tkn.tkn_type == TokenType.IDENTIFIER:
-    //         if self.match(TokenType.LPAREN):
-    //             args = []
-    //             while not self.match(TokenType.RPAREN):
-    //                 args.append(self.parse_expression())
-    //                 self.match(TokenType.COMMA)
-    //             return FunctionCall(tkn.value, args)
-    //         return Variable(tkn.value)
-
-    //     if tkn.tkn_type == TokenType.LPAREN:
-    //         expr = self.parse_expression()
-    //         self.expect(TokenType.RPAREN, "Expected ')'")
-    //         return expr
 
     throw std::runtime_error("Unexpected token: " + tkn.value);
 }

@@ -5,5 +5,5 @@ let c : int
 c := a + 2 * b
 
 let f : int -> int
-let g : (int -> int) * int -> int
-let h : int -> int + Error
+
+a := f(c) + f(b + 1)

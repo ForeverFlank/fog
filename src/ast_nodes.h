@@ -96,6 +96,16 @@ struct NodeBinaryOp : NodeExpr {
     ) : op{ op }, lhs{ std::move(lhs) }, rhs{ std::move(rhs) } { }
 };
 
+struct NodeFunctionCall : NodeExpr {
+    std::string name;
+    std::vector<std::unique_ptr<NodeExpr>> args;
+    
+    NodeFunctionCall(
+        std::string function_name,
+        std::vector<std::unique_ptr<NodeExpr>> args
+    ) : name{ function_name }, args{ std::move(args) } { }
+};
+
 struct NodeInt64Literal : NodeExpr {
     int64_t value;
 

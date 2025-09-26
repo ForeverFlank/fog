@@ -15,6 +15,14 @@ public:
     ASTParser(std::vector<Token> tokens) : tokens{ std::move(tokens) } { }
     std::unique_ptr<NodeBlock> parse_main();
 
+private:
+    const std::map<TokenType, int> OP_PRECEDENCE = {
+        {TokenType::PLUS, 1},  {TokenType::MINUS, 1}, {TokenType::STAR, 2},
+        {TokenType::SLASH, 2}, {TokenType::LT, 3},    {TokenType::LTE, 3},
+        {TokenType::GT, 3},    {TokenType::GTE, 3},   {TokenType::EQ, 4},
+        {TokenType::NEQ, 4}
+    };
+
     std::unique_ptr<ASTNode> parse_statement();
     std::unique_ptr<NodeBlock> parse_block();
     std::unique_ptr<NodeDeclare> parse_declare();
@@ -25,14 +33,6 @@ public:
     std::unique_ptr<NodeType> parse_product_type();
     std::unique_ptr<NodeType> parse_sum_type();
     std::unique_ptr<NodeType> parse_type_primary();
-
-private:
-    const std::map<TokenType, int> OP_PRECEDENCE = {
-        {TokenType::PLUS, 1},  {TokenType::MINUS, 1}, {TokenType::STAR, 2},
-        {TokenType::SLASH, 2}, {TokenType::LT, 3},    {TokenType::LTE, 3},
-        {TokenType::GT, 3},    {TokenType::GTE, 3},   {TokenType::EQ, 4},
-        {TokenType::NEQ, 4}
-    };
 
     std::vector<Token> tokens;
     size_t pos = 0;
