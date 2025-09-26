@@ -160,8 +160,12 @@ std::vector<Token> Lexer::tokenize() {
             next();
             continue;
         }
-
+        
         next();
+    }
+    
+    if (tokens.back().type != TokenType::TERMINATOR) {
+        tokens.push_back(Token(TokenType::TERMINATOR, "", pos));
     }
 
     return tokens;

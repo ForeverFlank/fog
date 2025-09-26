@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <typeinfo>
 #include <unordered_map>
@@ -51,11 +52,76 @@ void print_tokens(std::vector<fog::Token> &tokens) {
             << std::setw(12) << TOKEN_TYPE_NAMES.at(tokens[i].type) << " | "
             << tokens[i].value << std::endl;
     }
+    std::cout << std::endl;
 }
 
-void print_ast(fog::ASTNode *node) {
-    if (typeid(*node) == typeid(fog::NodeBlock)) {
-        std::cout << "NodeBlock" << std::endl;
+void print_ast(const fog::ASTNode *node, int level = 0) {
+    if (!node) return;
+
+    std::string prefix;
+    for (int i = 0; i < level; i++) {
+        prefix += "  ";
+    }
+    if (level > 0) {
+        prefix[2 * level - 2] = '-';
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeBlock *>(node)) {
+        std::cout << prefix << "Block" << std::endl;
+        for (auto &child : casted->nodes) {
+            print_ast(child.get(), level + 1);
+        }
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeDeclare *>(node)) {
+        std::cout << prefix << "Declare (";
+        std::cout << "is_const: " << casted->is_const << ", ";
+        std::cout << "var_name: " << casted->var_name << ")" << std::endl;
+        print_ast(casted->type.get(), level + 1);
+        if (casted->value != nullptr) {
+            print_ast(casted->value.get(), level + 1);
+        }
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeAssign *>(node)) {
+        std::cout << prefix << "Assign (";
+        std::cout << "var_name: " << casted->var_name << ")" << std::endl;
+        print_ast(casted->value.get(), level + 1);
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeVariable *>(node)) {
+        std::cout << prefix << "Variable (";
+        std::cout << "name: " << casted->name << ")" << std::endl;
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeBinaryOp *>(node)) {
+        std::cout << prefix << "BinaryOp (";
+        std::cout << "op: " << casted->op << ")" << std::endl;
+        print_ast(casted->lhs.get(), level + 1);
+        print_ast(casted->rhs.get(), level + 1);
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeInt64Literal *>(node)) {
+        std::cout << prefix << "Int64Literal (";
+        std::cout << "value: " << casted->value << ")" << std::endl;
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeAtomicType *>(node)) {
+        std::cout << prefix << "AtomicType (";
+        std::cout << "name: " << casted->name << ")" << std::endl;
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeProductType *>(node)) {
+        std::cout << prefix << "TupleType" << std::endl;
+        for (auto &child : casted->types) {
+            print_ast(child.get(), level + 1);
+        }
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeMapType *>(node)) {
+        std::cout << prefix << "MapType" << std::endl;
+        print_ast(casted->domain.get(), level + 1);
+        print_ast(casted->codomain.get(), level + 1);
     }
 }
 

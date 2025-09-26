@@ -53,15 +53,15 @@ struct Token {
     size_t pos;
 
     Token(TokenType type, std::string value, size_t pos)
-        : type{type}, value{value}, pos{pos} {};
+        : type{ type }, value{ value }, pos{ pos } { };
 };
 
 class Lexer {
-  public:
-    Lexer(std::string source) : source{source} {};
+public:
+    Lexer(std::string source) : source{ source } { };
     std::vector<Token> tokenize();
 
-  private:
+private:
     std::string source;
     size_t pos = 0;
     int brace_depth = 0;
@@ -71,8 +71,10 @@ class Lexer {
     char peek() { return source[pos]; }
 
     bool is_comment() {
-        return pos + 1 < source.size() && source[pos] == '/' &&
-               source[pos + 1] == '/';
+        return
+            pos + 1 < source.size() &&
+            source[pos] == '/' &&
+            source[pos + 1] == '/';
     }
 
     Token parse_word();
@@ -85,7 +87,7 @@ const std::map<std::string, TokenType> KEYWORD_TOKENS = {
     {"let", TokenType::LET},       {"const", TokenType::CONST},
     {"return", TokenType::RETURN}, {"if", TokenType::IF},
     {"else", TokenType::ELSE},     {"while", TokenType::WHILE},
-    {"true", TokenType::TRUE},     {"false", TokenType::FALSE}};
+    {"true", TokenType::TRUE},     {"false", TokenType::FALSE} };
 
 const std::map<std::string, TokenType> TWO_CHAR_TOKENS = {
     {":=", TokenType::ASSIGN}, {"->", TokenType::ARROW}, {"!=", TokenType::NEQ},
@@ -99,12 +101,12 @@ const std::map<char, TokenType> ONE_CHAR_TOKENS = {
     {',', TokenType::COMMA},  {'+', TokenType::PLUS},
     {'-', TokenType::MINUS},  {'*', TokenType::STAR},
     {'/', TokenType::SLASH},  {'=', TokenType::EQ},
-    {'<', TokenType::LT},     {'>', TokenType::GT}};
+    {'<', TokenType::LT},     {'>', TokenType::GT} };
 
 const std::set<TokenType> CONTINUATION_TOKENS = {
     TokenType::ARROW, TokenType::ASSIGN, TokenType::LBRACE, TokenType::RBRACE,
     TokenType::COLON, TokenType::COMMA,  TokenType::PLUS,   TokenType::MINUS,
     TokenType::STAR,  TokenType::SLASH,  TokenType::EQ,     TokenType::NEQ,
-    TokenType::LT,    TokenType::LTE,    TokenType::GT,     TokenType::GTE};
+    TokenType::LT,    TokenType::LTE,    TokenType::GT,     TokenType::GTE };
 
 } // namespace fog
