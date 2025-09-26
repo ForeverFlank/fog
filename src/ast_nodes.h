@@ -10,14 +10,14 @@ struct ASTNode {
     virtual ~ASTNode() = default;
 };
 
-struct NodeType : ASTNode {};
+struct NodeType : ASTNode { };
 
-struct NodeExpr : ASTNode {};
+struct NodeExpr : ASTNode { };
 
 struct NodePrimitiveType : NodeType {
     std::string name;
 
-    NodePrimitiveType(std::string name) : name{name} {};
+    NodePrimitiveType(std::string name) : name{name} { };
 };
 
 struct NodeTupleType : NodeType {
@@ -33,15 +33,18 @@ struct NodeVariable : ASTNode {
     std::string name;
     std::unique_ptr<NodeType> type;
 
-    NodeVariable(std::string name, std::unique_ptr<NodeType> type)
-        : name{name}, type{std::move(type)} {};
+    NodeVariable(
+        std::string name,
+        std::unique_ptr<NodeType> type
+    ) : name{name}, type{std::move(type)} { };
 };
 
 struct NodeBlock : ASTNode {
     std::vector<std::unique_ptr<ASTNode>> nodes;
 
-    NodeBlock(std::vector<std::unique_ptr<ASTNode>> nodes)
-        : nodes{std::move(nodes)} {}
+    NodeBlock(
+        std::vector<std::unique_ptr<ASTNode>> nodes
+    ) : nodes{std::move(nodes)} { }
 };
 
 struct NodeDeclare : ASTNode {
@@ -49,18 +52,21 @@ struct NodeDeclare : ASTNode {
     std::unique_ptr<NodeVariable> var;
     std::unique_ptr<NodeExpr> value;
 
-    NodeDeclare(bool is_const, std::unique_ptr<NodeVariable> var,
-                std::unique_ptr<NodeExpr> value)
-        : is_const{is_const}, var{std::move(var)}, value{std::move(value)} {}
+    NodeDeclare(
+        bool is_const,
+        std::unique_ptr<NodeVariable> var,
+        std::unique_ptr<NodeExpr> value
+    ) : is_const{is_const}, var{std::move(var)}, value{std::move(value)} { }
 };
 
 struct NodeAssign : ASTNode {
     std::unique_ptr<NodeVariable> var;
     std::unique_ptr<NodeExpr> value;
 
-    NodeAssign(std::unique_ptr<NodeVariable> var,
-               std::unique_ptr<NodeExpr> value)
-        : var{std::move(var)}, value{std::move(value)} {}
+    NodeAssign(
+        std::unique_ptr<NodeVariable> var,
+        std::unique_ptr<NodeExpr> value
+    ) : var{std::move(var)}, value{std::move(value)} { }
 };
 
 struct NodeBinaryOp : NodeExpr {
@@ -68,27 +74,29 @@ struct NodeBinaryOp : NodeExpr {
     std::unique_ptr<NodeExpr> lhs;
     std::unique_ptr<NodeExpr> rhs;
 
-    NodeBinaryOp(std::string op, std::unique_ptr<NodeExpr> lhs,
-                 std::unique_ptr<NodeExpr> rhs)
-        : op{op}, lhs{std::move(lhs)}, rhs{std::move(rhs)} {};
+    NodeBinaryOp(
+        std::string op,
+        std::unique_ptr<NodeExpr> lhs,
+        std::unique_ptr<NodeExpr> rhs
+    ) : op{op}, lhs{std::move(lhs)}, rhs{std::move(rhs)} { };
 };
 
 struct NodeInt64Literal : NodeExpr {
     int64_t value;
 
-    NodeInt64Literal(int64_t value) : value{value} {};
+    NodeInt64Literal(int64_t value) : value{value} { };
 };
 
 struct NodeFloatLiteral : NodeExpr {
     float value;
 
-    NodeFloatLiteral(float value) : value{value} {};
+    NodeFloatLiteral(float value) : value{value} { };
 };
 
 struct NodeDoubleLiteral : NodeExpr {
     double value;
 
-    NodeDoubleLiteral(double value) : value{value} {};
+    NodeDoubleLiteral(double value) : value{value} { };
 };
 
 struct NodeCharLiteral : NodeExpr {

@@ -9,13 +9,20 @@
 
 namespace fog {
 
-std::unique_ptr<NodeBlock> ASTParser::ParseMain() {
+std::unique_ptr<NodeBlock> ASTParser::parse_main() {
     std::vector<std::unique_ptr<ASTNode>> statements;
 
     std::unique_ptr<ASTNode> stmt;
-    while (Peek().has_value()) {
-        stmt = std::move(ParseStatement());
+    while (peek().has_value()) {
+        // std::cout << pos << " ";
 
+        if (peek().value().type == TokenType::TERMINATOR) {
+            next();
+            continue;
+        }
+
+        stmt = std::move(parse_statement());
+        
         if (stmt != nullptr) {
             statements.push_back(std::move(stmt));
         }
@@ -24,8 +31,8 @@ std::unique_ptr<NodeBlock> ASTParser::ParseMain() {
     return std::make_unique<NodeBlock>(std::move(statements));
 }
 
-std::unique_ptr<ASTNode> ASTParser::ParseStatement() {
-    auto optional_tkn = Peek();
+std::unique_ptr<ASTNode> ASTParser::parse_statement() {
+    auto optional_tkn = peek();
 
     if (!optional_tkn.has_value()) {
         return nullptr;
@@ -38,24 +45,25 @@ std::unique_ptr<ASTNode> ASTParser::ParseStatement() {
     // }
 
     if (type == TokenType::LET || type == TokenType::CONST) {
-        return ParseDeclare();
+        return parse_declare();
     }
 
     if (type == TokenType::IDENTIFIER && pos + 1 < tokens.size() &&
         tokens[pos + 1].type == TokenType::ASSIGN) {
-        return ParseAssign();
+        return parse_assign();
     }
 
+    // next();
     return nullptr;
 }
 
-std::unique_ptr<NodeBlock> ASTParser::ParseBlock() {
+std::unique_ptr<NodeBlock> ASTParser::parse_block() {
     bool inside_brace = false;
     std::vector<std::unique_ptr<ASTNode>> statements;
 
     std::unique_ptr<ASTNode> stmt;
-    while (Peek().has_value()) {
-        stmt = ParseStatement();
+    while (peek().has_value()) {
+        stmt = parse_statement();
 
         if (stmt != nullptr) {
             statements.push_back(std::move(stmt));
@@ -65,64 +73,83 @@ std::unique_ptr<NodeBlock> ASTParser::ParseBlock() {
     return std::make_unique<NodeBlock>(std::move(statements));
 }
 
-std::unique_ptr<NodeDeclare> ASTParser::ParseDeclare() {
-    bool is_let = Match(TokenType::LET);
-    bool is_const = Match(TokenType::CONST);
+std::unique_ptr<NodeDeclare> ASTParser::parse_declare() {
+    bool is_let = match(TokenType::LET);
+    bool is_const = match(TokenType::CONST);
 
     if (!is_let && !is_const) {
         throw std::runtime_error("Expected 'let' or 'const'");
     }
-    Next();
+    next();
 
-    Token var_tkn = Peek().value();
-    Next();
+    Token var_tkn = peek().value();
+    next();
 
-    Expect(TokenType::COLON, "Expected ':'");
-    Next();
+    expect(TokenType::COLON, "Expected ':'");
+    next();
 
-    auto type_node = std::move(ParseType());
+    auto type_node = parse_type();
 
-    auto var_node = std::make_unique<NodeVariable>(var_tkn.value, std::move(type_node));
+    auto var_node = std::make_unique<NodeVariable>(
+        var_tkn.value,
+        std::move(type_node)
+    );
 
-    if (Match(TokenType::TERMINATOR)) {
+    std::unique_ptr<NodeExpr> value_node = nullptr;
+
+    if (!match(TokenType::TERMINATOR)) {
+        expect(TokenType::ASSIGN, "Expected ':='");
+        next();
+
+        value_node = parse_expr(0);
     }
 
-    Expect(TokenType::ASSIGN, "Expected ':='");
-    Next();
-
-    auto value_node = std::move(ParseExpr(0));
-
-    return std::make_unique<NodeDeclare>(is_const, std::move(var_node), std::move(value_node));
+    return std::make_unique<NodeDeclare>(
+        is_const,
+        std::move(var_node),
+        std::move(value_node)
+    );
 }
 
-std::unique_ptr<NodeAssign> ASTParser::ParseAssign() {}
+std::unique_ptr<NodeAssign> ASTParser::parse_assign() {
+    return nullptr;
+}
 
-std::unique_ptr<NodeType> ASTParser::ParseType() { return nullptr; }
+std::unique_ptr<NodeType> ASTParser::parse_type() {
+    next();
+    return nullptr;
+}
 
-std::unique_ptr<NodeExpr> ASTParser::ParseExpr(int min_prec) {
-    auto expr = ParseExprPrimary();
+std::unique_ptr<NodeExpr> ASTParser::parse_expr(int min_prec) {
+    auto expr = parse_expr_primary();
 
-    while (Peek().has_value()) {
-        Token op = Peek().value();
+    while (peek().has_value()) {
+        Token op = peek().value();
         auto it = PRECEDENCE.find(op.type);
         if (it == PRECEDENCE.end()) {
             break;
         }
+
         int prec = PRECEDENCE.at(op.type);
         if (prec < min_prec) {
             break;
         }
-        Next();
-        auto rhs = std::move(ParseExpr(prec + 1));
-        expr = std::make_unique<NodeBinaryOp>(op.value, std::move(expr), std::move(rhs));
+        next();
+
+        auto rhs = parse_expr(prec + 1);
+        expr = std::make_unique<NodeBinaryOp>(
+            op.value,
+            std::move(expr),
+            std::move(rhs)
+        );
     }
 
     return expr;
 }
 
-std::unique_ptr<NodeExpr> ASTParser::ParseExprPrimary() {
-    auto tkn = PeekRequired();
-    Next();
+std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
+    auto tkn = peek_required();
+    next();
 
     std::string str = tkn.value;
     std::stringstream ss(str);
@@ -142,4 +169,4 @@ std::unique_ptr<NodeExpr> ASTParser::ParseExprPrimary() {
     throw std::runtime_error("Unexpected token: " + str);
 }
 
-}  // namespace fog
+} // namespace fog

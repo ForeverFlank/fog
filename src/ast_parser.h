@@ -11,48 +11,49 @@
 namespace fog {
 
 class ASTParser {
-   public:
-    ASTParser(std::vector<Token> tokens) : tokens{std::move(tokens)} {}
-    std::unique_ptr<NodeBlock> ParseMain();
+public:
+    ASTParser(std::vector<Token> tokens) : tokens{std::move(tokens)} { }
+    std::unique_ptr<NodeBlock> parse_main();
 
-    std::unique_ptr<ASTNode> ParseStatement();
-    std::unique_ptr<NodeBlock> ParseBlock();
-    std::unique_ptr<NodeDeclare> ParseDeclare();
-    std::unique_ptr<NodeAssign> ParseAssign();
-    std::unique_ptr<NodeType> ParseType();
-    std::unique_ptr<NodeExpr> ParseExpr(int);
-    std::unique_ptr<NodeExpr> ParseExprPrimary();
+    std::unique_ptr<ASTNode> parse_statement();
+    std::unique_ptr<NodeBlock> parse_block();
+    std::unique_ptr<NodeDeclare> parse_declare();
+    std::unique_ptr<NodeAssign> parse_assign();
+    std::unique_ptr<NodeType> parse_type();
+    std::unique_ptr<NodeExpr> parse_expr(int);
+    std::unique_ptr<NodeExpr> parse_expr_primary();
 
-   private:
+private:
     const std::map<TokenType, int> PRECEDENCE = {
         {TokenType::PLUS, 1},  {TokenType::MINUS, 1}, {TokenType::STAR, 2},
         {TokenType::SLASH, 2}, {TokenType::LT, 3},    {TokenType::LTE, 3},
         {TokenType::GT, 3},    {TokenType::GTE, 3},   {TokenType::EQ, 4},
-        {TokenType::NEQ, 4}};
+        {TokenType::NEQ, 4}
+    };
 
     std::vector<Token> tokens;
     size_t pos = 0;
 
-    void Next() { pos++; }
+    void next() { pos++; }
 
-    std::optional<Token> Peek() {
+    std::optional<Token> peek() {
         if (pos >= tokens.size()) {
             return {};
         }
         return tokens[pos];
     }
 
-    Token PeekRequired() {
+    Token peek_required() {
         if (pos >= tokens.size()) {
             throw std::runtime_error("Unexpected EOF");
         }
         return tokens[pos];
     }
 
-    bool Match(TokenType type) { return type == Peek().value().type; }
+    bool match(TokenType type) { return type == peek().value().type; }
 
-    Token Expect(TokenType type, char *err_msg) {
-        Token tkn = Peek().value();
+    Token expect(TokenType type, char *err_msg) {
+        Token tkn = peek().value();
         if (tkn.type != type) {
             throw std::runtime_error(err_msg);
         }

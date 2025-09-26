@@ -57,28 +57,28 @@ struct Token {
 };
 
 class Lexer {
-   public:
+  public:
     Lexer(std::string source) : source{source} {};
-    std::vector<Token> Tokenize();
+    std::vector<Token> tokenize();
 
-   private:
+  private:
     std::string source;
     size_t pos = 0;
     int brace_depth = 0;
     int paren_depth = 0;
 
-    void Next() { pos++; }
-    char Peek() { return source[pos]; }
+    void next() { pos++; }
+    char peek() { return source[pos]; }
 
-    bool IsComment() {
+    bool is_comment() {
         return pos + 1 < source.size() && source[pos] == '/' &&
                source[pos + 1] == '/';
     }
 
-    Token ParseWord();
-    Token ParseNumber();
-    std::optional<Token> ParseTwoCharSymbol();
-    std::optional<Token> ParseOneCharSymbol();
+    Token parse_word();
+    Token parse_number();
+    std::optional<Token> parse_two_char_symbol();
+    std::optional<Token> parse_one_char_symbol();
 };
 
 const std::map<std::string, TokenType> KEYWORD_TOKENS = {
@@ -107,37 +107,4 @@ const std::set<TokenType> CONTINUATION_TOKENS = {
     TokenType::STAR,  TokenType::SLASH,  TokenType::EQ,     TokenType::NEQ,
     TokenType::LT,    TokenType::LTE,    TokenType::GT,     TokenType::GTE};
 
-const std::map<TokenType, std::string> TOKEN_TYPE_NAMES = {
-    {TokenType::TERMINATOR, "TERMINATOR"},
-    {TokenType::ASSIGN, "ASSIGN"},
-    {TokenType::LBRACE, "LBRACE"},
-    {TokenType::RBRACE, "RBRACE"},
-    {TokenType::LPAREN, "LPAREN"},
-    {TokenType::RPAREN, "RPAREN"},
-    {TokenType::IDENTIFIER, "IDENTIFIER"},
-    {TokenType::LET, "LET"},
-    {TokenType::CONST, "CONST"},
-    {TokenType::INT, "INT"},
-    {TokenType::FLOAT, "FLOAT"},
-    {TokenType::STRING, "STRING"},
-    {TokenType::TRUE, "TRUE"},
-    {TokenType::FALSE, "FALSE"},
-    {TokenType::ARROW, "ARROW"},
-    {TokenType::COLON, "COLON"},
-    {TokenType::COMMA, "COMMA"},
-    {TokenType::RETURN, "RETURN"},
-    {TokenType::IF, "IF"},
-    {TokenType::ELSE, "ELSE"},
-    {TokenType::WHILE, "WHILE"},
-    {TokenType::PLUS, "PLUS"},
-    {TokenType::MINUS, "MINUS"},
-    {TokenType::STAR, "STAR"},
-    {TokenType::SLASH, "SLASH"},
-    {TokenType::EQ, "EQ"},
-    {TokenType::NEQ, "NEQ"},
-    {TokenType::LT, "LT"},
-    {TokenType::LTE, "LTE"},
-    {TokenType::GT, "GT"},
-    {TokenType::GTE, "GTE"}};
-
-}  // namespace fog
+} // namespace fog
