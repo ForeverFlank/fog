@@ -26,6 +26,7 @@ enum class TokenType {
     FALSE,
 
     ARROW,
+    FATARROW,
     COLON,
     COMMA,
     RETURN,
@@ -84,29 +85,34 @@ private:
 };
 
 const std::map<std::string, TokenType> KEYWORD_TOKENS = {
-    {"let", TokenType::LET},       {"const", TokenType::CONST},
-    {"return", TokenType::RETURN}, {"if", TokenType::IF},
-    {"else", TokenType::ELSE},     {"while", TokenType::WHILE},
-    {"true", TokenType::TRUE},     {"false", TokenType::FALSE} };
+    { "let",    TokenType::LET },       { "const",  TokenType::CONST },
+    { "return", TokenType::RETURN },    { "if",     TokenType::IF },
+    { "else",   TokenType::ELSE },      { "while",  TokenType::WHILE },
+    { "true",   TokenType::TRUE },      { "false",  TokenType::FALSE },
+    { "do",     TokenType::LBRACE },    { "end",    TokenType::RBRACE }
+};
 
 const std::map<std::string, TokenType> TWO_CHAR_TOKENS = {
-    {":=", TokenType::ASSIGN}, {"->", TokenType::ARROW}, {"!=", TokenType::NEQ},
-    {"<=", TokenType::LTE},    {">=", TokenType::GTE},
+    { ":=", TokenType::ASSIGN },    { "->", TokenType::ARROW },
+    { "=>", TokenType::FATARROW },  { "!=", TokenType::NEQ },
+    { "<=", TokenType::LTE },       { ">=", TokenType::GTE }
 };
 
 const std::map<char, TokenType> ONE_CHAR_TOKENS = {
-    {':', TokenType::COLON},  {';', TokenType::TERMINATOR},
-    {'(', TokenType::LPAREN}, {')', TokenType::RPAREN},
-    {'{', TokenType::LBRACE}, {'}', TokenType::RBRACE},
-    {',', TokenType::COMMA},  {'+', TokenType::PLUS},
-    {'-', TokenType::MINUS},  {'*', TokenType::STAR},
-    {'/', TokenType::SLASH},  {'=', TokenType::EQ},
-    {'<', TokenType::LT},     {'>', TokenType::GT} };
+    { ':', TokenType::COLON },      { ';', TokenType::TERMINATOR },
+    { '(', TokenType::LPAREN },     { ')', TokenType::RPAREN },
+    { '{', TokenType::LBRACE },     { '}', TokenType::RBRACE },
+    { ',', TokenType::COMMA },      { '+', TokenType::PLUS },
+    { '-', TokenType::MINUS },      { '*', TokenType::STAR },
+    { '/', TokenType::SLASH },      { '=', TokenType::EQ },
+    { '<', TokenType::LT },         { '>', TokenType::GT }
+};
 
 const std::set<TokenType> CONTINUATION_TOKENS = {
-    TokenType::ARROW, TokenType::ASSIGN, TokenType::LBRACE, TokenType::RBRACE,
-    TokenType::COLON, TokenType::COMMA,  TokenType::PLUS,   TokenType::MINUS,
-    TokenType::STAR,  TokenType::SLASH,  TokenType::EQ,     TokenType::NEQ,
-    TokenType::LT,    TokenType::LTE,    TokenType::GT,     TokenType::GTE };
+    TokenType::ARROW,   TokenType::ASSIGN,  TokenType::LBRACE,  TokenType::RBRACE,
+    TokenType::COLON,   TokenType::COMMA,   TokenType::PLUS,    TokenType::MINUS,
+    TokenType::STAR,    TokenType::SLASH,   TokenType::EQ,      TokenType::NEQ,
+    TokenType::LT,      TokenType::LTE,     TokenType::GT,      TokenType::GTE
+};
 
 } // namespace fog

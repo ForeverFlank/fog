@@ -6,43 +6,45 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <vector>
+#include <utility>
 
 #include "ast_nodes.h"
 #include "ast_parser.h"
 #include "lexer.h"
 
 const std::map<fog::TokenType, std::string> TOKEN_TYPE_NAMES = {
-    {fog::TokenType::TERMINATOR,    "TERMINATOR"},
-    {fog::TokenType::ASSIGN,        "ASSIGN"},
-    {fog::TokenType::LBRACE,        "LBRACE"},
-    {fog::TokenType::RBRACE,        "RBRACE"},
-    {fog::TokenType::LPAREN,        "LPAREN"},
-    {fog::TokenType::RPAREN,        "RPAREN"},
-    {fog::TokenType::IDENTIFIER,    "IDENTIFIER"},
-    {fog::TokenType::LET,           "LET"},
-    {fog::TokenType::CONST,         "CONST"},
-    {fog::TokenType::INT,           "INT"},
-    {fog::TokenType::FLOAT,         "FLOAT"},
-    {fog::TokenType::STRING,        "STRING"},
-    {fog::TokenType::TRUE,          "TRUE"},
-    {fog::TokenType::FALSE,         "FALSE"},
-    {fog::TokenType::ARROW,         "ARROW"},
-    {fog::TokenType::COLON,         "COLON"},
-    {fog::TokenType::COMMA,         "COMMA"},
-    {fog::TokenType::RETURN,        "RETURN"},
-    {fog::TokenType::IF,            "IF"},
-    {fog::TokenType::ELSE,          "ELSE"},
-    {fog::TokenType::WHILE,         "WHILE"},
-    {fog::TokenType::PLUS,          "PLUS"},
-    {fog::TokenType::MINUS,         "MINUS"},
-    {fog::TokenType::STAR,          "STAR"},
-    {fog::TokenType::SLASH,         "SLASH"},
-    {fog::TokenType::EQ,            "EQ"},
-    {fog::TokenType::NEQ,           "NEQ"},
-    {fog::TokenType::LT,            "LT"},
-    {fog::TokenType::LTE,           "LTE"},
-    {fog::TokenType::GT,            "GT"},
-    {fog::TokenType::GTE,           "GTE"}
+    { fog::TokenType::TERMINATOR,   "TERMINATOR" },
+    { fog::TokenType::ASSIGN,       "ASSIGN"     },
+    { fog::TokenType::LBRACE,       "LBRACE"     },
+    { fog::TokenType::RBRACE,       "RBRACE"     },
+    { fog::TokenType::LPAREN,       "LPAREN"     },
+    { fog::TokenType::RPAREN,       "RPAREN"     },
+    { fog::TokenType::IDENTIFIER,   "IDENTIFIER" },
+    { fog::TokenType::LET,          "LET"        },
+    { fog::TokenType::CONST,        "CONST"      },
+    { fog::TokenType::INT,          "INT"        },
+    { fog::TokenType::FLOAT,        "FLOAT"      },
+    { fog::TokenType::STRING,       "STRING"     },
+    { fog::TokenType::TRUE,         "TRUE"       },
+    { fog::TokenType::FALSE,        "FALSE"      },
+    { fog::TokenType::ARROW,        "ARROW"      },
+    { fog::TokenType::FATARROW,     "FATARROW"   },
+    { fog::TokenType::COLON,        "COLON"      },
+    { fog::TokenType::COMMA,        "COMMA"      },
+    { fog::TokenType::RETURN,       "RETURN"     },
+    { fog::TokenType::IF,           "IF"         },
+    { fog::TokenType::ELSE,         "ELSE"       },
+    { fog::TokenType::WHILE,        "WHILE"      },
+    { fog::TokenType::PLUS,         "PLUS"       },
+    { fog::TokenType::MINUS,        "MINUS"      },
+    { fog::TokenType::STAR,         "STAR"       },
+    { fog::TokenType::SLASH,        "SLASH"      },
+    { fog::TokenType::EQ,           "EQ"         },
+    { fog::TokenType::NEQ,          "NEQ"        },
+    { fog::TokenType::LT,           "LT"         },
+    { fog::TokenType::LTE,          "LTE"        },
+    { fog::TokenType::GT,           "GT"         },
+    { fog::TokenType::GTE,          "GTE"        }
 };
 
 void print_tokens(std::vector<fog::Token> &tokens) {
@@ -89,9 +91,31 @@ void print_ast(const fog::ASTNode *node, int level = 0) {
         print_ast(casted->value.get(), level + 1);
     }
 
+    if (auto casted = dynamic_cast<const fog::NodeReturn *>(node)) {
+        std::cout << prefix << "Return" << std::endl;
+        print_ast(casted->value.get(), level + 1);
+    }
+
     if (auto casted = dynamic_cast<const fog::NodeVariable *>(node)) {
         std::cout << prefix << "Variable (";
         std::cout << "name: " << casted->name << ")" << std::endl;
+    }
+
+    if (auto casted = dynamic_cast<const fog::NodeLambda *>(node)) {
+        std::cout << prefix << "Lambda (";
+        std::cout << "args: [";
+        bool b = false;
+        for (auto &arg : casted->args) {
+            if (b) std::cout << ", ";
+            std::cout << arg;
+            b = true;
+        }
+        std::cout << "])" << std::endl;
+        if (casted->body.index() == 0) {
+            print_ast(std::get<0>(casted->body).get(), level + 1);
+        } else if (casted->body.index() == 1) {
+            print_ast(std::get<1>(casted->body).get(), level + 1);
+        }
     }
 
     if (auto casted = dynamic_cast<const fog::NodeBinaryOp *>(node)) {

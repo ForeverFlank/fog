@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <variant>
 
 namespace fog {
 
@@ -43,13 +44,8 @@ struct NodeMapType : NodeType {
     NodeMapType(
         std::unique_ptr<NodeType> domain,
         std::unique_ptr<NodeType> codomain
-    ) : domain{ std::move(domain) }, codomain{ std::move(codomain) } { }
-};
-
-struct NodeVariable : NodeExpr {
-    std::string name;
-
-    NodeVariable(std::string name) : name{ name } { }
+    ) : domain{ std::move(domain) },
+        codomain{ std::move(codomain) } { }
 };
 
 struct NodeBlock : ASTNode {
@@ -71,7 +67,8 @@ struct NodeDeclare : ASTNode {
         std::string var_name,
         std::unique_ptr<NodeType> type,
         std::unique_ptr<NodeExpr> value
-    ) : is_const{ is_const }, var_name{ var_name }, type{ std::move(type) }, value{ std::move(value) } { }
+    ) : is_const{ is_const }, var_name{ var_name },
+        type{ std::move(type) }, value{ std::move(value) } { }
 };
 
 struct NodeAssign : ASTNode {
@@ -82,6 +79,35 @@ struct NodeAssign : ASTNode {
         std::string var_name,
         std::unique_ptr<NodeExpr> value
     ) : var_name{ var_name }, value{ std::move(value) } { }
+};
+
+struct NodeReturn : ASTNode {
+    std::unique_ptr<NodeExpr> value;
+
+    NodeReturn(
+        std::unique_ptr<NodeExpr> value
+    ) : value{ std::move(value) } { }
+};
+
+struct NodeVariable : NodeExpr {
+    std::string name;
+
+    NodeVariable(std::string name) : name{ name } { }
+};
+
+struct NodeLambda : NodeExpr {
+    std::vector<std::string> args;
+
+    using BodyVariant = std::variant<
+        std::unique_ptr<NodeBlock>,
+        std::unique_ptr<NodeExpr>
+    >;
+    
+    BodyVariant body;
+    
+    NodeLambda(
+        std::vector<std::string> args, BodyVariant body
+    ) : args{ args }, body{ std::move(body) } { }
 };
 
 struct NodeBinaryOp : NodeExpr {
@@ -96,10 +122,18 @@ struct NodeBinaryOp : NodeExpr {
     ) : op{ op }, lhs{ std::move(lhs) }, rhs{ std::move(rhs) } { }
 };
 
+struct NodeTuple : NodeExpr {
+    std::vector<std::unique_ptr<NodeExpr>> elems;
+
+    NodeTuple(
+        std::vector<std::unique_ptr<NodeExpr>> elems
+    ) : elems{ std::move(elems) } { }
+};
+
 struct NodeFunctionCall : NodeExpr {
     std::string name;
     std::vector<std::unique_ptr<NodeExpr>> args;
-    
+
     NodeFunctionCall(
         std::string function_name,
         std::vector<std::unique_ptr<NodeExpr>> args

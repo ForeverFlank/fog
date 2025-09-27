@@ -39,12 +39,13 @@ Token Lexer::parse_number() {
         c = peek();
 
         if (c == '.') {
-            if (!decimal)
+            if (!decimal) {
                 decimal = true;
-            else
+            } else {
                 throw std::runtime_error(
                     "(" + std::to_string(pos) +
                     ") Invalid number format: multiple decimal points");
+            }
         }
     }
 
@@ -61,10 +62,10 @@ Token Lexer::parse_number() {
 }
 
 std::optional<Token> Lexer::parse_two_char_symbol() {
-    if (pos + 1 >= source.size()) return {};
+    if (pos + 1 >= source.size()) return { };
 
     size_t begin = pos;
-    std::string sym{source[pos], source[pos + 1]};
+    std::string sym = source.substr(pos, 2);
 
     auto it = TWO_CHAR_TOKENS.find(sym);
     if (it != TWO_CHAR_TOKENS.end()) {
@@ -73,7 +74,7 @@ std::optional<Token> Lexer::parse_two_char_symbol() {
         return Token(it->second, sym, begin);
     }
 
-    return {};
+    return { };
 }
 
 std::optional<Token> Lexer::parse_one_char_symbol() {
@@ -86,7 +87,7 @@ std::optional<Token> Lexer::parse_one_char_symbol() {
         return Token(it->second, std::string(1, c), begin);
     }
 
-    return {};
+    return { };
 }
 
 std::vector<Token> Lexer::tokenize() {
@@ -136,34 +137,35 @@ std::vector<Token> Lexer::tokenize() {
             tokens.push_back(res.value());
 
             switch (res.value().type) {
-                case TokenType::LBRACE:
-                    brace_depth++;
-                    break;
-                case TokenType::RBRACE:
-                    brace_depth--;
-                    break;
-                case TokenType::LPAREN:
-                    paren_depth++;
-                    break;
-                case TokenType::RPAREN:
-                    paren_depth--;
-                    break;
-                default:
-                    break;
+            case TokenType::LBRACE:
+                brace_depth++;
+                break;
+            case TokenType::RBRACE:
+                brace_depth--;
+                break;
+            case TokenType::LPAREN:
+                paren_depth++;
+                break;
+            case TokenType::RPAREN:
+                paren_depth--;
+                break;
+            default:
+                break;
             }
             continue;
         }
 
         if (c == '\n' && paren_depth == 0 &&
-            !CONTINUATION_TOKENS.contains(tokens.back().type)) {
+            !CONTINUATION_TOKENS.contains(tokens.back().type)
+            ) {
             tokens.push_back(Token(TokenType::TERMINATOR, "", pos));
             next();
             continue;
         }
-        
+
         next();
     }
-    
+
     if (tokens.back().type != TokenType::TERMINATOR) {
         tokens.push_back(Token(TokenType::TERMINATOR, "", pos));
     }

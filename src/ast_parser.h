@@ -17,17 +17,19 @@ public:
 
 private:
     const std::map<TokenType, int> OP_PRECEDENCE = {
-        {TokenType::PLUS, 1},  {TokenType::MINUS, 1}, {TokenType::STAR, 2},
-        {TokenType::SLASH, 2}, {TokenType::LT, 3},    {TokenType::LTE, 3},
-        {TokenType::GT, 3},    {TokenType::GTE, 3},   {TokenType::EQ, 4},
-        {TokenType::NEQ, 4}
+        { TokenType::PLUS, 1 }, { TokenType::MINUS, 1 },
+        { TokenType::STAR, 2 }, { TokenType::SLASH, 2 },
+        { TokenType::LT,   3 }, { TokenType::LTE,   3 },
+        { TokenType::GT,   3 }, { TokenType::GTE,   3 },
+        { TokenType::EQ,   4 }, { TokenType::NEQ,   4 }
     };
 
     std::unique_ptr<ASTNode> parse_statement();
     std::unique_ptr<NodeBlock> parse_block();
     std::unique_ptr<NodeDeclare> parse_declare();
     std::unique_ptr<NodeAssign> parse_assign();
-    std::unique_ptr<NodeExpr> parse_expr(int);
+
+    std::unique_ptr<NodeExpr> parse_expr(int min_prec = 0);
     std::unique_ptr<NodeExpr> parse_expr_primary();
     std::unique_ptr<NodeType> parse_type();
     std::unique_ptr<NodeType> parse_product_type();
