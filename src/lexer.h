@@ -88,8 +88,8 @@ const std::map<std::string, TokenType> KEYWORD_TOKENS = {
     { "let",    TokenType::LET },       { "const",  TokenType::CONST },
     { "return", TokenType::RETURN },    { "if",     TokenType::IF },
     { "else",   TokenType::ELSE },      { "while",  TokenType::WHILE },
-    { "true",   TokenType::TRUE },      { "false",  TokenType::FALSE },
-    { "do",     TokenType::LBRACE },    { "end",    TokenType::RBRACE }
+    { "do",     TokenType::LBRACE },    { "end",    TokenType::RBRACE },
+    { "true",   TokenType::TRUE },      { "false",  TokenType::FALSE }
 };
 
 const std::map<std::string, TokenType> TWO_CHAR_TOKENS = {

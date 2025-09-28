@@ -248,6 +248,14 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
         return std::make_unique<NodeFloatLiteral>(val);
     }
 
+    if (tkn.type == TokenType::TRUE) {
+        return std::make_unique<NodeBoolLiteral>(true);
+    }
+
+    if (tkn.type == TokenType::FALSE) {
+        return std::make_unique<NodeBoolLiteral>(false);
+    }
+
     throw std::runtime_error("Unexpected token: " + tkn.value);
 }
 

@@ -15,39 +15,6 @@ struct NodeExpr : ASTNode { };
 
 struct NodeType : ASTNode { };
 
-struct NodeAtomicType : NodeType {
-    std::string name;
-
-    NodeAtomicType(std::string name) : name{ name } { }
-};
-
-struct NodeSumType : NodeType {
-    std::vector<std::unique_ptr<NodeType>> types;
-
-    NodeSumType(
-        std::vector<std::unique_ptr<NodeType>> types
-    ) : types{ std::move(types) } { }
-};
-
-struct NodeProductType : NodeType {
-    std::vector<std::unique_ptr<NodeType>> types;
-
-    NodeProductType(
-        std::vector<std::unique_ptr<NodeType>> types
-    ) : types{ std::move(types) } { }
-};
-
-struct NodeMapType : NodeType {
-    std::unique_ptr<NodeType> domain;
-    std::unique_ptr<NodeType> codomain;
-
-    NodeMapType(
-        std::unique_ptr<NodeType> domain,
-        std::unique_ptr<NodeType> codomain
-    ) : domain{ std::move(domain) },
-        codomain{ std::move(codomain) } { }
-};
-
 struct NodeBlock : ASTNode {
     std::vector<std::unique_ptr<ASTNode>> nodes;
 
@@ -152,6 +119,12 @@ struct NodeFloatLiteral : NodeExpr {
     NodeFloatLiteral(float value) : value{ value } { }
 };
 
+struct NodeBoolLiteral : NodeExpr {
+    bool value;
+
+    NodeBoolLiteral(bool value) : value{ value } { }
+};
+
 struct NodeDoubleLiteral : NodeExpr {
     double value;
 
@@ -164,6 +137,39 @@ struct NodeCharLiteral : NodeExpr {
 
 struct NodeStringLiteral : NodeExpr {
     std::string value;
+};
+
+struct NodeAtomicType : NodeType {
+    std::string name;
+
+    NodeAtomicType(std::string name) : name{ name } { }
+};
+
+struct NodeSumType : NodeType {
+    std::vector<std::unique_ptr<NodeType>> types;
+
+    NodeSumType(
+        std::vector<std::unique_ptr<NodeType>> types
+    ) : types{ std::move(types) } { }
+};
+
+struct NodeProductType : NodeType {
+    std::vector<std::unique_ptr<NodeType>> types;
+
+    NodeProductType(
+        std::vector<std::unique_ptr<NodeType>> types
+    ) : types{ std::move(types) } { }
+};
+
+struct NodeMapType : NodeType {
+    std::unique_ptr<NodeType> domain;
+    std::unique_ptr<NodeType> codomain;
+
+    NodeMapType(
+        std::unique_ptr<NodeType> domain,
+        std::unique_ptr<NodeType> codomain
+    ) : domain{ std::move(domain) },
+        codomain{ std::move(codomain) } { }
 };
 
 }  // namespace fog
