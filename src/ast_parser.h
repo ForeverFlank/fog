@@ -24,10 +24,10 @@ private:
         { TokenType::EQ,   4 }, { TokenType::NEQ,   4 }
     };
 
-    std::unique_ptr<ASTNode> parse_statement();
-    std::unique_ptr<NodeBlock> parse_block();
+    std::unique_ptr<ASTNode>     parse_statement();
+    std::unique_ptr<NodeBlock>   parse_block();
     std::unique_ptr<NodeDeclare> parse_declare();
-    std::unique_ptr<NodeAssign> parse_assign();
+    std::unique_ptr<NodeAssign>  parse_assign();
 
     std::unique_ptr<NodeExpr> parse_expr(int min_prec = 0);
     std::unique_ptr<NodeExpr> parse_expr_primary();

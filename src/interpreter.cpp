@@ -30,6 +30,21 @@ void Scope::set_var(std::string name, std::shared_ptr<Value> value) {
     throw std::runtime_error("Undefined variable: " + name);
 }
 
+BinaryOpFunction Scope::get_op(BinaryOpKey key) {
+    auto it = operators.find(key);
+    if (it != operators.end()) {
+        return it->second;
+    }
+    if (parent != nullptr) {
+        return parent->get_op(key);
+    }
+    throw std::runtime_error("Undefined operator: " + std::get<0>(key));
+}
+
+void Scope::set_op(BinaryOpKey key, BinaryOpFunction value) {
+    operators[key] = value;
+}
+
 std::shared_ptr<Type> Scope::get_atomic_type(std::string name) {
     auto value = get_var(name);
     return std::dynamic_pointer_cast<Type>(value);
@@ -70,12 +85,19 @@ std::shared_ptr<Value> Interpreter::eval(
     const ASTNode *node,
     std::shared_ptr<Scope> scope
 ) {
+    if (auto casted = dynamic_cast<const NodeMain *>(node)) {
+        for (auto &stmt : casted->nodes) {
+            eval(stmt.get(), scope);
+        }
+        return nullptr;
+    }
+
     if (auto casted = dynamic_cast<const NodeBlock *>(node)) {
         auto block_scope = std::make_shared<Scope>(scope);
         for (auto &stmt : casted->nodes) {
             eval(stmt.get(), block_scope);
         }
-        return;
+        return nullptr;
     }
 
     if (auto casted = dynamic_cast<const NodeDeclare *>(node)) {
@@ -87,14 +109,14 @@ std::shared_ptr<Value> Interpreter::eval(
             auto value = eval(casted->value.get(), scope);
             scope->set_var(name, value);
         }
-        return;
+        return nullptr;
     }
     
     if (auto casted = dynamic_cast<const NodeAssign *>(node)) {
         std::string name = casted->var_name;
         auto value = eval(casted->value.get(), scope);
         scope->set_var(name, value);
-        return;
+        return nullptr;
     }
 
     if (auto casted = dynamic_cast<const NodeExpr *>(node)) {
@@ -104,6 +126,8 @@ std::shared_ptr<Value> Interpreter::eval(
     if (auto casted = dynamic_cast<const NodeReturn *>(node)) {
 
     }
+
+    return nullptr;
 }
 
 std::shared_ptr<Value> Interpreter::eval_expr(
@@ -122,7 +146,15 @@ std::shared_ptr<Value> Interpreter::eval_expr(
     // }
 
     if (auto casted = dynamic_cast<const NodeBinaryOp *>(node)) {
-        
+        auto lhs = eval(casted->lhs.get(), scope);
+        auto rhs = eval(casted->rhs.get(), scope);
+
+        auto key = std::make_tuple(casted->op, lhs->type, rhs->type);
+        auto op = scope->get_op(key);
+
+        auto res = op(lhs, rhs);
+
+        return res;
     }
 
     if (auto casted = dynamic_cast<const NodeTuple *>(node)) {

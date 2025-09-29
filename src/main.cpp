@@ -11,6 +11,7 @@
 #include "ast_nodes.h"
 #include "ast_parser.h"
 #include "lexer.h"
+#include "interpreter.h"
 
 const std::map<fog::TokenType, std::string> TOKEN_TYPE_NAMES = {
     { fog::TokenType::TERMINATOR,   "TERMINATOR" },
@@ -181,12 +182,20 @@ int main(int argc, char *argv[]) {
     fog::Lexer lexer(source);
     std::vector<fog::Token> tokens = lexer.tokenize();
 
-    print_tokens(tokens);
+    // print_tokens(tokens);
 
     fog::ASTParser ast_parser(tokens);
     std::unique_ptr<fog::NodeBlock> main_block = ast_parser.parse_main();
 
-    print_ast(main_block.get());
+    // print_ast(main_block.get());
+
+    fog::Interpreter interpreter;
+    interpreter.eval(main_block.get());
+
+    std::cout << std::endl;
+    for (auto &item : interpreter.global_scope->variables) {
+        std::cout << item.first << " = " << std::get<int64_t>(item.second->value) << std::endl;
+    }
 
     return 0;
 }

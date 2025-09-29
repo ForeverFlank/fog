@@ -20,7 +20,13 @@ struct NodeBlock : ASTNode {
 
     NodeBlock(
         std::vector<std::unique_ptr<ASTNode>> nodes
-    ) : nodes{ std::move(nodes) } { }
+    ) : nodes{std::move(nodes)} { }
+};
+
+struct NodeMain : NodeBlock {
+    NodeMain(
+        std::vector<std::unique_ptr<ASTNode>> nodes
+    ) : NodeBlock{std::move(nodes)} { }
 };
 
 struct NodeDeclare : ASTNode {
@@ -34,8 +40,8 @@ struct NodeDeclare : ASTNode {
         std::string var_name,
         std::unique_ptr<NodeType> type,
         std::unique_ptr<NodeExpr> value
-    ) : is_const{ is_const }, var_name{ var_name },
-        type{ std::move(type) }, value{ std::move(value) } { }
+    ) : is_const{is_const}, var_name{var_name},
+        type{std::move(type)}, value{std::move(value)} { }
 };
 
 struct NodeAssign : ASTNode {
@@ -45,7 +51,7 @@ struct NodeAssign : ASTNode {
     NodeAssign(
         std::string var_name,
         std::unique_ptr<NodeExpr> value
-    ) : var_name{ var_name }, value{ std::move(value) } { }
+    ) : var_name{var_name}, value{std::move(value)} { }
 };
 
 struct NodeReturn : ASTNode {
@@ -53,13 +59,13 @@ struct NodeReturn : ASTNode {
 
     NodeReturn(
         std::unique_ptr<NodeExpr> value
-    ) : value{ std::move(value) } { }
+    ) : value{std::move(value)} { }
 };
 
 struct NodeVariable : NodeExpr {
     std::string name;
 
-    NodeVariable(std::string name) : name{ name } { }
+    NodeVariable(std::string name) : name{name} { }
 };
 
 struct NodeLambda : NodeExpr {
@@ -69,12 +75,12 @@ struct NodeLambda : NodeExpr {
         std::unique_ptr<NodeBlock>,
         std::unique_ptr<NodeExpr>
     >;
-    
+
     BodyVariant body;
-    
+
     NodeLambda(
         std::vector<std::string> args, BodyVariant body
-    ) : args{ args }, body{ std::move(body) } { }
+    ) : args{args}, body{std::move(body)} { }
 };
 
 struct NodeBinaryOp : NodeExpr {
@@ -86,7 +92,7 @@ struct NodeBinaryOp : NodeExpr {
         std::string op,
         std::unique_ptr<NodeExpr> lhs,
         std::unique_ptr<NodeExpr> rhs
-    ) : op{ op }, lhs{ std::move(lhs) }, rhs{ std::move(rhs) } { }
+    ) : op{op}, lhs{std::move(lhs)}, rhs{std::move(rhs)} { }
 };
 
 struct NodeTuple : NodeExpr {
@@ -94,7 +100,7 @@ struct NodeTuple : NodeExpr {
 
     NodeTuple(
         std::vector<std::unique_ptr<NodeExpr>> elems
-    ) : elems{ std::move(elems) } { }
+    ) : elems{std::move(elems)} { }
 };
 
 struct NodeFunctionCall : NodeExpr {
@@ -104,31 +110,31 @@ struct NodeFunctionCall : NodeExpr {
     NodeFunctionCall(
         std::string function_name,
         std::vector<std::unique_ptr<NodeExpr>> args
-    ) : name{ function_name }, args{ std::move(args) } { }
+    ) : name{function_name}, args{std::move(args)} { }
 };
 
 struct NodeInt64Literal : NodeExpr {
     int64_t value;
 
-    NodeInt64Literal(int64_t value) : value{ value } { }
+    NodeInt64Literal(int64_t value) : value{value} { }
 };
 
 struct NodeFloatLiteral : NodeExpr {
     float value;
 
-    NodeFloatLiteral(float value) : value{ value } { }
+    NodeFloatLiteral(float value) : value{value} { }
 };
 
 struct NodeBoolLiteral : NodeExpr {
     bool value;
 
-    NodeBoolLiteral(bool value) : value{ value } { }
+    NodeBoolLiteral(bool value) : value{value} { }
 };
 
 struct NodeDoubleLiteral : NodeExpr {
     double value;
 
-    NodeDoubleLiteral(double value) : value{ value } { }
+    NodeDoubleLiteral(double value) : value{value} { }
 };
 
 struct NodeCharLiteral : NodeExpr {
@@ -142,7 +148,7 @@ struct NodeStringLiteral : NodeExpr {
 struct NodeAtomicType : NodeType {
     std::string name;
 
-    NodeAtomicType(std::string name) : name{ name } { }
+    NodeAtomicType(std::string name) : name{name} { }
 };
 
 struct NodeSumType : NodeType {
@@ -150,7 +156,7 @@ struct NodeSumType : NodeType {
 
     NodeSumType(
         std::vector<std::unique_ptr<NodeType>> types
-    ) : types{ std::move(types) } { }
+    ) : types{std::move(types)} { }
 };
 
 struct NodeProductType : NodeType {
@@ -158,7 +164,7 @@ struct NodeProductType : NodeType {
 
     NodeProductType(
         std::vector<std::unique_ptr<NodeType>> types
-    ) : types{ std::move(types) } { }
+    ) : types{std::move(types)} { }
 };
 
 struct NodeMapType : NodeType {
@@ -168,8 +174,8 @@ struct NodeMapType : NodeType {
     NodeMapType(
         std::unique_ptr<NodeType> domain,
         std::unique_ptr<NodeType> codomain
-    ) : domain{ std::move(domain) },
-        codomain{ std::move(codomain) } { }
+    ) : domain{std::move(domain)},
+        codomain{std::move(codomain)} { }
 };
 
 }  // namespace fog

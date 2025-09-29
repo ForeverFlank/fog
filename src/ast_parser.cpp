@@ -27,7 +27,7 @@ std::unique_ptr<NodeBlock> ASTParser::parse_main() {
         }
     }
 
-    return std::make_unique<NodeBlock>(std::move(statements));
+    return std::make_unique<NodeMain>(std::move(statements));
 }
 
 std::unique_ptr<ASTNode> ASTParser::parse_statement() {

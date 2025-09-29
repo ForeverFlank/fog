@@ -2,16 +2,4 @@ let a : int := 1
 let b : int := 2
 
 let c : int
-c := a + 2 * b
-
-let f : int -> int
-f := (n) => 3 * n + 1
-
-let g : int * int -> int
-g := (x, y) => do
-    let a : int := x * y
-    let b : int := x + y
-    return a*a + a*b + b*b
-end
-
-a := f(c) + f(b + 1)
+c := a + b + 1

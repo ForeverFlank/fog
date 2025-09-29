@@ -2,25 +2,57 @@
 
 #include "ast_nodes.h"
 
+#include <functional>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 
 namespace fog {
 
-using ValueType = std::variant<
-    int64_t,
-    float,
-    bool,
-    std::string,
-    std::vector<std::unique_ptr<Value>>
->;
+struct Type;
 
 struct Value {
+    using ValueType = std::variant<
+        int64_t,
+        float,
+        bool,
+        std::string,
+        std::vector<std::unique_ptr<Value>>
+    >;
+
     ValueType value;
     std::shared_ptr<Type> type;
+
+    Value() = default;
+    Value(
+        ValueType value,
+        std::shared_ptr<Type> type
+    ) : value{std::move(value)}, type{type} { };
+    virtual ~Value() = default;
 };
 
-struct Type : Value { };
+struct Type : Value {
+    Type() { }
+};
+
+using BinaryOpKey = std::tuple<
+    std::string,
+    std::shared_ptr<Type>,
+    std::shared_ptr<Type>
+>;
+
+using BinaryOpFunction = std::function<
+    std::shared_ptr<Value>(std::shared_ptr<Value>, std::shared_ptr<Value>)
+>;
+
+struct BinaryOpKeyHash {
+    size_t operator()(const BinaryOpKey &key) const {
+        return
+            std::hash<std::string>()(std::get<0>(key)) ^
+            std::hash<Type *>()(std::get<1>(key).get()) ^
+            std::hash<Type *>()(std::get<2>(key).get());
+    }
+};
 
 struct PrimitiveType : Type {
     std::string name;
@@ -28,44 +60,91 @@ struct PrimitiveType : Type {
 
 struct ProductType : Type {
     std::vector<std::shared_ptr<Type>> types;
+
+    ProductType() = default;
+    ProductType(std::vector<std::shared_ptr<Type>> types)
+        : Type{ }, types{std::move(types)} { }
 };
 
 struct SumType : Type {
     std::vector<std::shared_ptr<Type>> types;
+
+    SumType() = default;
+    SumType(std::vector<std::shared_ptr<Type>> types)
+        : Type{ }, types{std::move(types)} { }
 };
 
 struct MapType : Type {
     std::shared_ptr<Type> domain;
     std::shared_ptr<Type> codomain;
-};
 
-struct PrimitiveType {
-    static std::shared_ptr<Type> Int;
+    MapType() = default;
+    MapType(std::shared_ptr<Type> domain, std::shared_ptr<Type> codomain)
+        : Type{ }, domain{std::move(domain)}, codomain{std::move(codomain)} { }
 };
 
 class Scope {
 public:
-    Scope() : parent { nullptr } { }
-    Scope(std::shared_ptr<Scope> parent) : parent{ parent } { }
+    Scope() : parent{nullptr} { }
+    Scope(std::shared_ptr<Scope> parent) : parent{parent} { }
 
     void init_var(std::string name, std::shared_ptr<Type> type);
 
     std::shared_ptr<Value> get_var(std::string name);
-    void set_var(std::string name, std::shared_ptr<Value> value);
-    
+    void                   set_var(std::string name, std::shared_ptr<Value> value);
+
+    BinaryOpFunction get_op(BinaryOpKey key);
+    void             set_op(BinaryOpKey key, BinaryOpFunction value);
+
     std::shared_ptr<Type> get_atomic_type(std::string name);
     std::shared_ptr<Type> resolve_type(const NodeType *node);
-    
-private:
+
+// private:
     std::shared_ptr<Scope> parent;
+
     std::unordered_map<std::string, std::shared_ptr<Value>> variables;
+    std::unordered_map<
+        BinaryOpKey,
+        BinaryOpFunction,
+        BinaryOpKeyHash
+    > operators;
 };
 
 class Interpreter {
 public:
+    std::shared_ptr<Scope> global_scope;
+
+    Interpreter() {
+        global_scope = std::make_shared<Scope>();
+
+        global_scope->init_var("int", std::make_shared<PrimitiveType>());
+        global_scope->init_var("float", std::make_shared<PrimitiveType>());
+        global_scope->init_var("bool", std::make_shared<PrimitiveType>());
+
+        auto int_type = global_scope->get_atomic_type("int");
+
+        global_scope->set_op({"+", int_type, int_type},
+            [this] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
+                return this->add_int_int(a, b);
+            });
+    }
+
+    std::shared_ptr<Value> eval(const ASTNode *node) {
+        return eval(node, global_scope);
+    }
+
     static std::shared_ptr<Value> eval(const ASTNode *node, std::shared_ptr<Scope> scope);
 private:
     static std::shared_ptr<Value> eval_expr(const NodeExpr *node, std::shared_ptr<Scope> scope);
+
+    std::shared_ptr<Value> add_int_int(
+        std::shared_ptr<Value> a,
+        std::shared_ptr<Value> b
+    ) {
+        auto a_val = std::get<int64_t>(a->value);
+        auto b_val = std::get<int64_t>(b->value);
+        return std::make_shared<Value>(a_val + b_val, global_scope->get_atomic_type("int"));
+    };
 };
 
 }  // namespace fog
