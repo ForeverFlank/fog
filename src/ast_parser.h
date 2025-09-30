@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <optional>
 #include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "ast_nodes.h"
@@ -12,16 +14,34 @@ namespace fog {
 
 class ASTParser {
 public:
-    ASTParser(std::vector<Token> tokens) : tokens{ std::move(tokens) } { }
+    ASTParser(std::vector<Token> tokens) : tokens{std::move(tokens)} { }
     std::unique_ptr<NodeBlock> parse_main();
 
 private:
-    const std::map<TokenType, int> OP_PRECEDENCE = {
-        { TokenType::PLUS, 1 }, { TokenType::MINUS, 1 },
-        { TokenType::STAR, 2 }, { TokenType::SLASH, 2 },
-        { TokenType::LT,   3 }, { TokenType::LTE,   3 },
-        { TokenType::GT,   3 }, { TokenType::GTE,   3 },
-        { TokenType::EQ,   4 }, { TokenType::NEQ,   4 }
+    const std::unordered_set<TokenType> UNARY_OP = {
+        TokenType::NOT, TokenType::MINUS
+    };
+    
+    const std::unordered_map<TokenType, int> BINARY_OP_PRECEDENCE = {
+        {TokenType::EQ,     8}, {TokenType::NEQ,   8},
+        
+        {TokenType::LT,     7}, {TokenType::LTE,   7},
+        {TokenType::GT,     7}, {TokenType::GTE,   7},
+        
+        {TokenType::CARET,  6},
+        
+        {TokenType::STAR,   5}, {TokenType::SLASH, 5},
+        {TokenType::DIV,    5}, {TokenType::MOD,   5},
+        
+        {TokenType::PLUS,   4}, {TokenType::MINUS, 4},
+        
+        {TokenType::AND,    3},
+        {TokenType::XOR,    2},
+        {TokenType::OR,     1},
+    };
+
+    const std::unordered_set<TokenType> RIGHT_ASSOC_OP = {
+        TokenType::CARET,
     };
 
     std::unique_ptr<ASTNode>     parse_statement();
@@ -31,6 +51,9 @@ private:
 
     std::unique_ptr<NodeExpr> parse_expr(int min_prec = 0);
     std::unique_ptr<NodeExpr> parse_expr_primary();
+    std::unique_ptr<NodeExpr> parse_expr_unary(Token tkn);
+    std::unique_ptr<NodeExpr> parse_expr_literal(Token tkn);
+
     std::unique_ptr<NodeType> parse_type();
     std::unique_ptr<NodeType> parse_product_type();
     std::unique_ptr<NodeType> parse_sum_type();

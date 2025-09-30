@@ -38,6 +38,10 @@ BinaryOpFunction Scope::get_op(BinaryOpKey key) {
     if (parent != nullptr) {
         return parent->get_op(key);
     }
+    // testing
+    // return [] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
+    //     return std::make_shared<Value>(0, nullptr);
+    // };
     throw std::runtime_error("Undefined operator: " + std::get<0>(key));
 }
 
@@ -57,7 +61,7 @@ std::shared_ptr<Type> Scope::resolve_type(const NodeType *node) {
 
     if (auto casted = dynamic_cast<const NodeProductType *>(node)) {
         auto res = std::make_shared<ProductType>();
-        for (auto& tkn : casted->types) {
+        for (auto &tkn : casted->types) {
             auto type = resolve_type(tkn.get());
             res->types.push_back(type);
         }
@@ -66,7 +70,7 @@ std::shared_ptr<Type> Scope::resolve_type(const NodeType *node) {
 
     if (auto casted = dynamic_cast<const NodeSumType *>(node)) {
         auto res = std::make_shared<SumType>();
-        for (auto& tkn : casted->types) {
+        for (auto &tkn : casted->types) {
             auto type = resolve_type(tkn.get());
             res->types.push_back(type);
         }
@@ -78,6 +82,87 @@ std::shared_ptr<Type> Scope::resolve_type(const NodeType *node) {
         res->domain = resolve_type(casted->domain.get());
         res->codomain = resolve_type(casted->codomain.get());
         return res;
+    }
+
+    throw std::runtime_error("Unexpected node");
+}
+
+Interpreter::Interpreter() {
+    global_scope = std::make_shared<Scope>();
+
+    auto type_type = std::make_shared<PrimitiveType>("type");
+    type_type->type = type_type;
+    global_scope->init_var("type", type_type);
+    global_scope->set_var("type", type_type);
+
+    auto init_type = [this, type_type] (std::string name) {
+        auto type = std::make_shared<PrimitiveType>(name, type_type);
+        global_scope->init_var(name, type_type);
+        global_scope->set_var(name, type);
+    };
+
+    init_type("int");
+    init_type("float");
+    init_type("bool");
+
+    auto int_type = global_scope->get_atomic_type("int");
+    auto float_type = global_scope->get_atomic_type("float");
+
+    auto make_int_op = [this, int_type] (auto op) {
+        return [this, op, int_type] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
+            int32_t a_val = std::get<int32_t>(a->value);
+            int32_t b_val = std::get<int32_t>(b->value);
+            auto result = op(a_val, b_val);
+            return std::make_shared<Value>(result, int_type);
+            };
+        };
+
+    auto make_float_op = [this, float_type, int_type] (auto op) {
+        return [this, op, float_type, int_type] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
+            float a_val, b_val;
+
+            a_val = (a->type == int_type)
+                ? static_cast<float>(std::get<int32_t>(a->value))
+                : std::get<float>(a->value);
+
+            b_val = (b->type == int_type)
+                ? static_cast<float>(std::get<int32_t>(b->value))
+                : std::get<float>(b->value);
+
+            auto result = op(a_val, b_val);
+            return std::make_shared<Value>(result, float_type);
+            };
+        };
+
+    global_scope->set_op({"+", int_type, int_type},
+        make_int_op([] (int32_t a, int32_t b) { return a + b; })
+    );
+    global_scope->set_op({"-", int_type, int_type},
+        make_int_op([] (int32_t a, int32_t b) { return a - b; })
+    );
+    global_scope->set_op({"*", int_type, int_type},
+        make_int_op([] (int32_t a, int32_t b) { return a * b; })
+    );
+    global_scope->set_op({"/", int_type, int_type},
+        make_int_op([] (int32_t a, int32_t b) { return a / b; })
+    );
+
+    for (int i = 1; i < 4; i++) {
+        auto type_a = (i & 1) ? float_type : int_type;
+        auto type_b = (i & 2) ? float_type : int_type;
+
+        global_scope->set_op({"+", type_a, type_b},
+            make_float_op([] (float a, float b) { return a + b; })
+        );
+        global_scope->set_op({"-", type_a, type_b},
+            make_float_op([] (float a, float b) { return a - b; })
+        );
+        global_scope->set_op({"*", type_a, type_b},
+            make_float_op([] (float a, float b) { return a * b; })
+        );
+        global_scope->set_op({"/", type_a, type_b},
+            make_float_op([] (float a, float b) { return a / b; })
+        );
     }
 }
 
@@ -104,14 +189,14 @@ std::shared_ptr<Value> Interpreter::eval(
         std::string name = casted->var_name;
         auto type = scope->resolve_type(casted->type.get());
         scope->init_var(name, type);
-        
+
         if (casted->value != nullptr) {
             auto value = eval(casted->value.get(), scope);
             scope->set_var(name, value);
         }
         return nullptr;
     }
-    
+
     if (auto casted = dynamic_cast<const NodeAssign *>(node)) {
         std::string name = casted->var_name;
         auto value = eval(casted->value.get(), scope);
@@ -127,7 +212,7 @@ std::shared_ptr<Value> Interpreter::eval(
 
     }
 
-    return nullptr;
+    throw std::runtime_error("Unexpected node");
 }
 
 std::shared_ptr<Value> Interpreter::eval_expr(
@@ -158,33 +243,35 @@ std::shared_ptr<Value> Interpreter::eval_expr(
     }
 
     if (auto casted = dynamic_cast<const NodeTuple *>(node)) {
-        
+
     }
 
     if (auto casted = dynamic_cast<const NodeFunctionCall *>(node)) {
-        
+
     }
 
-    if (auto casted = dynamic_cast<const NodeInt64Literal *>(node)) {
+    if (auto casted = dynamic_cast<const NodeInt32Literal *>(node)) {
         return std::make_shared<Value>(
             casted->value,
             scope->get_atomic_type("int")
         );
     }
-    
+
     if (auto casted = dynamic_cast<const NodeFloatLiteral *>(node)) {
         return std::make_shared<Value>(
             casted->value,
             scope->get_atomic_type("float")
         );
     }
-    
+
     if (auto casted = dynamic_cast<const NodeBoolLiteral *>(node)) {
         return std::make_shared<Value>(
             casted->value,
             scope->get_atomic_type("bool")
         );
     }
+
+    return nullptr;
 }
 
 }

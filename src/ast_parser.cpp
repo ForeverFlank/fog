@@ -69,11 +69,11 @@ std::unique_ptr<NodeBlock> ASTParser::parse_block() {
     next();
 
     std::vector<std::unique_ptr<ASTNode>> statements;
-    
+
     std::unique_ptr<ASTNode> stmt;
     while (pos < tokens.size() && !match(TokenType::RBRACE)) {
         stmt = parse_statement();
-        
+
         if (stmt != nullptr) {
             statements.push_back(std::move(stmt));
         }
@@ -128,23 +128,23 @@ std::unique_ptr<NodeAssign> ASTParser::parse_assign() {
     );
 }
 
-
 std::unique_ptr<NodeExpr> ASTParser::parse_expr(int min_prec) {
     auto expr = parse_expr_primary();
 
     while (pos < tokens.size()) {
         Token op = peek();
-        auto it = OP_PRECEDENCE.find(op.type);
-        if (it == OP_PRECEDENCE.end()) {
+        auto it = BINARY_OP_PRECEDENCE.find(op.type);
+        if (it == BINARY_OP_PRECEDENCE.end()) {
             break;
         }
-        int prec = OP_PRECEDENCE.at(op.type);
+        int prec = BINARY_OP_PRECEDENCE.at(op.type);
         if (prec < min_prec) {
             break;
         }
         next();
 
-        auto rhs = parse_expr(prec + 1);
+        bool right_assoc = RIGHT_ASSOC_OP.contains(op.type);
+        auto rhs = parse_expr(right_assoc ? prec : prec + 1);
         expr = std::make_unique<NodeBinaryOp>(
             op.value,
             std::move(expr),
@@ -158,6 +158,10 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr(int min_prec) {
 std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
     auto tkn = peek();
     next();
+
+    if (UNARY_OP.contains(tkn.type)) {
+        return parse_expr_unary(tkn);
+    }
 
     if (tkn.type == TokenType::LPAREN) {
         size_t save = pos;
@@ -234,12 +238,25 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
         return std::make_unique<NodeVariable>(tkn.value);
     }
 
+    if (auto res = parse_expr_literal(tkn)) {
+        return res;
+    }
+
+    throw std::runtime_error("Unexpected token: " + tkn.value);
+}
+
+std::unique_ptr<NodeExpr> ASTParser::parse_expr_unary(Token tkn) {
+    auto value = parse_expr();
+    return std::make_unique<NodeUnaryOp>(tkn.value, std::move(value));
+}
+
+std::unique_ptr<NodeExpr> ASTParser::parse_expr_literal(Token tkn) {
     std::stringstream ss(tkn.value);
 
     if (tkn.type == TokenType::INT) {
-        int64_t val;
+        int32_t val;
         ss >> val;
-        return std::make_unique<NodeInt64Literal>(val);
+        return std::make_unique<NodeInt32Literal>(val);
     }
 
     if (tkn.type == TokenType::FLOAT) {
@@ -256,7 +273,7 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
         return std::make_unique<NodeBoolLiteral>(false);
     }
 
-    throw std::runtime_error("Unexpected token: " + tkn.value);
+    return nullptr;
 }
 
 std::unique_ptr<NodeType> ASTParser::parse_type() {

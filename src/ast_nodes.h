@@ -83,6 +83,16 @@ struct NodeLambda : NodeExpr {
     ) : args{args}, body{std::move(body)} { }
 };
 
+struct NodeUnaryOp : NodeExpr {
+    std::string op;
+    std::unique_ptr<NodeExpr> value;
+
+    NodeUnaryOp(
+        std::string op,
+        std::unique_ptr<NodeExpr> value
+    ) : op{op}, value{std::move(value)} { }
+};
+
 struct NodeBinaryOp : NodeExpr {
     std::string op;
     std::unique_ptr<NodeExpr> lhs;
@@ -113,10 +123,10 @@ struct NodeFunctionCall : NodeExpr {
     ) : name{function_name}, args{std::move(args)} { }
 };
 
-struct NodeInt64Literal : NodeExpr {
-    int64_t value;
+struct NodeInt32Literal : NodeExpr {
+    int32_t value;
 
-    NodeInt64Literal(int64_t value) : value{value} { }
+    NodeInt32Literal(int32_t value) : value{value} { }
 };
 
 struct NodeFloatLiteral : NodeExpr {

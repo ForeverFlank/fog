@@ -134,8 +134,8 @@ void print_ast(const fog::ASTNode *node, int level = 0) {
         }
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeInt64Literal *>(node)) {
-        std::cout << prefix << "Int64Literal (";
+    if (auto casted = dynamic_cast<const fog::NodeInt32Literal *>(node)) {
+        std::cout << prefix << "Int32Literal (";
         std::cout << "value: " << casted->value << ")" << std::endl;
     }
 
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << std::endl;
     for (auto &item : interpreter.global_scope->variables) {
-        std::cout << item.first << " = " << std::get<int64_t>(item.second->value) << std::endl;
+        std::cout << item.first << " = " << std::get<int32_t>(item.second->value) << std::endl;
     }
 
     return 0;

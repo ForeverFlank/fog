@@ -13,7 +13,7 @@ struct Type;
 
 struct Value {
     using ValueType = std::variant<
-        int64_t,
+        int32_t,
         float,
         bool,
         std::string,
@@ -25,13 +25,17 @@ struct Value {
 
     Value() = default;
     Value(
+        std::shared_ptr<Type> type
+    ) : type{type} { };
+    Value(
         ValueType value,
         std::shared_ptr<Type> type
     ) : value{std::move(value)}, type{type} { };
+
     virtual ~Value() = default;
 };
 
-struct Type : Value {
+struct Type : virtual Value {
     Type() { }
 };
 
@@ -56,6 +60,10 @@ struct BinaryOpKeyHash {
 
 struct PrimitiveType : Type {
     std::string name;
+
+    PrimitiveType(std::string name) : name{name} { }
+    PrimitiveType(std::string name, std::shared_ptr<Type> type)
+        : Value(type), name{name} { }
 };
 
 struct ProductType : Type {
@@ -89,7 +97,7 @@ public:
     Scope(std::shared_ptr<Scope> parent) : parent{parent} { }
 
     void init_var(std::string name, std::shared_ptr<Type> type);
-
+    
     std::shared_ptr<Value> get_var(std::string name);
     void                   set_var(std::string name, std::shared_ptr<Value> value);
 
@@ -99,7 +107,7 @@ public:
     std::shared_ptr<Type> get_atomic_type(std::string name);
     std::shared_ptr<Type> resolve_type(const NodeType *node);
 
-// private:
+    // private:
     std::shared_ptr<Scope> parent;
 
     std::unordered_map<std::string, std::shared_ptr<Value>> variables;
@@ -114,37 +122,16 @@ class Interpreter {
 public:
     std::shared_ptr<Scope> global_scope;
 
-    Interpreter() {
-        global_scope = std::make_shared<Scope>();
-
-        global_scope->init_var("int", std::make_shared<PrimitiveType>());
-        global_scope->init_var("float", std::make_shared<PrimitiveType>());
-        global_scope->init_var("bool", std::make_shared<PrimitiveType>());
-
-        auto int_type = global_scope->get_atomic_type("int");
-
-        global_scope->set_op({"+", int_type, int_type},
-            [this] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
-                return this->add_int_int(a, b);
-            });
-    }
+    Interpreter();
 
     std::shared_ptr<Value> eval(const ASTNode *node) {
         return eval(node, global_scope);
     }
 
     static std::shared_ptr<Value> eval(const ASTNode *node, std::shared_ptr<Scope> scope);
+
 private:
     static std::shared_ptr<Value> eval_expr(const NodeExpr *node, std::shared_ptr<Scope> scope);
-
-    std::shared_ptr<Value> add_int_int(
-        std::shared_ptr<Value> a,
-        std::shared_ptr<Value> b
-    ) {
-        auto a_val = std::get<int64_t>(a->value);
-        auto b_val = std::get<int64_t>(b->value);
-        return std::make_shared<Value>(a_val + b_val, global_scope->get_atomic_type("int"));
-    };
 };
 
 }  // namespace fog

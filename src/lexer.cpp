@@ -38,14 +38,16 @@ Token Lexer::parse_number() {
         next();
         c = peek();
 
-        if (c == '.') {
-            if (!decimal) {
-                decimal = true;
-            } else {
-                throw std::runtime_error(
-                    "(" + std::to_string(pos) +
-                    ") Invalid number format: multiple decimal points");
-            }
+        if (c != '.') {
+            continue;
+        }
+
+        if (!decimal) {
+            decimal = true;
+        } else {
+            throw std::runtime_error(
+                "(" + std::to_string(pos) +
+                ") Invalid number format: multiple decimal points");
         }
     }
 

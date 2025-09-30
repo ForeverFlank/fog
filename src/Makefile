@@ -8,7 +8,7 @@ OBJS = main.o lexer.o ast_parser.o interpreter.o
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
 
-main.o: main.cpp lexer.h ast_parser.h ast_nodes.h
+main.o: main.cpp lexer.h ast_parser.h ast_nodes.h interpreter.h
 	$(CXX) $(CXXFLAGS) -c main.cpp
 
 lexer.o: lexer.cpp lexer.h
