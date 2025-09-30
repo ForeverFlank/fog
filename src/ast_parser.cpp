@@ -159,8 +159,11 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
     auto tkn = peek();
     next();
 
-    if (UNARY_OP.contains(tkn.type)) {
-        return parse_expr_unary(tkn);
+    auto unary_it = UNARY_OP_PRECEDENCE.find(tkn.type);
+    if (unary_it != UNARY_OP_PRECEDENCE.end()) {
+        int prec = unary_it->second;
+        auto value = parse_expr(prec);
+        return std::make_unique<NodeUnaryOp>(tkn.value, std::move(value));
     }
 
     if (tkn.type == TokenType::LPAREN) {
@@ -243,11 +246,6 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary() {
     }
 
     throw std::runtime_error("Unexpected token: " + tkn.value);
-}
-
-std::unique_ptr<NodeExpr> ASTParser::parse_expr_unary(Token tkn) {
-    auto value = parse_expr();
-    return std::make_unique<NodeUnaryOp>(tkn.value, std::move(value));
 }
 
 std::unique_ptr<NodeExpr> ASTParser::parse_expr_literal(Token tkn) {

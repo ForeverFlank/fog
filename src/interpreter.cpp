@@ -38,10 +38,7 @@ BinaryOpFunction Scope::get_op(BinaryOpKey key) {
     if (parent != nullptr) {
         return parent->get_op(key);
     }
-    // testing
-    // return [] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
-    //     return std::make_shared<Value>(0, nullptr);
-    // };
+
     throw std::runtime_error("Undefined operator: " + std::get<0>(key));
 }
 
@@ -99,11 +96,12 @@ Interpreter::Interpreter() {
         auto type = std::make_shared<PrimitiveType>(name, type_type);
         global_scope->init_var(name, type_type);
         global_scope->set_var(name, type);
-    };
+        };
 
     init_type("int");
     init_type("float");
     init_type("bool");
+    init_type("lambda");
 
     auto int_type = global_scope->get_atomic_type("int");
     auto float_type = global_scope->get_atomic_type("float");
@@ -143,8 +141,18 @@ Interpreter::Interpreter() {
     global_scope->set_op({"*", int_type, int_type},
         make_int_op([] (int32_t a, int32_t b) { return a * b; })
     );
-    global_scope->set_op({"/", int_type, int_type},
+    global_scope->set_op({"div", int_type, int_type},
         make_int_op([] (int32_t a, int32_t b) { return a / b; })
+    );
+    global_scope->set_op({"mod", int_type, int_type},
+        make_int_op([] (int32_t a, int32_t b) { return a % b; })
+    );
+    global_scope->set_op({"-", nullptr, int_type},
+        [this, int_type] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
+            return std::make_shared<Value>(
+                -std::get<int32_t>(b->value),
+                int_type);
+        }
     );
 
     for (int i = 1; i < 4; i++) {
@@ -164,9 +172,16 @@ Interpreter::Interpreter() {
             make_float_op([] (float a, float b) { return a / b; })
         );
     }
+    global_scope->set_op({"-", nullptr, float_type},
+        [this, float_type] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
+            return std::make_shared<Value>(
+                -std::get<float>(b->value),
+                float_type);
+        }
+    );
 }
 
-std::shared_ptr<Value> Interpreter::eval(
+std::shared_ptr<ReturnValue> Interpreter::eval(
     const ASTNode *node,
     std::shared_ptr<Scope> scope
 ) {
@@ -180,7 +195,10 @@ std::shared_ptr<Value> Interpreter::eval(
     if (auto casted = dynamic_cast<const NodeBlock *>(node)) {
         auto block_scope = std::make_shared<Scope>(scope);
         for (auto &stmt : casted->nodes) {
-            eval(stmt.get(), block_scope);
+            auto res = eval(stmt.get(), block_scope);
+            if (res != nullptr) {
+                return res;
+            }
         }
         return nullptr;
     }
@@ -191,7 +209,7 @@ std::shared_ptr<Value> Interpreter::eval(
         scope->init_var(name, type);
 
         if (casted->value != nullptr) {
-            auto value = eval(casted->value.get(), scope);
+            auto value = eval_expr(casted->value.get(), scope);
             scope->set_var(name, value);
         }
         return nullptr;
@@ -199,17 +217,18 @@ std::shared_ptr<Value> Interpreter::eval(
 
     if (auto casted = dynamic_cast<const NodeAssign *>(node)) {
         std::string name = casted->var_name;
-        auto value = eval(casted->value.get(), scope);
+        auto value = eval_expr(casted->value.get(), scope);
         scope->set_var(name, value);
         return nullptr;
     }
 
-    if (auto casted = dynamic_cast<const NodeExpr *>(node)) {
-        return eval_expr(casted, scope);
-    }
+    // if (auto casted = dynamic_cast<const NodeExpr *>(node)) {
+    //     return eval_expr(casted, scope);
+    // }
 
     if (auto casted = dynamic_cast<const NodeReturn *>(node)) {
-
+        auto value = eval_expr(casted->value.get(), scope);
+        return std::make_shared<ReturnValue>(value);
     }
 
     throw std::runtime_error("Unexpected node");
@@ -223,16 +242,28 @@ std::shared_ptr<Value> Interpreter::eval_expr(
         return scope->get_var(casted->name);
     }
 
-    // if (auto casted = dynamic_cast<const NodeLambda *>(node)) {
-    //     return std::make_shared<Value>(
-    //         casted->args,
-    //         scope->resolve_type(casted->???)
-    //     )
-    // }
+    if (auto casted = dynamic_cast<const NodeLambda *>(node)) {
+        auto lambda_ptr = std::shared_ptr<NodeLambda>(const_cast<NodeLambda *>(casted));
+        return std::make_shared<Value>(
+            lambda_ptr,
+            scope->get_atomic_type("lambda")
+        );
+    }
+
+    if (auto casted = dynamic_cast<const NodeUnaryOp *>(node)) {
+        auto value = eval_expr(casted->value.get(), scope);
+
+        auto key = std::make_tuple(casted->op, nullptr, value->type);
+        auto op = scope->get_op(key);
+
+        auto res = op(nullptr, value);
+
+        return res;
+    }
 
     if (auto casted = dynamic_cast<const NodeBinaryOp *>(node)) {
-        auto lhs = eval(casted->lhs.get(), scope);
-        auto rhs = eval(casted->rhs.get(), scope);
+        auto lhs = eval_expr(casted->lhs.get(), scope);
+        auto rhs = eval_expr(casted->rhs.get(), scope);
 
         auto key = std::make_tuple(casted->op, lhs->type, rhs->type);
         auto op = scope->get_op(key);
@@ -247,7 +278,40 @@ std::shared_ptr<Value> Interpreter::eval_expr(
     }
 
     if (auto casted = dynamic_cast<const NodeFunctionCall *>(node)) {
+        auto fn_var = scope->get_var(casted->name);
+        auto fn_type = fn_var->type;
 
+        std::vector<std::shared_ptr<Type>> arg_types;
+
+        if (auto product = std::dynamic_pointer_cast<ProductType>(fn_type)) {
+            arg_types = product->types;
+        } else {
+            arg_types.push_back(fn_type);
+        }
+
+        auto fn = std::get<std::shared_ptr<NodeLambda>>(fn_var->value);
+        auto fn_scope = std::make_shared<Scope>(scope);
+
+        for (size_t i = 0; i < fn->args.size(); i++) {
+            fn_scope->init_var(fn->args[i], arg_types[i]);
+            fn_scope->set_var(fn->args[i], eval_expr(casted->args[i].get(), scope));
+        }
+
+        if (auto &block_ptr = std::get<std::unique_ptr<NodeBlock>>(fn->body)) {
+            if (block_ptr) {
+                auto res = eval(block_ptr.get(), fn_scope);
+                return res->value;
+            }
+        }
+
+        if (auto &block_ptr = std::get<std::unique_ptr<NodeExpr>>(fn->body)) {
+            if (block_ptr) {
+                auto res = eval(block_ptr.get(), fn_scope);
+                return res->value;
+            }
+        }
+
+        throw std::runtime_error("Unexpected function's block or return expression");
     }
 
     if (auto casted = dynamic_cast<const NodeInt32Literal *>(node)) {

@@ -119,6 +119,12 @@ void print_ast(const fog::ASTNode *node, int level = 0) {
         }
     }
 
+    if (auto casted = dynamic_cast<const fog::NodeUnaryOp *>(node)) {
+        std::cout << prefix << "UnaryOp (";
+        std::cout << "op: " << casted->op << ")" << std::endl;
+        print_ast(casted->value.get(), level + 1);
+    }
+    
     if (auto casted = dynamic_cast<const fog::NodeBinaryOp *>(node)) {
         std::cout << prefix << "BinaryOp (";
         std::cout << "op: " << casted->op << ")" << std::endl;
@@ -187,14 +193,16 @@ int main(int argc, char *argv[]) {
     fog::ASTParser ast_parser(tokens);
     std::unique_ptr<fog::NodeBlock> main_block = ast_parser.parse_main();
 
-    // print_ast(main_block.get());
+    print_ast(main_block.get());
 
     fog::Interpreter interpreter;
     interpreter.eval(main_block.get());
 
     std::cout << std::endl;
     for (auto &item : interpreter.global_scope->variables) {
-        std::cout << item.first << " = " << std::get<int32_t>(item.second->value) << std::endl;
+        try {
+            std::cout << item.first << " = " << std::get<int32_t>(item.second->value) << std::endl;
+        } catch (std::exception e) { }
     }
 
     return 0;

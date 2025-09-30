@@ -18,22 +18,22 @@ public:
     std::unique_ptr<NodeBlock> parse_main();
 
 private:
-    const std::unordered_set<TokenType> UNARY_OP = {
-        TokenType::NOT, TokenType::MINUS
+    const std::unordered_map<TokenType, int> UNARY_OP_PRECEDENCE = {
+        {TokenType::NOT,    9}, {TokenType::MINUS,  9}
     };
     
     const std::unordered_map<TokenType, int> BINARY_OP_PRECEDENCE = {
-        {TokenType::EQ,     8}, {TokenType::NEQ,   8},
+        {TokenType::EQ,     8}, {TokenType::NEQ,    8},
         
-        {TokenType::LT,     7}, {TokenType::LTE,   7},
-        {TokenType::GT,     7}, {TokenType::GTE,   7},
+        {TokenType::LT,     7}, {TokenType::LTE,    7},
+        {TokenType::GT,     7}, {TokenType::GTE,    7},
         
         {TokenType::CARET,  6},
         
-        {TokenType::STAR,   5}, {TokenType::SLASH, 5},
-        {TokenType::DIV,    5}, {TokenType::MOD,   5},
+        {TokenType::STAR,   5}, {TokenType::SLASH,  5},
+        {TokenType::DIV,    5}, {TokenType::MOD,    5},
         
-        {TokenType::PLUS,   4}, {TokenType::MINUS, 4},
+        {TokenType::PLUS,   4}, {TokenType::MINUS,  4},
         
         {TokenType::AND,    3},
         {TokenType::XOR,    2},
@@ -51,7 +51,6 @@ private:
 
     std::unique_ptr<NodeExpr> parse_expr(int min_prec = 0);
     std::unique_ptr<NodeExpr> parse_expr_primary();
-    std::unique_ptr<NodeExpr> parse_expr_unary(Token tkn);
     std::unique_ptr<NodeExpr> parse_expr_literal(Token tkn);
 
     std::unique_ptr<NodeType> parse_type();

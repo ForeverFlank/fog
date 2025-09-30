@@ -17,6 +17,7 @@ struct Value {
         float,
         bool,
         std::string,
+        std::shared_ptr<NodeLambda>,
         std::vector<std::unique_ptr<Value>>
     >;
 
@@ -91,13 +92,19 @@ struct MapType : Type {
         : Type{ }, domain{std::move(domain)}, codomain{std::move(codomain)} { }
 };
 
+struct ReturnValue {
+    std::shared_ptr<Value> value;
+
+    ReturnValue(std::shared_ptr<Value> value) : value{value} { };
+};
+
 class Scope {
 public:
     Scope() : parent{nullptr} { }
     Scope(std::shared_ptr<Scope> parent) : parent{parent} { }
 
     void init_var(std::string name, std::shared_ptr<Type> type);
-    
+
     std::shared_ptr<Value> get_var(std::string name);
     void                   set_var(std::string name, std::shared_ptr<Value> value);
 
@@ -124,11 +131,11 @@ public:
 
     Interpreter();
 
-    std::shared_ptr<Value> eval(const ASTNode *node) {
+    std::shared_ptr<ReturnValue> eval(const ASTNode *node) {
         return eval(node, global_scope);
     }
 
-    static std::shared_ptr<Value> eval(const ASTNode *node, std::shared_ptr<Scope> scope);
+    static std::shared_ptr<ReturnValue> eval(const ASTNode *node, std::shared_ptr<Scope> scope);
 
 private:
     static std::shared_ptr<Value> eval_expr(const NodeExpr *node, std::shared_ptr<Scope> scope);
