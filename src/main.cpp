@@ -193,16 +193,20 @@ int main(int argc, char *argv[]) {
     fog::ASTParser ast_parser(tokens);
     std::unique_ptr<fog::NodeBlock> main_block = ast_parser.parse_main();
 
-    print_ast(main_block.get());
+    // print_ast(main_block.get());
 
     fog::Interpreter interpreter;
     interpreter.eval(main_block.get());
 
     std::cout << std::endl;
     for (auto &item : interpreter.global_scope->variables) {
+        std::string val;
         try {
-            std::cout << item.first << " = " << std::get<int32_t>(item.second->value) << std::endl;
-        } catch (std::exception e) { }
+            val = std::to_string(std::get<int32_t>(item.second->value));
+        } catch (std::exception e) {
+            val = "<?>";
+        }
+        std::cout << item.first << " = " << val << std::endl;
     }
 
     return 0;

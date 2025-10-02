@@ -1,5 +1,6 @@
 #include "interpreter.h"
 
+#include <iostream>
 #include <stdexcept>
 
 namespace fog {
@@ -244,6 +245,7 @@ std::shared_ptr<Value> Interpreter::eval_expr(
 
     if (auto casted = dynamic_cast<const NodeLambda *>(node)) {
         auto lambda_ptr = std::shared_ptr<NodeLambda>(const_cast<NodeLambda *>(casted));
+
         return std::make_shared<Value>(
             lambda_ptr,
             scope->get_atomic_type("lambda")
@@ -277,6 +279,7 @@ std::shared_ptr<Value> Interpreter::eval_expr(
 
     }
 
+    
     if (auto casted = dynamic_cast<const NodeFunctionCall *>(node)) {
         auto fn_var = scope->get_var(casted->name);
         auto fn_type = fn_var->type;
@@ -291,23 +294,23 @@ std::shared_ptr<Value> Interpreter::eval_expr(
 
         auto fn = std::get<std::shared_ptr<NodeLambda>>(fn_var->value);
         auto fn_scope = std::make_shared<Scope>(scope);
-
+        
         for (size_t i = 0; i < fn->args.size(); i++) {
             fn_scope->init_var(fn->args[i], arg_types[i]);
             fn_scope->set_var(fn->args[i], eval_expr(casted->args[i].get(), scope));
         }
 
-        if (auto &block_ptr = std::get<std::unique_ptr<NodeBlock>>(fn->body)) {
-            if (block_ptr) {
-                auto res = eval(block_ptr.get(), fn_scope);
+        if (auto block_ptr = std::get_if<std::unique_ptr<NodeBlock>>(&fn->body)) {
+            if (*block_ptr) {
+                auto res = eval(block_ptr->get(), fn_scope);
                 return res->value;
             }
         }
-
-        if (auto &block_ptr = std::get<std::unique_ptr<NodeExpr>>(fn->body)) {
-            if (block_ptr) {
-                auto res = eval(block_ptr.get(), fn_scope);
-                return res->value;
+        
+        if (auto block_ptr = std::get_if<std::unique_ptr<NodeExpr>>(&fn->body)) {
+            if (*block_ptr) {
+                auto res = eval_expr(block_ptr->get(), fn_scope);
+                return res;
             }
         }
 
