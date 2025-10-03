@@ -1,9 +1,12 @@
-let a : int := 1
-let b : int := 2
+let c : int := 1
 
 let f : int -> int
-f := (x) => 3*x + 1
+f := (x) => x + c
 
-let c : int := f(2*a + b)
+let x : int := f(5)
+
+c := 2
+
+let y : int := f(5)
 
 
