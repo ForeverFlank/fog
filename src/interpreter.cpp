@@ -174,7 +174,7 @@ Interpreter::Interpreter() {
         );
     }
     global_scope->set_op({"-", nullptr, float_type},
-        [this, float_type] (std::shared_ptr<Value> a, std::shared_ptr<Value> b) {
+        [this, float_type] (std::shared_ptr<Value>, std::shared_ptr<Value> b) {
             return std::make_shared<Value>(
                 -std::get<float>(b->value),
                 float_type);
@@ -239,13 +239,20 @@ std::shared_ptr<Value> Interpreter::eval_expr(
     const NodeExpr *node,
     std::shared_ptr<Scope> scope
 ) {
+    if (node == nullptr) {
+        throw std::runtime_error("Null expression pointer");
+    }
+
     if (auto casted = dynamic_cast<const NodeVariable *>(node)) {
         return scope->get_var(casted->name);
     }
 
     if (auto casted = dynamic_cast<const NodeLambda *>(node)) {
+        auto cloned = casted->clone().get();
+        auto lambda_ptr = std::shared_ptr<NodeLambda>(const_cast<NodeLambda *>(cloned));
+
         return std::make_shared<Value>(
-            std::move(casted->clone()),
+            lambda_ptr,
             scope->get_atomic_type("lambda")
         );
     }
@@ -291,19 +298,21 @@ std::shared_ptr<Value> Interpreter::eval_expr(
 
         auto fn = std::get<std::shared_ptr<NodeLambda>>(fn_var->value);
         auto fn_scope = std::make_shared<Scope>(scope);
-        
+
         for (size_t i = 0; i < fn->args.size(); i++) {
             fn_scope->init_var(fn->args[i], arg_types[i]);
             fn_scope->set_var(fn->args[i], eval_expr(casted->args[i].get(), scope));
         }
 
         if (std::holds_alternative<std::unique_ptr<NodeBlock>>(fn->body)) {
-            auto res = eval(std::get<std::unique_ptr<NodeBlock>>(fn->body).get(), fn_scope);
+            auto body = std::get<std::unique_ptr<NodeBlock>>(fn->body).get();
+            auto res = eval(body, fn_scope);
             return res->value;
         }
         
         if (std::holds_alternative<std::unique_ptr<NodeExpr>>(fn->body)) {
-            auto res = eval_expr(std::get<std::unique_ptr<NodeExpr>>(fn->body).get(), fn_scope);
+            auto body = std::get<std::unique_ptr<NodeExpr>>(fn->body).get();
+            auto res = eval_expr(body, fn_scope);
             return res;
         }
 
@@ -345,7 +354,7 @@ std::shared_ptr<Value> Interpreter::eval_expr(
         );
     }
 
-    return nullptr;
+    throw std::runtime_error("Unhandled expression node");
 }
 
 }

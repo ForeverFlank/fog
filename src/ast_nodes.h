@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include <iostream>
 
 namespace fog {
 
@@ -137,9 +138,9 @@ struct NodeLambda : NodeExpr {
         BodyVariant cloned;
 
         if (std::holds_alternative<std::unique_ptr<NodeBlock>>(body)) {
-            cloned = std::get<std::unique_ptr<NodeBlock>>(body)->clone();
+            cloned = std::move(std::get<std::unique_ptr<NodeBlock>>(body)->clone());
         } else {
-            cloned = std::get<std::unique_ptr<NodeExpr>>(body)->clone();
+            cloned = std::move(std::get<std::unique_ptr<NodeExpr>>(body)->clone());
         }
 
         return std::make_unique<NodeLambda>(args, std::move(cloned));
