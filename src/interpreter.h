@@ -18,7 +18,7 @@ struct Value {
         bool,
         std::string,
         std::shared_ptr<NodeLambda>,
-        std::vector<std::unique_ptr<Value>>
+        std::vector<std::shared_ptr<Value>>
     >;
 
     ValueType value;

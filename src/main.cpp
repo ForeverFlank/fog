@@ -124,7 +124,7 @@ void print_ast(const fog::ASTNode *node, int level = 0) {
         std::cout << "op: " << casted->op << ")" << std::endl;
         print_ast(casted->value.get(), level + 1);
     }
-    
+
     if (auto casted = dynamic_cast<const fog::NodeBinaryOp *>(node)) {
         std::cout << prefix << "BinaryOp (";
         std::cout << "op: " << casted->op << ")" << std::endl;
@@ -197,16 +197,33 @@ int main(int argc, char *argv[]) {
 
     fog::Interpreter interpreter;
     interpreter.eval(main_block.get());
+    // try { interpreter.eval(main_block.get()); }
+    // catch (...) { }
 
-    std::cout << std::endl;
+    // std::cout << std::endl;
     for (auto &item : interpreter.global_scope->variables) {
-        std::string val;
+        std::string str;
+        
         try {
-            val = std::to_string(std::get<int32_t>(item.second->value));
-        } catch (std::exception e) {
-            val = "<?>";
-        }
-        std::cout << item.first << " = " << val << std::endl;
+            if (item.second == nullptr) {
+                throw std::exception();
+            }
+
+            auto val = std::move(item.second->value);
+
+            str = std::visit([](auto&& arg) -> std::string {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_arithmetic_v<T>) {
+                    return std::to_string(arg);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    return arg;
+                } else {
+                    return "<?>";
+                }
+            }, val);
+        } catch (...) { str = "<?>"; }
+        
+        std::cout << item.first << " = " << str << std::endl;
     }
 
     return 0;

@@ -244,10 +244,8 @@ std::shared_ptr<Value> Interpreter::eval_expr(
     }
 
     if (auto casted = dynamic_cast<const NodeLambda *>(node)) {
-        auto lambda_ptr = std::shared_ptr<NodeLambda>(const_cast<NodeLambda *>(casted));
-
         return std::make_shared<Value>(
-            lambda_ptr,
+            std::move(casted->clone()),
             scope->get_atomic_type("lambda")
         );
     }
@@ -279,7 +277,6 @@ std::shared_ptr<Value> Interpreter::eval_expr(
 
     }
 
-    
     if (auto casted = dynamic_cast<const NodeFunctionCall *>(node)) {
         auto fn_var = scope->get_var(casted->name);
         auto fn_type = fn_var->type;
@@ -300,19 +297,29 @@ std::shared_ptr<Value> Interpreter::eval_expr(
             fn_scope->set_var(fn->args[i], eval_expr(casted->args[i].get(), scope));
         }
 
-        if (auto block_ptr = std::get_if<std::unique_ptr<NodeBlock>>(&fn->body)) {
-            if (*block_ptr) {
-                auto res = eval(block_ptr->get(), fn_scope);
-                return res->value;
-            }
+        if (std::holds_alternative<std::unique_ptr<NodeBlock>>(fn->body)) {
+            auto res = eval(std::get<std::unique_ptr<NodeBlock>>(fn->body).get(), fn_scope);
+            return res->value;
         }
         
-        if (auto block_ptr = std::get_if<std::unique_ptr<NodeExpr>>(&fn->body)) {
-            if (*block_ptr) {
-                auto res = eval_expr(block_ptr->get(), fn_scope);
-                return res;
-            }
+        if (std::holds_alternative<std::unique_ptr<NodeExpr>>(fn->body)) {
+            auto res = eval_expr(std::get<std::unique_ptr<NodeExpr>>(fn->body).get(), fn_scope);
+            return res;
         }
+
+        // if (auto block_ptr = std::get_if<std::unique_ptr<NodeBlock>>(&fn->body)) {
+        //     if (*block_ptr) {
+        //         auto res = eval(block_ptr->get(), fn_scope);
+        //         return res->value;
+        //     }
+        // }
+
+        // if (auto block_ptr = std::get_if<std::unique_ptr<NodeExpr>>(&fn->body)) {
+        //     if (*block_ptr) {
+        //         auto res = eval_expr(block_ptr->get(), fn_scope);
+        //         return res;
+        //     }
+        // }
 
         throw std::runtime_error("Unexpected function's block or return expression");
     }
