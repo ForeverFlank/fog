@@ -114,7 +114,6 @@ public:
     std::shared_ptr<Type> get_atomic_type(std::string name);
     std::shared_ptr<Type> resolve_type(const NodeType *node);
 
-    // private:
     std::shared_ptr<Scope> parent;
 
     std::unordered_map<std::string, std::shared_ptr<Value>> variables;

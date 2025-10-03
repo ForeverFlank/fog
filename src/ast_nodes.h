@@ -9,52 +9,57 @@
 namespace fog {
 
 struct ASTNode {
-    ASTNode() { }
+    ASTNode() = default;
     virtual ~ASTNode() = default;
-    
-    std::unique_ptr<ASTNode> clone() {
-        return std::unique_ptr<ASTNode>();
-    }
+
+    virtual std::unique_ptr<ASTNode> clone() const = 0;
 };
 
+template<typename Derived>
+static std::unique_ptr<Derived> downcast_unique_ptr(std::unique_ptr<ASTNode> p) {
+    return std::unique_ptr<Derived>(static_cast<Derived *>(p.release()));
+}
+
 struct NodeExpr : ASTNode {
-    NodeExpr() { }
-    
-    std::unique_ptr<NodeExpr> clone() {
-        return std::unique_ptr<NodeExpr>();
+    std::unique_ptr<ASTNode> clone() const override {
+        return std::make_unique<NodeExpr>(*this);
     }
 };
 
 struct NodeType : ASTNode {
-    NodeType() { }
-
-    std::unique_ptr<NodeType> clone() {
-        return std::unique_ptr<NodeType>();
+    std::unique_ptr<ASTNode> clone() const override {
+        return std::make_unique<NodeType>(*this);
     }
 };
 
 struct NodeBlock : ASTNode {
     std::vector<std::unique_ptr<ASTNode>> nodes;
 
-    NodeBlock(
-        std::vector<std::unique_ptr<ASTNode>> nodes
-    ) : nodes{std::move(nodes)} { }
-    
-    std::unique_ptr<NodeBlock> clone() {
+    NodeBlock(std::vector<std::unique_ptr<ASTNode>> nodes)
+        : nodes{std::move(nodes)} {}
+
+    std::unique_ptr<ASTNode> clone() const override {
         std::vector<std::unique_ptr<ASTNode>> cloned;
-
-        for (size_t i = 0; i < nodes.size(); i++) {
-            cloned.push_back(nodes[i]->clone());
+        cloned.reserve(nodes.size());
+        for (auto const &n : nodes) {
+            cloned.push_back(n->clone());
         }
-
         return std::make_unique<NodeBlock>(std::move(cloned));
     }
 };
 
 struct NodeMain : NodeBlock {
-    NodeMain(
-        std::vector<std::unique_ptr<ASTNode>> nodes
-    ) : NodeBlock{std::move(nodes)} { }
+    NodeMain(std::vector<std::unique_ptr<ASTNode>> nodes)
+        : NodeBlock{std::move(nodes)} {}
+
+    std::unique_ptr<ASTNode> clone() const override {
+        std::vector<std::unique_ptr<ASTNode>> cloned;
+        cloned.reserve(nodes.size());
+        for (auto const &n : nodes) {
+            cloned.push_back(n->clone());
+        }
+        return std::make_unique<NodeMain>(std::move(cloned));
+    }
 };
 
 struct NodeDeclare : ASTNode {
@@ -68,15 +73,15 @@ struct NodeDeclare : ASTNode {
         std::string var_name,
         std::unique_ptr<NodeType> type,
         std::unique_ptr<NodeExpr> value
-    ) : is_const{is_const}, var_name{var_name},
-        type{std::move(type)}, value{std::move(value)} { }
-    
-    std::unique_ptr<NodeDeclare> clone() {
+    ) : is_const{is_const}, var_name{std::move(var_name)},
+        type{std::move(type)}, value{std::move(value)} {}
+
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeDeclare>(
             is_const,
             var_name,
-            std::move(type->clone()),
-            std::move(value->clone())
+            downcast_unique_ptr<NodeType>(type->clone()),
+            downcast_unique_ptr<NodeExpr>(value->clone())
         );
     }
 };
@@ -85,15 +90,13 @@ struct NodeAssign : ASTNode {
     std::string var_name;
     std::unique_ptr<NodeExpr> value;
 
-    NodeAssign(
-        std::string var_name,
-        std::unique_ptr<NodeExpr> value
-    ) : var_name{var_name}, value{std::move(value)} { }
+    NodeAssign(std::string var_name, std::unique_ptr<NodeExpr> value)
+        : var_name{std::move(var_name)}, value{std::move(value)} {}
 
-    std::unique_ptr<NodeAssign> clone() {
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeAssign>(
             var_name,
-            std::move(value->clone())
+            downcast_unique_ptr<NodeExpr>(value->clone())
         );
     }
 };
@@ -101,21 +104,22 @@ struct NodeAssign : ASTNode {
 struct NodeReturn : ASTNode {
     std::unique_ptr<NodeExpr> value;
 
-    NodeReturn(
-        std::unique_ptr<NodeExpr> value
-    ) : value{std::move(value)} { }
+    NodeReturn(std::unique_ptr<NodeExpr> value)
+        : value{std::move(value)} {}
 
-    std::unique_ptr<NodeReturn> clone() {
-        return std::make_unique<NodeReturn>(std::move(value->clone()));
+    std::unique_ptr<ASTNode> clone() const override {
+        return std::make_unique<NodeReturn>(
+            downcast_unique_ptr<NodeExpr>(value->clone())
+        );
     }
 };
 
 struct NodeVariable : NodeExpr {
     std::string name;
-    
-    NodeVariable(std::string name) : name{name} { }
 
-    std::unique_ptr<NodeVariable> clone() {
+    NodeVariable(std::string name) : name{std::move(name)} {}
+
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeVariable>(name);
     }
 };
@@ -127,22 +131,19 @@ struct NodeLambda : NodeExpr {
         std::unique_ptr<NodeBlock>,
         std::unique_ptr<NodeExpr>
     >;
-
     BodyVariant body;
 
-    NodeLambda(
-        std::vector<std::string> args, BodyVariant body
-    ) : args{args}, body{std::move(body)} { }
+    NodeLambda(std::vector<std::string> args, BodyVariant body)
+        : args{std::move(args)}, body{std::move(body)} {}
 
-    std::unique_ptr<NodeLambda> clone() const {
+    std::unique_ptr<ASTNode> clone() const override {
         BodyVariant cloned;
 
-        if (std::holds_alternative<std::unique_ptr<NodeBlock>>(body)) {
-            cloned = std::move(std::get<std::unique_ptr<NodeBlock>>(body)->clone());
-        } else {
-            cloned = std::move(std::get<std::unique_ptr<NodeExpr>>(body)->clone());
+        if (auto p = std::get_if<std::unique_ptr<NodeBlock>>(&body)) {
+            cloned = downcast_unique_ptr<NodeBlock>((*p)->clone());
+        } else if (auto p = std::get_if<std::unique_ptr<NodeExpr>>(&body)) {
+            cloned = downcast_unique_ptr<NodeExpr>((*p)->clone());
         }
-
         return std::make_unique<NodeLambda>(args, std::move(cloned));
     }
 };
@@ -151,15 +152,13 @@ struct NodeUnaryOp : NodeExpr {
     std::string op;
     std::unique_ptr<NodeExpr> value;
 
-    NodeUnaryOp(
-        std::string op,
-        std::unique_ptr<NodeExpr> value
-    ) : op{op}, value{std::move(value)} { }
+    NodeUnaryOp(std::string op, std::unique_ptr<NodeExpr> value)
+        : op{std::move(op)}, value{std::move(value)} {}
 
-    std::unique_ptr<NodeUnaryOp> clone() {
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeUnaryOp>(
             op,
-            std::move(value->clone())
+            downcast_unique_ptr<NodeExpr>(value->clone())
         );
     }
 };
@@ -169,17 +168,16 @@ struct NodeBinaryOp : NodeExpr {
     std::unique_ptr<NodeExpr> lhs;
     std::unique_ptr<NodeExpr> rhs;
 
-    NodeBinaryOp(
-        std::string op,
-        std::unique_ptr<NodeExpr> lhs,
-        std::unique_ptr<NodeExpr> rhs
-    ) : op{op}, lhs{std::move(lhs)}, rhs{std::move(rhs)} { }
+    NodeBinaryOp(std::string op,
+                 std::unique_ptr<NodeExpr> lhs,
+                 std::unique_ptr<NodeExpr> rhs)
+        : op{std::move(op)}, lhs{std::move(lhs)}, rhs{std::move(rhs)} {}
 
-    std::unique_ptr<NodeBinaryOp> clone() {
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeBinaryOp>(
             op,
-            std::move(lhs->clone()),
-            std::move(rhs->clone())
+            downcast_unique_ptr<NodeExpr>(lhs->clone()),
+            downcast_unique_ptr<NodeExpr>(rhs->clone())
         );
     }
 };
@@ -187,17 +185,15 @@ struct NodeBinaryOp : NodeExpr {
 struct NodeTuple : NodeExpr {
     std::vector<std::unique_ptr<NodeExpr>> elems;
 
-    NodeTuple(
-        std::vector<std::unique_ptr<NodeExpr>> elems
-    ) : elems{std::move(elems)} { }
+    NodeTuple(std::vector<std::unique_ptr<NodeExpr>> elems)
+        : elems{std::move(elems)} {}
 
-    std::unique_ptr<NodeTuple> clone() {
+    std::unique_ptr<ASTNode> clone() const override {
         std::vector<std::unique_ptr<NodeExpr>> cloned;
-
-        for (size_t i = 0; i < elems.size(); i++) {
-            cloned.push_back(std::move(elems[i]->clone()));
+        cloned.reserve(elems.size());
+        for (auto const &e : elems) {
+            cloned.push_back(downcast_unique_ptr<NodeExpr>(e->clone()));
         }
-
         return std::make_unique<NodeTuple>(std::move(cloned));
     }
 };
@@ -206,66 +202,64 @@ struct NodeFunctionCall : NodeExpr {
     std::string name;
     std::vector<std::unique_ptr<NodeExpr>> args;
 
-    NodeFunctionCall(
-        std::string function_name,
-        std::vector<std::unique_ptr<NodeExpr>> args
-    ) : name{function_name}, args{std::move(args)} { }
+    NodeFunctionCall(std::string function_name,
+                     std::vector<std::unique_ptr<NodeExpr>> args)
+        : name{std::move(function_name)}, args{std::move(args)} {}
 
-    std::unique_ptr<NodeFunctionCall> clone() {
+    std::unique_ptr<ASTNode> clone() const override {
         std::vector<std::unique_ptr<NodeExpr>> cloned;
-
-        for (size_t i = 0; i < args.size(); i++) {
-            cloned.push_back(std::move(args[i]->clone()));
+        cloned.reserve(args.size());
+        for (auto const &a : args) {
+            cloned.push_back(downcast_unique_ptr<NodeExpr>(a->clone()));
         }
-
         return std::make_unique<NodeFunctionCall>(name, std::move(cloned));
     }
 };
 
 struct NodeInt32Literal : NodeExpr {
     int32_t value;
-
-    NodeInt32Literal(int32_t value) : value{value} { }
-
-    std::unique_ptr<NodeInt32Literal> clone() {
+    NodeInt32Literal(int32_t value) : value{value} {}
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeInt32Literal>(value);
     }
 };
 
 struct NodeFloatLiteral : NodeExpr {
     float value;
-
-    NodeFloatLiteral(float value) : value{value} { }
-
-    std::unique_ptr<NodeFloatLiteral> clone() {
+    NodeFloatLiteral(float value) : value{value} {}
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeFloatLiteral>(value);
     }
 };
 
 struct NodeBoolLiteral : NodeExpr {
     bool value;
-
-    NodeBoolLiteral(bool value) : value{value} { }
-
-    std::unique_ptr<NodeBoolLiteral> clone() {
+    NodeBoolLiteral(bool value) : value{value} {}
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeBoolLiteral>(value);
     }
 };
 
 struct NodeCharLiteral : NodeExpr {
     char value;
+    NodeCharLiteral(char value) : value{value} {}
+    std::unique_ptr<ASTNode> clone() const override {
+        return std::make_unique<NodeCharLiteral>(value);
+    }
 };
 
 struct NodeStringLiteral : NodeExpr {
     std::string value;
+    NodeStringLiteral(std::string value) : value{std::move(value)} {}
+    std::unique_ptr<ASTNode> clone() const override {
+        return std::make_unique<NodeStringLiteral>(value);
+    }
 };
 
 struct NodeAtomicType : NodeType {
     std::string name;
-
-    NodeAtomicType(std::string name) : name{name} { }
-
-    std::unique_ptr<NodeAtomicType> clone() {
+    NodeAtomicType(std::string name) : name{std::move(name)} {}
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeAtomicType>(name);
     }
 };
@@ -273,17 +267,15 @@ struct NodeAtomicType : NodeType {
 struct NodeSumType : NodeType {
     std::vector<std::unique_ptr<NodeType>> types;
 
-    NodeSumType(
-        std::vector<std::unique_ptr<NodeType>> types
-    ) : types{std::move(types)} { }
+    NodeSumType(std::vector<std::unique_ptr<NodeType>> types)
+        : types{std::move(types)} {}
 
-    std::unique_ptr<NodeSumType> clone() {
+    std::unique_ptr<ASTNode> clone() const override {
         std::vector<std::unique_ptr<NodeType>> cloned;
-
-        for (size_t i = 0; i < types.size(); i++) {
-            cloned.push_back(std::move(types[i]->clone()));
+        cloned.reserve(types.size());
+        for (auto const &t : types) {
+            cloned.push_back(downcast_unique_ptr<NodeType>(t->clone()));
         }
-
         return std::make_unique<NodeSumType>(std::move(cloned));
     }
 };
@@ -291,17 +283,15 @@ struct NodeSumType : NodeType {
 struct NodeProductType : NodeType {
     std::vector<std::unique_ptr<NodeType>> types;
 
-    NodeProductType(
-        std::vector<std::unique_ptr<NodeType>> types
-    ) : types{std::move(types)} { }
+    NodeProductType(std::vector<std::unique_ptr<NodeType>> types)
+        : types{std::move(types)} {}
 
-    std::unique_ptr<NodeProductType> clone() {
+    std::unique_ptr<ASTNode> clone() const override {
         std::vector<std::unique_ptr<NodeType>> cloned;
-
-        for (size_t i = 0; i < types.size(); i++) {
-            cloned.push_back(std::move(types[i]->clone()));
+        cloned.reserve(types.size());
+        for (auto const &t : types) {
+            cloned.push_back(downcast_unique_ptr<NodeType>(t->clone()));
         }
-
         return std::make_unique<NodeProductType>(std::move(cloned));
     }
 };
@@ -310,18 +300,16 @@ struct NodeMapType : NodeType {
     std::unique_ptr<NodeType> domain;
     std::unique_ptr<NodeType> codomain;
 
-    NodeMapType(
-        std::unique_ptr<NodeType> domain,
-        std::unique_ptr<NodeType> codomain
-    ) : domain{std::move(domain)},
-        codomain{std::move(codomain)} { }
-    
-    std::unique_ptr<NodeMapType> clone() {
+    NodeMapType(std::unique_ptr<NodeType> domain,
+                std::unique_ptr<NodeType> codomain)
+        : domain{std::move(domain)}, codomain{std::move(codomain)} {}
+
+    std::unique_ptr<ASTNode> clone() const override {
         return std::make_unique<NodeMapType>(
-            std::move(domain->clone()),
-            std::move(codomain->clone())
+            downcast_unique_ptr<NodeType>(domain->clone()),
+            downcast_unique_ptr<NodeType>(codomain->clone())
         );
     }
 };
 
-}  // namespace fog
+} // namespace fog

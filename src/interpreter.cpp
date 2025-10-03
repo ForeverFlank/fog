@@ -248,11 +248,12 @@ std::shared_ptr<Value> Interpreter::eval_expr(
     }
 
     if (auto casted = dynamic_cast<const NodeLambda *>(node)) {
-        auto cloned = casted->clone().get();
-        auto lambda_ptr = std::shared_ptr<NodeLambda>(const_cast<NodeLambda *>(cloned));
+        auto lambda_ptr = std::unique_ptr<NodeLambda>(
+            static_cast<NodeLambda *>(casted->clone().release())
+        );
 
         return std::make_shared<Value>(
-            lambda_ptr,
+            std::move(lambda_ptr),
             scope->get_atomic_type("lambda")
         );
     }
@@ -309,7 +310,7 @@ std::shared_ptr<Value> Interpreter::eval_expr(
             auto res = eval(body, fn_scope);
             return res->value;
         }
-        
+
         if (std::holds_alternative<std::unique_ptr<NodeExpr>>(fn->body)) {
             auto body = std::get<std::unique_ptr<NodeExpr>>(fn->body).get();
             auto res = eval_expr(body, fn_scope);
