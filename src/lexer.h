@@ -6,9 +6,11 @@
 #include <string>
 #include <vector>
 
-namespace fog {
+namespace fog
+{
 
-enum class TokenType {
+enum class TokenType
+{
     TERMINATOR, ASSIGN,
     LBRACE, RBRACE,
     LPAREN, RPAREN,
@@ -34,16 +36,19 @@ enum class TokenType {
 };
 
 
-struct Token {
+struct Token
+{
     TokenType type;
     std::string value;
     size_t pos;
 
     Token(TokenType type, std::string value, size_t pos)
-        : type{type}, value{value}, pos{pos} { };
+        : type{type}, value{value}, pos{pos}
+    { };
 };
 
-class Lexer {
+class Lexer
+{
 public:
     Lexer(std::string source) : source{source} { };
     std::vector<Token> tokenize();
@@ -57,7 +62,8 @@ private:
     void next() { pos++; }
     char peek() { return source[pos]; }
 
-    bool is_comment() {
+    bool is_comment()
+    {
         return
             pos + 1 < source.size() &&
             source[pos] == '/' &&

@@ -3,21 +3,24 @@
 #include "ast_nodes.h"
 
 #include <functional>
-#include <unordered_map>
 #include <utility>
 #include <variant>
+#include <unordered_map>
+#include <unordered_set>
 
-namespace fog {
+namespace fog
+{
 
 struct Type;
 
-struct Value {
+struct Value
+{
     using ValueType = std::variant<
         int32_t,
         float,
         bool,
         std::string,
-        std::shared_ptr<NodeLambda>,
+        std::shared_ptr<LambdaValue>,
         std::vector<std::shared_ptr<Value>>
     >;
 
@@ -27,16 +30,27 @@ struct Value {
     Value() = default;
     Value(
         std::shared_ptr<Type> type
-    ) : type{type} { };
+    ) : type{type}
+    { };
     Value(
         ValueType value,
         std::shared_ptr<Type> type
-    ) : value{std::move(value)}, type{type} { };
+    ) : value{std::move(value)}, type{type}
+    { };
 
     virtual ~Value() = default;
 };
 
-struct Type : virtual Value {
+struct LambdaValue : Value
+{
+    std::shared_ptr<NodeLambda> lambda_ast;
+    std::unordered_map<std::string, std::shared_ptr<Value>> captures;
+
+    LambdaValue() { }
+};
+
+struct Type : virtual Value
+{
     Type() { }
 };
 
@@ -50,8 +64,10 @@ using BinaryOpFunction = std::function<
     std::shared_ptr<Value>(std::shared_ptr<Value>, std::shared_ptr<Value>)
 >;
 
-struct BinaryOpKeyHash {
-    size_t operator()(const BinaryOpKey &key) const {
+struct BinaryOpKeyHash
+{
+    size_t operator()(const BinaryOpKey &key) const
+    {
         return
             std::hash<std::string>()(std::get<0>(key)) ^
             std::hash<Type *>()(std::get<1>(key).get()) ^
@@ -59,46 +75,56 @@ struct BinaryOpKeyHash {
     }
 };
 
-struct PrimitiveType : Type {
+struct PrimitiveType : Type
+{
     std::string name;
 
     PrimitiveType(std::string name) : name{name} { }
     PrimitiveType(std::string name, std::shared_ptr<Type> type)
-        : Value(type), name{name} { }
+        : Value(type), name{name}
+    { }
 };
 
-struct ProductType : Type {
+struct ProductType : Type
+{
     std::vector<std::shared_ptr<Type>> types;
 
     ProductType() = default;
     ProductType(std::vector<std::shared_ptr<Type>> types)
-        : Type{ }, types{std::move(types)} { }
+        : Type{ }, types{std::move(types)}
+    { }
 };
 
-struct SumType : Type {
+struct SumType : Type
+{
     std::vector<std::shared_ptr<Type>> types;
 
     SumType() = default;
     SumType(std::vector<std::shared_ptr<Type>> types)
-        : Type{ }, types{std::move(types)} { }
+        : Type{ }, types{std::move(types)}
+    { }
 };
 
-struct MapType : Type {
+struct MapType : Type
+{
     std::shared_ptr<Type> domain;
     std::shared_ptr<Type> codomain;
 
     MapType() = default;
     MapType(std::shared_ptr<Type> domain, std::shared_ptr<Type> codomain)
-        : Type{ }, domain{std::move(domain)}, codomain{std::move(codomain)} { }
+        : Type{ }, domain{std::move(domain)}, codomain{std::move(codomain)}
+    { }
 };
 
-struct ReturnValue {
+struct ReturnValue
+{
     std::shared_ptr<Value> value;
 
     ReturnValue(std::shared_ptr<Value> value) : value{value} { };
 };
 
-class Scope {
+class Scope
+{
 public:
     Scope() : parent{nullptr} { }
     Scope(std::shared_ptr<Scope> parent) : parent{parent} { }
@@ -124,13 +150,15 @@ public:
     > operators;
 };
 
-class Interpreter {
+class Interpreter
+{
 public:
     std::shared_ptr<Scope> global_scope;
 
     Interpreter();
 
-    std::shared_ptr<ReturnValue> eval(const ASTNode *node) {
+    std::shared_ptr<ReturnValue> eval(const ASTNode *node)
+    {
         return eval(node, global_scope);
     }
 
@@ -138,6 +166,11 @@ public:
 
 private:
     static std::shared_ptr<Value> eval_expr(const NodeExpr *node, std::shared_ptr<Scope> scope);
+    static void capture_lambda(
+        const ASTNode *node,
+        std::unordered_set<std::string> &args,
+        std::shared_ptr<Scope> scope
+    );
 };
 
 }  // namespace fog

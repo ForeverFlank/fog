@@ -10,9 +10,11 @@
 #include "ast_nodes.h"
 #include "lexer.h"
 
-namespace fog {
+namespace fog
+{
 
-class ASTParser {
+class ASTParser
+{
 public:
     ASTParser(std::vector<Token> tokens) : tokens{std::move(tokens)} { }
     std::unique_ptr<NodeBlock> parse_main();
@@ -21,20 +23,20 @@ private:
     const std::unordered_map<TokenType, int> UNARY_OP_PRECEDENCE = {
         {TokenType::NOT,    9}, {TokenType::MINUS,  9}
     };
-    
+
     const std::unordered_map<TokenType, int> BINARY_OP_PRECEDENCE = {
         {TokenType::EQ,     8}, {TokenType::NEQ,    8},
-        
+
         {TokenType::LT,     7}, {TokenType::LTE,    7},
         {TokenType::GT,     7}, {TokenType::GTE,    7},
-        
+
         {TokenType::CARET,  6},
-        
+
         {TokenType::STAR,   5}, {TokenType::SLASH,  5},
         {TokenType::DIV,    5}, {TokenType::MOD,    5},
-        
+
         {TokenType::PLUS,   4}, {TokenType::MINUS,  4},
-        
+
         {TokenType::AND,    3},
         {TokenType::XOR,    2},
         {TokenType::OR,     1},
@@ -64,16 +66,20 @@ private:
     void next() { pos++; }
     bool match(TokenType type) { return type == peek().type; }
 
-    Token peek() {
-        if (pos >= tokens.size()) {
+    Token peek()
+    {
+        if (pos >= tokens.size())
+        {
             throw std::runtime_error("Unexpected EOF");
         }
         return tokens[pos];
     }
 
-    Token expect(TokenType type, std::string err_msg) {
+    Token expect(TokenType type, std::string err_msg)
+    {
         Token tkn = peek();
-        if (tkn.type != type) {
+        if (tkn.type != type)
+        {
             throw std::runtime_error(err_msg.c_str());
         }
         return tkn;

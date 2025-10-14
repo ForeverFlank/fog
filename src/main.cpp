@@ -48,8 +48,10 @@ const std::map<fog::TokenType, std::string> TOKEN_TYPE_NAMES = {
     { fog::TokenType::GTE,          "GTE"        }
 };
 
-void print_tokens(std::vector<fog::Token> &tokens) {
-    for (size_t i = 0; i < tokens.size(); i++) {
+void print_tokens(std::vector<fog::Token> &tokens)
+{
+    for (size_t i = 0; i < tokens.size(); i++)
+    {
         std::cout
             << std::setw(4) << i
             << std::setw(12) << TOKEN_TYPE_NAMES.at(tokens[i].type) << " | "
@@ -58,114 +60,140 @@ void print_tokens(std::vector<fog::Token> &tokens) {
     std::cout << std::endl;
 }
 
-void print_ast(const fog::ASTNode *node, int level = 0) {
+void print_ast(const fog::ASTNode *node, int level = 0)
+{
     if (!node) return;
 
     std::string prefix;
-    for (int i = 0; i < level; i++) {
+    for (int i = 0; i < level; i++)
+    {
         prefix += "  ";
     }
-    if (level > 0) {
+    if (level > 0)
+    {
         prefix[2 * level - 2] = '-';
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeBlock *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeBlock *>(node))
+    {
         std::cout << prefix << "Block" << std::endl;
-        for (auto &child : casted->nodes) {
+        for (auto &child : casted->nodes)
+        {
             print_ast(child.get(), level + 1);
         }
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeDeclare *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeDeclare *>(node))
+    {
         std::cout << prefix << "Declare (";
         std::cout << "is_const: " << casted->is_const << ", ";
         std::cout << "var_name: " << casted->var_name << ")" << std::endl;
         print_ast(casted->type.get(), level + 1);
-        if (casted->value != nullptr) {
+        if (casted->value != nullptr)
+        {
             print_ast(casted->value.get(), level + 1);
         }
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeAssign *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeAssign *>(node))
+    {
         std::cout << prefix << "Assign (";
         std::cout << "var_name: " << casted->var_name << ")" << std::endl;
         print_ast(casted->value.get(), level + 1);
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeReturn *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeReturn *>(node))
+    {
         std::cout << prefix << "Return" << std::endl;
         print_ast(casted->value.get(), level + 1);
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeVariable *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeVariable *>(node))
+    {
         std::cout << prefix << "Variable (";
         std::cout << "name: " << casted->name << ")" << std::endl;
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeLambda *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeLambda *>(node))
+    {
         std::cout << prefix << "Lambda (";
         std::cout << "args: [";
         bool b = false;
-        for (auto &arg : casted->args) {
+        for (auto &arg : casted->args)
+        {
             if (b) std::cout << ", ";
             std::cout << arg;
             b = true;
         }
         std::cout << "])" << std::endl;
-        if (casted->body.index() == 0) {
+        if (casted->body.index() == 0)
+        {
             print_ast(std::get<0>(casted->body).get(), level + 1);
-        } else if (casted->body.index() == 1) {
+        }
+        else if (casted->body.index() == 1)
+        {
             print_ast(std::get<1>(casted->body).get(), level + 1);
         }
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeUnaryOp *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeUnaryOp *>(node))
+    {
         std::cout << prefix << "UnaryOp (";
         std::cout << "op: " << casted->op << ")" << std::endl;
         print_ast(casted->value.get(), level + 1);
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeBinaryOp *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeBinaryOp *>(node))
+    {
         std::cout << prefix << "BinaryOp (";
         std::cout << "op: " << casted->op << ")" << std::endl;
         print_ast(casted->lhs.get(), level + 1);
         print_ast(casted->rhs.get(), level + 1);
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeFunctionCall *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeFunctionCall *>(node))
+    {
         std::cout << prefix << "FunctionCall (";
         std::cout << "name: " << casted->name << ")" << std::endl;
-        for (auto &child : casted->args) {
+        for (auto &child : casted->args)
+        {
             print_ast(child.get(), level + 1);
         }
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeInt32Literal *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeInt32Literal *>(node))
+    {
         std::cout << prefix << "Int32Literal (";
         std::cout << "value: " << casted->value << ")" << std::endl;
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeAtomicType *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeAtomicType *>(node))
+    {
         std::cout << prefix << "AtomicType (";
         std::cout << "name: " << casted->name << ")" << std::endl;
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeProductType *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeProductType *>(node))
+    {
         std::cout << prefix << "TupleType" << std::endl;
-        for (auto &child : casted->types) {
+        for (auto &child : casted->types)
+        {
             print_ast(child.get(), level + 1);
         }
     }
 
-    if (auto casted = dynamic_cast<const fog::NodeMapType *>(node)) {
+    if (auto casted = dynamic_cast<const fog::NodeMapType *>(node))
+    {
         std::cout << prefix << "MapType" << std::endl;
         print_ast(casted->domain.get(), level + 1);
         print_ast(casted->codomain.get(), level + 1);
     }
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
+int main(int argc, char *argv[])
+{
+    if (argc < 2)
+    {
         std::cerr << "Usage: " << argv[0] << " <file-path>\n";
         return 1;
     }
@@ -173,7 +201,8 @@ int main(int argc, char *argv[]) {
     const char *path = argv[1];
 
     std::ifstream file(path);
-    if (!file) {
+    if (!file)
+    {
         std::cerr << "Failed to open file: " << path << "\n";
         return 1;
     }
@@ -201,28 +230,37 @@ int main(int argc, char *argv[]) {
     // catch (...) { }
 
     // std::cout << std::endl;
-    for (auto &item : interpreter.global_scope->variables) {
+    for (auto &item : interpreter.global_scope->variables)
+    {
         std::string str;
-        
-        try {
-            if (item.second == nullptr) {
+
+        try
+        {
+            if (item.second == nullptr)
+            {
                 throw std::exception();
             }
 
             auto val = std::move(item.second->value);
 
-            str = std::visit([](auto&& arg) -> std::string {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_arithmetic_v<T>) {
-                    return std::to_string(arg);
-                } else if constexpr (std::is_same_v<T, std::string>) {
-                    return arg;
-                } else {
-                    return "<?>";
-                }
-            }, val);
+            str = std::visit([] (auto &&arg) -> std::string
+                {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_arithmetic_v<T>)
+                    {
+                        return std::to_string(arg);
+                    }
+                    else if constexpr (std::is_same_v<T, std::string>)
+                    {
+                        return arg;
+                    }
+                    else
+                    {
+                        return "<?>";
+                    }
+                }, val);
         } catch (...) { str = "<?>"; }
-        
+
         std::cout << item.first << " = " << str << std::endl;
     }
 

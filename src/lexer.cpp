@@ -4,28 +4,33 @@
 #include <optional>
 #include <stdexcept>
 
-namespace fog {
+namespace fog
+{
 
-Token Lexer::parse_word() {
+Token Lexer::parse_word()
+{
     size_t begin = pos;
     std::string word;
 
     char c = peek();
-    while (isalnum(c) || c == '_') {
+    while (isalnum(c) || c == '_')
+    {
         word += c;
         next();
         c = peek();
     }
 
     auto it = KEYWORD_TOKENS.find(word);
-    if (it != KEYWORD_TOKENS.end()) {
+    if (it != KEYWORD_TOKENS.end())
+    {
         return Token(it->second, word, begin);
     }
 
     return Token(TokenType::IDENTIFIER, word, begin);
 }
 
-Token Lexer::parse_number() {
+Token Lexer::parse_number()
+{
     size_t begin = pos;
     std::string num;
 
@@ -33,18 +38,23 @@ Token Lexer::parse_number() {
     // bool float64 = false;
 
     char c = peek();
-    while (isdigit(c) || c == '.') {
+    while (isdigit(c) || c == '.')
+    {
         num += c;
         next();
         c = peek();
 
-        if (c != '.') {
+        if (c != '.')
+        {
             continue;
         }
 
-        if (!decimal) {
+        if (!decimal)
+        {
             decimal = true;
-        } else {
+        }
+        else
+        {
             throw std::runtime_error(
                 "(" + std::to_string(pos) +
                 ") Invalid number format: multiple decimal points");
@@ -56,21 +66,24 @@ Token Lexer::parse_number() {
     //     Get();
     // }
 
-    if (decimal) {
+    if (decimal)
+    {
         return Token(TokenType::FLOAT, num, begin);
     }
 
     return Token(TokenType::INT, num, begin);
 }
 
-std::optional<Token> Lexer::parse_two_char_symbol() {
+std::optional<Token> Lexer::parse_two_char_symbol()
+{
     if (pos + 1 >= source.size()) return { };
 
     size_t begin = pos;
     std::string sym = source.substr(pos, 2);
 
     auto it = TWO_CHAR_TOKENS.find(sym);
-    if (it != TWO_CHAR_TOKENS.end()) {
+    if (it != TWO_CHAR_TOKENS.end())
+    {
         next();
         next();
         return Token(it->second, sym, begin);
@@ -79,12 +92,14 @@ std::optional<Token> Lexer::parse_two_char_symbol() {
     return { };
 }
 
-std::optional<Token> Lexer::parse_one_char_symbol() {
+std::optional<Token> Lexer::parse_one_char_symbol()
+{
     size_t begin = pos;
     char c = peek();
 
     auto it = ONE_CHAR_TOKENS.find(c);
-    if (it != ONE_CHAR_TOKENS.end()) {
+    if (it != ONE_CHAR_TOKENS.end())
+    {
         next();
         return Token(it->second, std::string(1, c), begin);
     }
@@ -92,7 +107,8 @@ std::optional<Token> Lexer::parse_one_char_symbol() {
     return { };
 }
 
-std::vector<Token> Lexer::tokenize() {
+std::vector<Token> Lexer::tokenize()
+{
     pos = 0;
     brace_depth = 0;
     paren_depth = 0;
@@ -101,7 +117,8 @@ std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
 
     char c;
-    while (pos < len) {
+    while (pos < len)
+    {
         c = peek();
 
         if (paren_depth < 0)
@@ -109,19 +126,23 @@ std::vector<Token> Lexer::tokenize() {
         if (brace_depth < 0)
             throw std::runtime_error("Braces depth cannot be negative");
 
-        if (c == ' ') {
+        if (c == ' ')
+        {
             next();
             continue;
         }
-        if (is_comment()) {
+        if (is_comment())
+        {
             while (pos < len && peek() != '\n') next();
             continue;
         }
-        if (isalpha(c) || c == '_') {
+        if (isalpha(c) || c == '_')
+        {
             tokens.push_back(parse_word());
             continue;
         }
-        if (isdigit(c)) {
+        if (isdigit(c))
+        {
             tokens.push_back(parse_number());
             continue;
         }
@@ -129,16 +150,19 @@ std::vector<Token> Lexer::tokenize() {
         std::optional<Token> res;
 
         res = parse_two_char_symbol();
-        if (res.has_value()) {
+        if (res.has_value())
+        {
             tokens.push_back(res.value());
             continue;
         }
 
         res = parse_one_char_symbol();
-        if (res.has_value()) {
+        if (res.has_value())
+        {
             tokens.push_back(res.value());
 
-            switch (res.value().type) {
+            switch (res.value().type)
+            {
             case TokenType::LBRACE:
                 brace_depth++;
                 break;
@@ -159,7 +183,8 @@ std::vector<Token> Lexer::tokenize() {
 
         if (c == '\n' && paren_depth == 0 &&
             !CONTINUATION_TOKENS.contains(tokens.back().type)
-            ) {
+            )
+        {
             tokens.push_back(Token(TokenType::TERMINATOR, "", pos));
             next();
             continue;
@@ -168,7 +193,8 @@ std::vector<Token> Lexer::tokenize() {
         next();
     }
 
-    if (tokens.back().type != TokenType::TERMINATOR) {
+    if (tokens.back().type != TokenType::TERMINATOR)
+    {
         tokens.push_back(Token(TokenType::TERMINATOR, "", pos));
     }
 
