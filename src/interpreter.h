@@ -13,6 +13,8 @@ namespace fog
 
 struct Type;
 
+struct LambdaValue;
+
 struct Value
 {
     using ValueType = std::variant<
@@ -46,8 +48,19 @@ struct LambdaValue : Value
     std::shared_ptr<NodeLambda> lambda_ast;
     std::unordered_map<std::string, std::shared_ptr<Value>> captures;
 
-    LambdaValue() { }
+    LambdaValue(
+        std::shared_ptr<NodeLambda> lambda_ast
+    ) : lambda_ast{std::move(lambda_ast)}
+    { }
 };
+
+// struct BuiltinFunction : Value
+// {
+//     // std::shared_ptr<NodeLambda> lambda_ast;
+//     // std::unordered_map<std::string, std::shared_ptr<Value>> captures;
+
+//     BuiltinFunction() { }
+// };
 
 struct Type : virtual Value
 {

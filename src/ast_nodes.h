@@ -15,6 +15,8 @@ struct ASTNode
     virtual ~ASTNode() = default;
 
     virtual std::unique_ptr<ASTNode> clone() const = 0;
+
+    virtual bool is_expression() const { return false; }
 };
 
 template<typename Derived>
@@ -29,6 +31,10 @@ struct NodeExpr : ASTNode
     {
         return std::make_unique<NodeExpr>(*this);
     }
+
+    virtual void collect_used_variables(std::vector<std::string> &out) const { };
+
+    bool is_expression() const override { return true; }
 };
 
 struct NodeType : ASTNode
@@ -51,11 +57,22 @@ struct NodeBlock : ASTNode
     {
         std::vector<std::unique_ptr<ASTNode>> cloned;
         cloned.reserve(nodes.size());
-        for (auto const &n : nodes)
+        for (auto const &node : nodes)
         {
-            cloned.push_back(n->clone());
+            cloned.push_back(node->clone());
         }
         return std::make_unique<NodeBlock>(std::move(cloned));
+    }
+
+    void collect_used_variables(std::vector<std::string> &out)
+    {
+        for (auto const &node : nodes)
+        {
+            if (auto expr = dynamic_cast<NodeExpr *>(node.get()))
+            {
+                expr->collect_used_variables(out);
+            }
+        }
     }
 };
 
@@ -69,9 +86,9 @@ struct NodeMain : NodeBlock
     {
         std::vector<std::unique_ptr<ASTNode>> cloned;
         cloned.reserve(nodes.size());
-        for (auto const &n : nodes)
+        for (auto const &node : nodes)
         {
-            cloned.push_back(n->clone());
+            cloned.push_back(node->clone());
         }
         return std::make_unique<NodeMain>(std::move(cloned));
     }
@@ -148,6 +165,11 @@ struct NodeVariable : NodeExpr
     {
         return std::make_unique<NodeVariable>(name);
     }
+
+    void collect_used_variables(std::vector<std::string> &out) const override
+    {
+        out.push_back(name);
+    }
 };
 
 struct NodeLambda : NodeExpr
@@ -178,6 +200,18 @@ struct NodeLambda : NodeExpr
         }
         return std::make_unique<NodeLambda>(args, std::move(cloned));
     }
+
+    void collect_used_variables(std::vector<std::string> &out)
+    {
+        if (std::holds_alternative<std::unique_ptr<NodeBlock>>(body))
+        {
+            std::get<std::unique_ptr<NodeBlock>>(body)->collect_used_variables(out);
+        }
+        else if (std::holds_alternative<std::unique_ptr<NodeExpr>>(body))
+        {
+            std::get<std::unique_ptr<NodeExpr>>(body)->collect_used_variables(out);
+        }
+    }
 };
 
 struct NodeUnaryOp : NodeExpr
@@ -195,6 +229,11 @@ struct NodeUnaryOp : NodeExpr
             op,
             downcast_unique_ptr<NodeExpr>(value->clone())
         );
+    }
+
+    void collect_used_variables(std::vector<std::string> &out) const override
+    {
+        value->collect_used_variables(out);
     }
 };
 
@@ -218,6 +257,12 @@ struct NodeBinaryOp : NodeExpr
             downcast_unique_ptr<NodeExpr>(rhs->clone())
         );
     }
+
+    void collect_used_variables(std::vector<std::string> &out) const override
+    {
+        lhs->collect_used_variables(out);
+        rhs->collect_used_variables(out);
+    }
 };
 
 struct NodeTuple : NodeExpr
@@ -237,6 +282,14 @@ struct NodeTuple : NodeExpr
             cloned.push_back(downcast_unique_ptr<NodeExpr>(e->clone()));
         }
         return std::make_unique<NodeTuple>(std::move(cloned));
+    }
+
+    void collect_used_variables(std::vector<std::string> &out) const override
+    {
+        for (auto const &elem : elems)
+        {
+            elem->collect_used_variables(out);
+        }
     }
 };
 

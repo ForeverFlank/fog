@@ -4,9 +4,9 @@ let f : int -> int
 f := (x) => x + c
 
 let x : int := f(5)
+// f(5) = 5 + 1 = 6
 
 c := 2
 
 let y : int := f(5)
-
-
+// f(5) = 5 + 2 = 7

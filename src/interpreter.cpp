@@ -1,6 +1,6 @@
 #include "interpreter.h"
 
-#include <iostream>
+#include <algorithm>
 #include <stdexcept>
 
 namespace fog
@@ -208,6 +208,8 @@ Interpreter::Interpreter()
                 float_type);
         }
     );
+
+    // global_scope->set_var("print", std::make_shared<Value>());
 }
 
 std::shared_ptr<ReturnValue> Interpreter::eval(
@@ -297,11 +299,22 @@ std::shared_ptr<Value> Interpreter::eval_expr(
             static_cast<NodeLambda *>(casted->clone().release())
         );
 
-        LambdaValue lambda_value;
-        lambda_value.lambda_ast = lambda_ptr;
+        auto lambda_value = std::make_shared<LambdaValue>(lambda_ptr);
+
+        std::vector<std::string> used_vars;
+        lambda_ptr->collect_used_variables(used_vars);
+        auto args = lambda_ptr->args;
+        for (auto var : used_vars)
+        {
+            if (std::find(args.begin(), args.end(), var) == args.end())
+            {
+                continue;
+            }
+            lambda_value->captures[var] = scope->get_var(var);
+        }
 
         return std::make_shared<Value>(
-            std::move(lambda_value),
+            lambda_value,
             scope->get_atomic_type("lambda")
         );
     }
