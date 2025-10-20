@@ -25,7 +25,7 @@ std::shared_ptr<Value> Scope::get_var(std::string name)
     {
         return parent->get_var(name);
     }
-    throw std::runtime_error("Undefined variable: " + name);
+    throw std::runtime_error("get_var: undefined variable: " + name);
 }
 
 void Scope::set_var(std::string name, std::shared_ptr<Value> value)
@@ -35,7 +35,7 @@ void Scope::set_var(std::string name, std::shared_ptr<Value> value)
         variables[name] = value;
         return;
     }
-    throw std::runtime_error("Undefined variable: " + name);
+    throw std::runtime_error("set_var: undefined variable: " + name);
 }
 
 BinaryOpFunction Scope::get_op(BinaryOpKey key)
@@ -306,7 +306,7 @@ std::shared_ptr<Value> Interpreter::eval_expr(
         auto args = lambda_ptr->args;
         for (auto var : used_vars)
         {
-            if (std::find(args.begin(), args.end(), var) == args.end())
+            if (std::find(args.begin(), args.end(), var) != args.end())
             {
                 continue;
             }
