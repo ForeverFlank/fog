@@ -32,7 +32,7 @@ struct NodeExpr : ASTNode
         return std::make_unique<NodeExpr>(*this);
     }
 
-    virtual void collect_used_variables(std::vector<std::string> &out) const { };
+    virtual void collect_used_variables(std::vector<std::string> &) const { };
 
     bool is_expression() const override { return true; }
 };

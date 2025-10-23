@@ -174,7 +174,7 @@ Interpreter::Interpreter()
         make_int_op([] (int32_t a, int32_t b) { return a % b; })
     );
     global_scope->set_op({"-", nullptr, int_type},
-        [this, int_type] (std::shared_ptr<Value> a, std::shared_ptr<Value> b)
+        [this, int_type] (std::shared_ptr<Value>, std::shared_ptr<Value> b)
         {
             return std::make_shared<Value>(
                 -std::get<int32_t>(b->value),
@@ -365,25 +365,34 @@ std::shared_ptr<Value> Interpreter::eval_expr(
             arg_types.push_back(fn_type);
         }
 
-        auto fn = std::get<std::shared_ptr<LambdaValue>>(fn_var->value)->lambda_ast;
+        auto lambda = std::get<std::shared_ptr<LambdaValue>>(fn_var->value);
+        auto lambda_node = lambda->lambda_ast;
         auto fn_scope = std::make_shared<Scope>(scope);
 
-        for (size_t i = 0; i < fn->args.size(); i++)
+        for (size_t i = 0; i < lambda_node->args.size(); i++)
         {
-            fn_scope->init_var(fn->args[i], arg_types[i]);
-            fn_scope->set_var(fn->args[i], eval_expr(casted->args[i].get(), scope));
+            fn_scope->init_var(lambda_node->args[i], arg_types[i]);
+
+            auto arg_val = eval_expr(casted->args[i].get(), scope);
+            fn_scope->set_var(lambda_node->args[i], arg_val);
         }
 
-        if (std::holds_alternative<std::unique_ptr<NodeBlock>>(fn->body))
+        for (auto var : lambda->captures)
         {
-            auto body = std::get<std::unique_ptr<NodeBlock>>(fn->body).get();
+            fn_scope->init_var(var.first, var.second->type);
+            fn_scope->set_var(var.first, var.second);
+        }
+
+        if (std::holds_alternative<std::unique_ptr<NodeBlock>>(lambda_node->body))
+        {
+            auto body = std::get<std::unique_ptr<NodeBlock>>(lambda_node->body).get();
             auto res = eval(body, fn_scope);
             return res->value;
         }
 
-        if (std::holds_alternative<std::unique_ptr<NodeExpr>>(fn->body))
+        if (std::holds_alternative<std::unique_ptr<NodeExpr>>(lambda_node->body))
         {
-            auto body = std::get<std::unique_ptr<NodeExpr>>(fn->body).get();
+            auto body = std::get<std::unique_ptr<NodeExpr>>(lambda_node->body).get();
             auto res = eval_expr(body, fn_scope);
             return res;
         }
