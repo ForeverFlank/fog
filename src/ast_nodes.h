@@ -139,6 +139,52 @@ struct NodeAssign : ASTNode
     }
 };
 
+struct NodeIf : ASTNode
+{
+    std::unique_ptr<NodeExpr> condition;
+    std::unique_ptr<ASTNode> true_body;
+    std::unique_ptr<ASTNode> false_body; 
+
+    NodeIf(
+        std::unique_ptr<NodeExpr> condition,
+        std::unique_ptr<ASTNode> true_body,
+        std::unique_ptr<ASTNode> false_body
+    ) : condition{std::move(condition)},
+        true_body{std::move(true_body)},
+        false_body{std::move(false_body)}
+    { }
+
+    std::unique_ptr<ASTNode> clone() const override
+    {
+        return std::make_unique<NodeIf>(
+            downcast_unique_ptr<NodeExpr>(condition->clone()),
+            true_body->clone(),
+            false_body->clone()
+        );
+    }
+};
+
+struct NodeWhile : ASTNode
+{
+    std::unique_ptr<NodeExpr> condition;
+    std::unique_ptr<ASTNode> body;
+
+    NodeWhile(
+        std::unique_ptr<NodeExpr> condition,
+        std::unique_ptr<ASTNode> body
+    ) : condition{std::move(condition)},
+        body{std::move(body)}
+    { }
+
+    std::unique_ptr<ASTNode> clone() const override
+    {
+        return std::make_unique<NodeWhile>(
+            downcast_unique_ptr<NodeExpr>(condition->clone()),
+            body->clone()
+        );
+    }
+};
+
 struct NodeReturn : ASTNode
 {
     std::unique_ptr<NodeExpr> value;
