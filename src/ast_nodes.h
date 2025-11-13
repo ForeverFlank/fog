@@ -147,6 +147,14 @@ struct NodeIf : ASTNode
 
     NodeIf(
         std::unique_ptr<NodeExpr> condition,
+        std::unique_ptr<ASTNode> true_body
+    ) : condition{std::move(condition)},
+        true_body{std::move(true_body)},
+        false_body{nullptr}
+    { }
+
+    NodeIf(
+        std::unique_ptr<NodeExpr> condition,
         std::unique_ptr<ASTNode> true_body,
         std::unique_ptr<ASTNode> false_body
     ) : condition{std::move(condition)},

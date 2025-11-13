@@ -1,5 +1,8 @@
 let f : int -> int
-f := (n) => n + 1
+f := (n) => do
+    if n = 0 return 0
+    return 5
+end
 
-let c : int := 5
-let d : int := f(c)
+let x : int := 10
+let y : int := f(x)

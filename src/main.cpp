@@ -217,12 +217,12 @@ int main(int argc, char *argv[])
     fog::Lexer lexer(source);
     std::vector<fog::Token> tokens = lexer.tokenize();
 
-    // print_tokens(tokens);
+    print_tokens(tokens);
 
     fog::ASTParser ast_parser(tokens);
     std::unique_ptr<fog::NodeBlock> main_block = ast_parser.parse_main();
 
-    // print_ast(main_block.get());
+    print_ast(main_block.get());
 
     fog::Interpreter interpreter;
     interpreter.eval(main_block.get());

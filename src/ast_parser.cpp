@@ -60,6 +60,11 @@ std::unique_ptr<ASTNode> ASTParser::parse_statement()
         return parse_declare();
     }
 
+    if (type == TokenType::IF)
+    {
+        return parse_if();
+    }
+
     if (type == TokenType::IDENTIFIER && pos + 1 < tokens.size() &&
         tokens[pos + 1].type == TokenType::ASSIGN)
     {
@@ -144,6 +149,23 @@ std::unique_ptr<NodeAssign> ASTParser::parse_assign()
     return std::make_unique<NodeAssign>(
         var_name,
         std::move(value_node)
+    );
+}
+
+std::unique_ptr<NodeIf> ASTParser::parse_if()
+{
+    expect(TokenType::IF, "Expected 'if'");
+    next();
+
+    auto cond = parse_expr();
+    next();
+
+    auto true_body = parse_statement();
+    next();
+
+    return std::make_unique<NodeIf>(
+        std::move(cond),
+        std::move(true_body)
     );
 }
 

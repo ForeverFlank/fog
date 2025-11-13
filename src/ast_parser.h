@@ -50,6 +50,7 @@ private:
     std::unique_ptr<NodeBlock>   parse_block();
     std::unique_ptr<NodeDeclare> parse_declare();
     std::unique_ptr<NodeAssign>  parse_assign();
+    std::unique_ptr<NodeIf>      parse_if();
 
     std::unique_ptr<NodeExpr> parse_expr(int min_prec = 0);
     std::unique_ptr<NodeExpr> parse_expr_primary();
