@@ -1,6 +1,8 @@
 let f : int -> int
 f := (n) => do
-    if n = 0 return 0
+    if n = 0 do
+        return 0
+    end
     return 5
 end
 

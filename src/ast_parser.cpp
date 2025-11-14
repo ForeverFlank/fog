@@ -11,6 +11,8 @@
 namespace fog
 {
 
+// TODO: rewrite this whole thing with state machine
+
 std::unique_ptr<NodeBlock> ASTParser::parse_main()
 {
     std::vector<std::unique_ptr<ASTNode>> statements;
@@ -78,7 +80,7 @@ std::unique_ptr<ASTNode> ASTParser::parse_statement()
         return std::make_unique<NodeReturn>(std::move(expr));
     }
 
-    throw std::runtime_error("Unexpected token: " + peek().value);
+    throw std::runtime_error("Unexpected token: " + peek().value + " at pos " + std::to_string(pos));
 }
 
 std::unique_ptr<NodeBlock> ASTParser::parse_block()
@@ -161,7 +163,6 @@ std::unique_ptr<NodeIf> ASTParser::parse_if()
     next();
 
     auto true_body = parse_statement();
-    next();
 
     return std::make_unique<NodeIf>(
         std::move(cond),
@@ -307,7 +308,7 @@ std::unique_ptr<NodeExpr> ASTParser::parse_expr_primary()
         return res;
     }
 
-    throw std::runtime_error("Unexpected token: " + tkn.value);
+    throw std::runtime_error("Unexpected token: " + tkn.value + " at pos " + std::to_string(pos));
 }
 
 std::unique_ptr<NodeExpr> ASTParser::parse_expr_literal(Token tkn)

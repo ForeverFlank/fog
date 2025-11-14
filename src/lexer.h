@@ -103,7 +103,7 @@ const std::map<char, TokenType> ONE_CHAR_TOKENS = {
     {'-', TokenType::MINUS},        {'*', TokenType::STAR},
     {'/', TokenType::SLASH},        {'^', TokenType::CARET},
     {'<', TokenType::LT},           {'>', TokenType::GT},
-    {'/', TokenType::SLASH},
+    {'=', TokenType::EQ},
 };
 
 const std::set<TokenType> CONTINUATION_TOKENS = {
