@@ -1,116 +1,148 @@
 #pragma once
 
-#include <map>
-#include <optional>
-#include <set>
-#include <string>
-#include <vector>
+#include <inttypes.h>
 
-namespace fog
+typedef enum
 {
+    FOG_TOKEN_NULL,
 
-enum class TokenType
+    FOG_TOKEN_TERMINATOR,
+    FOG_TOKEN_ASSIGN,
+    FOG_TOKEN_LBRACE,
+    FOG_TOKEN_RBRACE,
+
+    FOG_TOKEN_LPAREN,
+    FOG_TOKEN_RPAREN,
+
+    FOG_TOKEN_IDENTIFIER,
+    FOG_TOKEN_LET,
+    FOG_TOKEN_CONST,
+
+    FOG_TOKEN_INT,
+    FOG_TOKEN_FLOAT,
+    FOG_TOKEN_STRING,
+
+    FOG_TOKEN_TRUE,
+    FOG_TOKEN_FALSE,
+
+    FOG_TOKEN_ARROW,
+    FOG_TOKEN_FATARROW,
+    FOG_TOKEN_COLON,
+
+    FOG_TOKEN_COMMA,
+    FOG_TOKEN_RETURN,
+
+    FOG_TOKEN_IF,
+    FOG_TOKEN_ELSE,
+    FOG_TOKEN_WHILE,
+
+    FOG_TOKEN_PLUS,
+    FOG_TOKEN_MINUS,
+    FOG_TOKEN_STAR,
+    FOG_TOKEN_SLASH,
+
+    FOG_TOKEN_DIV,
+    FOG_TOKEN_MOD,
+    FOG_TOKEN_CARET,
+
+    FOG_TOKEN_AND,
+    FOG_TOKEN_OR,
+    FOG_TOKEN_XOR,
+    FOG_TOKEN_NOT,
+
+    FOG_TOKEN_EQ,
+    FOG_TOKEN_NEQ,
+
+    FOG_TOKEN_LT,
+    FOG_TOKEN_LTE,
+
+    FOG_TOKEN_GT,
+    FOG_TOKEN_GTE
+}
+FOG_TokenType;
+
+typedef struct
 {
-    TERMINATOR, ASSIGN,
-    LBRACE, RBRACE,
-    LPAREN, RPAREN,
+    char *str;
+    FOG_TokenType type;
+}
+FOG_TokenEntry;
 
-    IDENTIFIER, LET, CONST,
-    INT, FLOAT, STRING,
-    TRUE, FALSE,
-
-    ARROW, FATARROW, COLON,
-    COMMA, RETURN,
-
-    IF, ELSE, WHILE,
-
-    PLUS, MINUS, STAR, SLASH,
-    DIV, MOD, CARET,
-
-    AND, OR, XOR, NOT,
-    // BITAND, BITOR, BITXOR, BITNOT,
-
-    EQ, NEQ,
-    LT, LTE,
-    GT, GTE
-};
-
-
-struct Token
+typedef struct
 {
-    TokenType type;
-    std::string value;
+    char *str;
+    size_t strLen;
+    FOG_TokenType type;
     size_t pos;
+}
+FOG_Token;
 
-    Token(TokenType type, std::string value, size_t pos)
-        : type{type}, value{value}, pos{pos}
-    { };
-};
-
-class Lexer
+typedef struct
 {
-public:
-    Lexer(std::string source) : source{source} { };
-    std::vector<Token> tokenize();
+    FOG_Token *data;
+    size_t size;
+    size_t cap;
+}
+FOG_TokenList;
 
-private:
-    std::string source;
-    size_t pos = 0;
-    int brace_depth = 0;
-    int paren_depth = 0;
+void fogTokenListInit(FOG_TokenList *ls);
+void fogTokenListPush(FOG_TokenList *ls, FOG_Token token);
 
-    void next() { pos++; }
-    char peek() { return source[pos]; }
+const FOG_TokenEntry FOG_KEYWORD_TOKENS[] = {
+    {"let",     FOG_TOKEN_LET},       {"const",   FOG_TOKEN_CONST},
+    {"return",  FOG_TOKEN_RETURN},    {"if",      FOG_TOKEN_IF},
+    {"else",    FOG_TOKEN_ELSE},      {"while",   FOG_TOKEN_WHILE},
+    {"do",      FOG_TOKEN_LBRACE},    {"end",     FOG_TOKEN_RBRACE},
+    {"true",    FOG_TOKEN_TRUE},      {"false",   FOG_TOKEN_FALSE},
 
-    bool is_comment()
-    {
-        return
-            pos + 1 < source.size() &&
-            source[pos] == '/' &&
-            source[pos + 1] == '/';
-    }
-
-    Token parse_word();
-    Token parse_number();
-    std::optional<Token> parse_two_char_symbol();
-    std::optional<Token> parse_one_char_symbol();
+    {"div",     FOG_TOKEN_DIV},       {"mod",    FOG_TOKEN_MOD},
+    {"and",     FOG_TOKEN_AND},       {"or",     FOG_TOKEN_OR},
+    {"xor",     FOG_TOKEN_XOR},       {"not",    FOG_TOKEN_NOT},
 };
 
-const std::map<std::string, TokenType> KEYWORD_TOKENS = {
-    {"let",     TokenType::LET},    {"const",   TokenType::CONST},
-    {"return",  TokenType::RETURN}, {"if",      TokenType::IF},
-    {"else",    TokenType::ELSE},   {"while",   TokenType::WHILE},
-    {"do",      TokenType::LBRACE}, {"end",     TokenType::RBRACE},
-    {"true",    TokenType::TRUE},   {"false",   TokenType::FALSE},
-
-    {"div",     TokenType::DIV},    {"mod",     TokenType::MOD},
-    {"and",     TokenType::AND},    {"or",      TokenType::OR},
-    {"xor",     TokenType::XOR},    {"not",   TokenType::NOT},
-
+const FOG_TokenEntry FOG_TWO_CHAR_TOKENS[] = {
+    {":=", FOG_TOKEN_ASSIGN},     {"->", FOG_TOKEN_ARROW},
+    {"=>", FOG_TOKEN_FATARROW},   {"!=", FOG_TOKEN_NEQ},
+    {"<=", FOG_TOKEN_LTE},        {">=", FOG_TOKEN_GTE},
 };
 
-const std::map<std::string, TokenType> TWO_CHAR_TOKENS = {
-    {":=", TokenType::ASSIGN},      {"->", TokenType::ARROW},
-    {"=>", TokenType::FATARROW},    {"!=", TokenType::NEQ},
-    {"<=", TokenType::LTE},         {">=", TokenType::GTE},
+const FOG_TokenEntry FOG_ONE_CHAR_TOKENS[] = {
+    {":", FOG_TOKEN_COLON},       {";", FOG_TOKEN_TERMINATOR},
+    {"(", FOG_TOKEN_LPAREN},      {")", FOG_TOKEN_RPAREN},
+    {"{", FOG_TOKEN_LBRACE},      {"}", FOG_TOKEN_RBRACE},
+    {",", FOG_TOKEN_COMMA},       {"+", FOG_TOKEN_PLUS},
+    {"-", FOG_TOKEN_MINUS},       {"*", FOG_TOKEN_STAR},
+    {"/", FOG_TOKEN_SLASH},       {"^", FOG_TOKEN_CARET},
+    {"<", FOG_TOKEN_LT},          {">", FOG_TOKEN_GT},
+    {"=", FOG_TOKEN_EQ},
 };
 
-const std::map<char, TokenType> ONE_CHAR_TOKENS = {
-    {':', TokenType::COLON},        {';', TokenType::TERMINATOR},
-    {'(', TokenType::LPAREN},       {')', TokenType::RPAREN},
-    {'{', TokenType::LBRACE},       {'}', TokenType::RBRACE},
-    {',', TokenType::COMMA},        {'+', TokenType::PLUS},
-    {'-', TokenType::MINUS},        {'*', TokenType::STAR},
-    {'/', TokenType::SLASH},        {'^', TokenType::CARET},
-    {'<', TokenType::LT},           {'>', TokenType::GT},
-    {'=', TokenType::EQ},
+const FOG_TokenType FOG_CONTINUATION_TOKENS[] = {
+    FOG_TOKEN_ARROW,  FOG_TOKEN_ASSIGN, FOG_TOKEN_LBRACE, FOG_TOKEN_RBRACE,
+    FOG_TOKEN_COLON,  FOG_TOKEN_COMMA,  FOG_TOKEN_PLUS,   FOG_TOKEN_MINUS,
+    FOG_TOKEN_STAR,   FOG_TOKEN_SLASH,  FOG_TOKEN_EQ,     FOG_TOKEN_NEQ,
+    FOG_TOKEN_LT,     FOG_TOKEN_LTE,    FOG_TOKEN_GT,     FOG_TOKEN_GTE
 };
 
-const std::set<TokenType> CONTINUATION_TOKENS = {
-    TokenType::ARROW,   TokenType::ASSIGN,  TokenType::LBRACE,  TokenType::RBRACE,
-    TokenType::COLON,   TokenType::COMMA,   TokenType::PLUS,    TokenType::MINUS,
-    TokenType::STAR,    TokenType::SLASH,   TokenType::EQ,      TokenType::NEQ,
-    TokenType::LT,      TokenType::LTE,     TokenType::GT,      TokenType::GTE
-};
+typedef struct
+{
+    char *str;
+    size_t strLen;
+    size_t pos;
+    size_t braceDepth;
+    size_t parenDepth;
+}
+FOG_Lexer;
 
-} // namespace fog
+void fogLexerInit(FOG_Lexer *lexer, char *str, size_t strLen);
+
+void fogLexerNext(FOG_Lexer *lexer);
+char fogLexerPeek(FOG_Lexer *lexer);
+
+FOG_Token fogLexerParseWord(FOG_Lexer *lexer);
+FOG_Token fogLexerParseNumber(FOG_Lexer *lexer);
+
+FOG_Token fogLexerParseOneCharSymbol(FOG_Lexer *lexer);
+FOG_Token fogLexerParseTwoCharSymbol(FOG_Lexer *lexer);
+
+FOG_TokenList fogLexerTokenize(char *str, size_t strLen);
