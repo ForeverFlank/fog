@@ -1,6 +1,5 @@
 # !/usr/bin
 
-make -C ./src
-make clean -C ./src
-rm ./fog
-mv ./src/fog ./fog
+make -C src
+mv ./src/fog ./
+make clean -C src

@@ -1,5 +1,6 @@
 #include "types.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
 void fogStringInit(FOG_String *str)

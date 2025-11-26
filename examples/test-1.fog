@@ -1,15 +1,14 @@
-let c : int := 1
+let c : int <- 1
 
 let f : int -> int
-f := (x) => x + c
+f <- (x) => x + c
 
-let x : int := f(5)
+let x : int <- f(5)
 // should be 6
 
-c := 2
+c <- 2
 
-let y : int := f(5)
+let y : int <- f(5)
 // should also be 6
 // because we have c = 1
 // when we assigned f
-

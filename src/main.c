@@ -54,7 +54,7 @@ void printTokens(FOG_TokenList *tokens)
             if (currToken.type != tokenEntry.type)
                 continue;
 
-            printf("%4d %12s | %s\n", i, tokenEntry.str, currToken.str);
+            printf("%4ld %12s | %s\n", i, tokenEntry.str, currToken.str);
         }
     }
 }
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    const char *path = argv[1];
+    char *path = argv[1];
     size_t sourceLen = 0;
 
     char *source = loadFile(path, &sourceLen);

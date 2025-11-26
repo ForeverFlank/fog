@@ -1,9 +1,30 @@
+#include "lexer.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
+#include <ctype.h>
 
 #include "types.h"
-#include "lexer.h"
+
+FOG_Token fogGetNullToken()
+{
+    FOG_Token token;
+    token.type = FOG_TOKEN_NULL;
+    token.str = NULL;
+    token.pos = 0;
+    return token;
+}
+
+FOG_Token fogGetTerminatorToken(size_t pos)
+{
+    FOG_Token token;
+    token.type = FOG_TOKEN_TERMINATOR;
+    token.str = NULL;
+    token.pos = pos;
+    return token;
+}
 
 void fogTokenListInit(FOG_TokenList *ls)
 {
@@ -38,10 +59,46 @@ void fogTokenListPush(FOG_TokenList *ls, FOG_Token token)
     ls->size++;
 }
 
-void fogLexerInit(FOG_Lexer *lexer, char *str, size_t strLen)
+const FOG_TokenEntry FOG_KEYWORD_TOKENS[] = {
+    {"let",     FOG_TOKEN_LET},       {"const",   FOG_TOKEN_CONST},
+    {"return",  FOG_TOKEN_RETURN},    {"if",      FOG_TOKEN_IF},
+    {"else",    FOG_TOKEN_ELSE},      {"while",   FOG_TOKEN_WHILE},
+    {"do",      FOG_TOKEN_LBRACE},    {"end",     FOG_TOKEN_RBRACE},
+    {"true",    FOG_TOKEN_TRUE},      {"false",   FOG_TOKEN_FALSE},
+
+    {"div",     FOG_TOKEN_DIV},       {"mod",    FOG_TOKEN_MOD},
+    {"and",     FOG_TOKEN_AND},       {"or",     FOG_TOKEN_OR},
+    {"xor",     FOG_TOKEN_XOR},       {"not",    FOG_TOKEN_NOT},
+};
+
+const FOG_TokenEntry FOG_TWO_CHAR_TOKENS[] = {
+    {"<-", FOG_TOKEN_ASSIGN},     {"->", FOG_TOKEN_ARROW},
+    {"=>", FOG_TOKEN_FATARROW},   {"!=", FOG_TOKEN_NEQ},
+    {"<=", FOG_TOKEN_LTE},        {">=", FOG_TOKEN_GTE},
+};
+
+const FOG_TokenEntry FOG_ONE_CHAR_TOKENS[] = {
+    {":", FOG_TOKEN_COLON},       {";", FOG_TOKEN_TERMINATOR},
+    {"(", FOG_TOKEN_LPAREN},      {")", FOG_TOKEN_RPAREN},
+    {"{", FOG_TOKEN_LBRACE},      {"}", FOG_TOKEN_RBRACE},
+    {",", FOG_TOKEN_COMMA},       {"+", FOG_TOKEN_PLUS},
+    {"-", FOG_TOKEN_MINUS},       {"*", FOG_TOKEN_STAR},
+    {"/", FOG_TOKEN_SLASH},       {"^", FOG_TOKEN_CARET},
+    {"<", FOG_TOKEN_LT},          {">", FOG_TOKEN_GT},
+    {"=", FOG_TOKEN_EQ},
+};
+
+const FOG_TokenType FOG_CONTINUATION_TOKENS[] = {
+    FOG_TOKEN_ARROW,  FOG_TOKEN_ASSIGN, FOG_TOKEN_LBRACE, FOG_TOKEN_RBRACE,
+    FOG_TOKEN_COLON,  FOG_TOKEN_COMMA,  FOG_TOKEN_PLUS,   FOG_TOKEN_MINUS,
+    FOG_TOKEN_STAR,   FOG_TOKEN_SLASH,  FOG_TOKEN_EQ,     FOG_TOKEN_NEQ,
+    FOG_TOKEN_LT,     FOG_TOKEN_LTE,    FOG_TOKEN_GT,     FOG_TOKEN_GTE
+};
+
+void fogLexerInit(FOG_Lexer *lexer, char *source, size_t sourceLen)
 {
-    lexer->str = str;
-    lexer->strLen = strLen;
+    lexer->source = source;
+    lexer->sourceLen = sourceLen;
     lexer->pos = 0;
     lexer->braceDepth = 0;
     lexer->parenDepth = 0;
@@ -54,7 +111,7 @@ void fogLexerNext(FOG_Lexer *lexer)
 
 char fogLexerPeek(FOG_Lexer *lexer)
 {
-    return lexer->str[lexer->pos];
+    return lexer->source[lexer->pos];
 }
 
 FOG_Token fogLexerParseWord(FOG_Lexer *lexer)
@@ -63,21 +120,21 @@ FOG_Token fogLexerParseWord(FOG_Lexer *lexer)
     FOG_String word;
     fogStringInit(&word);
 
-    char c = peek();
+    char c = fogLexerPeek(lexer);
     while (isalnum(c) || c == '_')
     {
         fogStringPush(&word, c);
-        next();
-        c = peek();
+        fogLexerNext(lexer);
+        c = fogLexerPeek(lexer);
     }
+    fogStringPush(&word, '\0');
 
     FOG_Token token;
     token.str = word.buf;
-    token.strLen = word.size;
     token.pos = begin;
 
     size_t arrSize = sizeof(FOG_KEYWORD_TOKENS) / sizeof(FOG_TokenEntry);
-    for (int i = 0; i < arrSize; i++)
+    for (size_t i = 0; i < arrSize; i++)
     {
         FOG_TokenEntry entry = FOG_KEYWORD_TOKENS[i];
         size_t entryStrLen = sizeof(entry.str);
@@ -95,19 +152,20 @@ FOG_Token fogLexerParseWord(FOG_Lexer *lexer)
 }
 
 FOG_Token fogLexerParseNumber(FOG_Lexer *lexer)
-{ 
+{
     size_t begin = lexer->pos;
     FOG_String num;
+    fogStringInit(&num);
 
     char decimal = 0;
     // bool float64 = false;
 
-    char c = peek();
+    char c = fogLexerPeek(lexer);
     while (isdigit(c) || c == '.')
     {
         fogStringPush(&num, c);
-        next();
-        c = peek();
+        fogLexerNext(lexer);
+        c = fogLexerPeek(lexer);
 
         if (c != '.')
         {
@@ -120,9 +178,7 @@ FOG_Token fogLexerParseNumber(FOG_Lexer *lexer)
         }
         else
         {
-            throw std::runtime_error(
-                "(" + std::to_string(pos) +
-                ") Invalid number format: multiple decimal points");
+            fprintf(stderr, "(%ld) Invalid number format: multiple decimal points", lexer->pos);
         }
     }
 
@@ -131,22 +187,81 @@ FOG_Token fogLexerParseNumber(FOG_Lexer *lexer)
     //     Get();
     // }
 
-    if (decimal)
+    fogStringPush(&num, '\0');
+
+    FOG_Token token;
+    token.pos = begin;
+    token.str = num.buf;
+    token.type = decimal ? FOG_TOKEN_FLOAT : FOG_TOKEN_INT;
+
+    return token;
+}
+
+FOG_Token fogLexerParseTwoCharToken(FOG_Lexer *lexer)
+{
+    if (lexer->pos + 1 >= lexer->sourceLen)
     {
-        return Token(TokenType::FLOAT, num, begin);
+        return fogGetNullToken();
     }
 
-    return Token(TokenType::INT, num, begin);
+    size_t begin = lexer->pos;
+    char *sym = (char *)malloc(3);
+    sym[0] = lexer->source[lexer->pos];
+    sym[1] = lexer->source[lexer->pos + 1];
+    sym[2] = '\0';
+
+    size_t arrSize = sizeof(FOG_TWO_CHAR_TOKENS) / sizeof(FOG_TokenEntry);
+    for (size_t i = 0; i < arrSize; i++)
+    {
+        FOG_TokenEntry entry = FOG_TWO_CHAR_TOKENS[i];
+        if (strcmp(entry.str, sym) == 0)
+        {
+            fogLexerNext(lexer);
+            fogLexerNext(lexer);
+
+            FOG_Token token;
+            token.type = entry.type;
+            token.str = sym;
+            token.pos = begin;
+            return token;
+        }
+    }
+
+    return fogGetNullToken();
 }
 
-FOG_Token fogLexerParseOneCharSymbol(FOG_Lexer *lexer)
+FOG_Token fogLexerParseOneCharToken(FOG_Lexer *lexer)
 {
-    return FOG_Token();
+    size_t begin = lexer->pos;
+    char *c = (char *)malloc(2);
+    c[0] = fogLexerPeek(lexer);
+    c[1] = '\0';
+
+    size_t arrSize = sizeof(FOG_ONE_CHAR_TOKENS) / sizeof(FOG_TokenEntry);
+    for (size_t i = 0; i < arrSize; i++)
+    {
+        FOG_TokenEntry entry = FOG_ONE_CHAR_TOKENS[i];
+        if (strcmp(entry.str, c) == 0)
+        {
+            fogLexerNext(lexer);
+
+            FOG_Token token;
+            token.type = entry.type;
+            token.str = c;
+            token.pos = begin;
+            return token;
+        }
+    }
+
+    return fogGetNullToken();
 }
 
-FOG_Token fogLexerParseTwoCharSymbol(FOG_Lexer *lexer)
+int fogLexerIsComment(FOG_Lexer *lexer)
 {
-    return FOG_Token();
+    return
+        lexer->pos + 1 < lexer->sourceLen &&
+        lexer->source[lexer->pos] == '/' &&
+        lexer->source[lexer->pos + 1] == '/';
 }
 
 FOG_TokenList fogLexerTokenize(char *source, size_t sourceLen)
@@ -160,7 +275,7 @@ FOG_TokenList fogLexerTokenize(char *source, size_t sourceLen)
     char c;
     while (lexer.pos < sourceLen)
     {
-        c = peek();
+        c = fogLexerPeek(&lexer);
 
         if (lexer.parenDepth < 0)
         {
@@ -175,12 +290,15 @@ FOG_TokenList fogLexerTokenize(char *source, size_t sourceLen)
 
         if (c == ' ')
         {
-            next();
+            fogLexerNext(&lexer);
             continue;
         }
-        if (is_comment())
+        if (fogLexerIsComment(&lexer))
         {
-            while (lexer.pos < sourceLen && peek() != '\n') next();
+            while (lexer.pos < sourceLen && fogLexerPeek(&lexer) != '\n')
+            {
+                fogLexerNext(&lexer);
+            }
             continue;
         }
         if (isalpha(c) || c == '_')
@@ -196,14 +314,14 @@ FOG_TokenList fogLexerTokenize(char *source, size_t sourceLen)
 
         FOG_Token token;
 
-        token = fogLexerParseTwoCharSymbol(&lexer);
+        token = fogLexerParseTwoCharToken(&lexer);
         if (token.type != FOG_TOKEN_NULL)
         {
             fogTokenListPush(&tokens, token);
             continue;
         }
 
-        token = fogLexerParseOneCharSymbol(&lexer);
+        token = fogLexerParseOneCharToken(&lexer);
         if (token.type != FOG_TOKEN_NULL)
         {
             fogTokenListPush(&tokens, token);
@@ -233,36 +351,30 @@ FOG_TokenList fogLexerTokenize(char *source, size_t sourceLen)
             FOG_TokenType lastTokenType = tokens.data[tokens.size - 1].type;
             size_t arrSize = sizeof(FOG_CONTINUATION_TOKENS) / sizeof(FOG_TokenType);
 
-            char found = 0;
-            for (int i = 0; i < arrSize && !found; i++)
+            int found = 0;
+            for (size_t i = 0; i < arrSize && !found; i++)
             {
                 if (FOG_CONTINUATION_TOKENS[i] == lastTokenType)
+                {
                     found = 1;
+                }
             }
 
-            if (found)
+            if (!found)
             {
-                FOG_Token token;
-                token.type = FOG_TOKEN_TERMINATOR;
-                token.str = NULL;
-                token.strLen = 0;
-                token.pos = lexer.pos;
+                FOG_Token token = fogGetTerminatorToken(lexer.pos);
+                fogLexerNext(&lexer);
                 fogTokenListPush(&tokens, token);
-                next();
                 continue;
             }
         }
 
-        next();
+        fogLexerNext(&lexer);
     }
 
     if (tokens.data[tokens.size - 1].type != FOG_TOKEN_TERMINATOR)
     {
-        FOG_Token token;
-        token.type = FOG_TOKEN_TERMINATOR;
-        token.str = NULL;
-        token.strLen = 0;
-        token.pos = lexer.pos;
+        FOG_Token token = fogGetTerminatorToken(lexer.pos);
         fogTokenListPush(&tokens, token);
     }
 
