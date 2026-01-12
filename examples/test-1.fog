@@ -1,14 +1,27 @@
-let c : int <- 1
+// traditional declaration
+let fib : int -> int
+fib(n) = {
+    if n = 0 {
+        return 0
+    }
+    if n = 1 {
+        return 1
+    }
+    return fib(n - 1) + fib(n - 2)
+}
 
-let f : int -> int
-f <- (x) => x + c
+// declare by assigning lambda
+let collatz : int -> int
+collatz = (x) => {
+    if x mod 2 = 0 {
+        return x / 2
+    }
+    return 3 * x + 1
+}
 
-let x : int <- f(5)
-// should be 6
+var x : int = 10
+x <- fib(x)
+while x != 1 {
+    x <- collatz(x)
+}
 
-c <- 2
-
-let y : int <- f(5)
-// should also be 6
-// because we have c = 1
-// when we assigned f

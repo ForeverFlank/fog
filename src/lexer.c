@@ -346,7 +346,10 @@ FOG_TokenList fogLexerTokenize(char *source, size_t sourceLen)
             continue;
         }
 
-        if (c == '\n' && lexer.parenDepth == 0)
+        // check if the last token of the line is not a 
+        // continuation token. if so, push a terminator token
+        // to the list.
+        if (c == '\n' && lexer.parenDepth == 0 && tokens.size > 0)
         {
             FOG_TokenType lastTokenType = tokens.data[tokens.size - 1].type;
             size_t arrSize = sizeof(FOG_CONTINUATION_TOKENS) / sizeof(FOG_TokenType);
@@ -372,6 +375,7 @@ FOG_TokenList fogLexerTokenize(char *source, size_t sourceLen)
         fogLexerNext(&lexer);
     }
 
+    // push an extra terminator token at the end, if not already existed
     if (tokens.data[tokens.size - 1].type != FOG_TOKEN_TERMINATOR)
     {
         FOG_Token token = fogGetTerminatorToken(lexer.pos);
