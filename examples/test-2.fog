@@ -1,7 +1,7 @@
 let score = 80
-let grade : string
-grade = | "A"   if score >= 80
-        | "B"   if score >= 70
-        | "C"   if score >= 60
-        | "D"   if score >= 50
-        | "F"   otherwise
+let grade = | "A"   if score >= 80
+            | "B"   if score >= 70
+            | "C"   if score >= 60
+            | "D"   if score >= 50
+            | "F"   otherwise
+
