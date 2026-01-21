@@ -1,0 +1,8 @@
+let sqrt : float -> float + Null
+sqrt(x) = | Math.sqrt(x)    if x >= 0
+          | Null            otherwise
+
+let a = sqrt(100)
+let b = sqrt(0)
+let c = sqrt(-1)
+

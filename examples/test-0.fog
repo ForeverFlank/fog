@@ -15,7 +15,7 @@ let int : type {
 // operator overloading
 int.-(lhs, rhs) = _builtin_sub(lhs, rhs)
 
-var i : int = 0
+let mutable i : int = 0
 while i < 10 {
     i <- i + 1
     print(i)

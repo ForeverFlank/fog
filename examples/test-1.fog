@@ -19,7 +19,7 @@ collatz = (x) => {
     return 3 * x + 1
 }
 
-var x : int = 10
+let mutable x : int = 10
 x <- fib(x)
 while x != 1 {
     x <- collatz(x)

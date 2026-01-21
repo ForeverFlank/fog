@@ -1,10 +1,7 @@
-let f : int -> int
-f := (n) => do
-    if n = 0 do
-        return 0
-    end
-    return 5
-end
-
-let x : int := 10
-let y : int := f(x)
+let score = 80
+let grade : string
+grade = | "A"   if score >= 80
+        | "B"   if score >= 70
+        | "C"   if score >= 60
+        | "D"   if score >= 50
+        | "F"   otherwise
