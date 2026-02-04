@@ -1,0 +1,29 @@
+let prime : Int -> Bool
+prime(n) = {
+    if n <= 2 {
+        return false
+    }
+
+    for i in range[2, sqrt(n)] {
+        if n mod i = 0 {
+            return false
+        }
+    }
+    
+    return true
+}
+
+let in : Range -> Int -> Bool
+in(r) = n => | r.begin <= n <= r.end    if r is Range.Closed
+             | r.begin < n < r.end      if r is Range.Opened
+          -- | blah blah blah
+
+let num = 101
+
+print num + | " is prime"       if num is prime
+            | " is not prime"   otherwise
+
+print num + | " is in [0, 100)"     if num is in range[0, 100)
+            | " is not in [0, 100)" otherwise
+
+-- maybe the "is" itself could also be defined right within the language, given these syntaxes?

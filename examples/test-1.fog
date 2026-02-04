@@ -1,4 +1,4 @@
-// traditional declaration
+-- traditional declaration
 let fib : int -> int
 fib(n) = {
     if n = 0 {
@@ -10,7 +10,7 @@ fib(n) = {
     return fib(n - 1) + fib(n - 2)
 }
 
-// declare by assigning lambda
+-- declare by assigning lambda
 let collatz : int -> int
 collatz = (x) => {
     if x mod 2 = 0 {

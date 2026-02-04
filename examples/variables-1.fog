@@ -1,0 +1,5 @@
+-- declaration with value
+
+let pi = 3.14159265359
+let phi = 1 + Math.sqrt(5) / 2
+let myName = "Alice"
