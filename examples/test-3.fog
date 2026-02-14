@@ -1,9 +1,0 @@
-let trySqrt : float -> float + Error
-trySqrt(x) = | Math.sqrt(x)     if x >= 0
-             | error            otherwise
-
-let num = trySqrt(-1)
-
-print(| "No error!" if num is float
-      | "Error!"    if num is Error)
-

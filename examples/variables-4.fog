@@ -1,5 +1,0 @@
--- mutable variables
-
-let mutable a = 100
-let mutable b : int = 200
-let mutable c : int -> int

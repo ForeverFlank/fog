@@ -1,0 +1,7 @@
+let o<a, b, c> : (b -> c) -> (a -> b) -> (a -> c)
+
+
+-- this has problems where T is unit
+-- and will be resolved in later examples
+
+let Optional<T> : Type = T + Unit

@@ -1,5 +1,0 @@
--- declaration without value
-
-let c
-let d : int + Null
-let f : int -> int

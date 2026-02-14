@@ -1,0 +1,7 @@
+let mutable x : Int = 2
+let mutable y : Int = 3
+let mutable z : Int = x
+
+x <- 3
+y <- x + 2
+z <- x + y

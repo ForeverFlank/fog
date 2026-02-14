@@ -1,4 +1,0 @@
--- declaration with implicit type and value
-
-let a : int = 1
-let b : float = 32.7
