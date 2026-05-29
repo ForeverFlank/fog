@@ -1,0 +1,14 @@
+num1 : Int8
+num2 : Int16
+num3 : Int32
+num4 : Int64
+num5 : UInt8
+num6 : UInt16
+num7 : UInt32
+num8 : UInt64
+
+float1 : Float32
+float2 : Float64
+
+func1 : Float32 -> Float32
+func2 : Float32 -> Float32 -> Float32

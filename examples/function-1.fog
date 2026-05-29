@@ -1,0 +1,26 @@
+fib1 : Int32 -> Int32
+fib1 0 = 0
+fib1 1 = 1
+fib1 n = fib1 (n - 1) + fib1 (n - 2)
+
+fib2 : Int32 -> Int32
+fib2 n =
+    | n == 0, 0
+    | n == 1, 1
+    | else,   fib2 (n - 1) + fib2 (n - 2)
+
+fib3 : Int32 -> Int32
+fib3 n = {
+    if (n == 0) {
+        0
+    }
+    if (n == 1) {
+        1
+    }
+    fib3 (n - 1) + fib3 (n - 2)
+}
+
+res : String
+res = toString (fib1 10) || toString (fib2 10) || toString (fib3 10)
+
+main = printLine res

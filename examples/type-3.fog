@@ -1,9 +1,0 @@
-let Vector2 = type {
-    let x : Float
-    let y : Float
-
-
-}
-
-let v1 : Vector2 = Vector2(2, 3)
-let v2 : 

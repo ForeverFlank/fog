@@ -1,4 +1,0 @@
-let a : Int
-let b : Int = 2
-let c : Int = 2 + 3
-let d : Int = 2 + b + c

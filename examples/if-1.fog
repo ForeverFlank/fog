@@ -1,8 +1,0 @@
-let score = 69
-let grade =
-    | "A"   if score >= 80
-    | "B"   if score >= 70
-    | "C"   if score >= 60
-    | "D"   if score >= 50
-    | "F"   otherwise
-print grade
