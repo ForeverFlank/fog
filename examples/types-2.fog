@@ -3,8 +3,8 @@
 tuple : Int32 * Float32
 tuple = (10, 2.4f)
 
-num1 = first tuple      -- 10
-num2 = second tuple     -- 2.4f
+num1 = first tuple    -- 10
+num2 = second tuple   -- 2.4f
 
 -- records --
 
@@ -13,9 +13,6 @@ Person = { name : String, age : Int32 }
 
 alice : Person
 alice = { name = "Alice", age = 67 }
-
-bob : { name : String, age : Int32 }
-bob = { name = "Bob", age = 89 }
 
 -- unions --
 

@@ -27,5 +27,5 @@ g x = 2 * x
 fog : Int32 -> Int32
 fog = f << g
 
-main = printLine toString fog 67    -- 17956
 
+string = 67 |> fog |> toString      -- 17956

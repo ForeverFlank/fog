@@ -19,8 +19,3 @@ fib3 n = {
     }
     fib3 (n - 1) + fib3 (n - 2)
 }
-
-res : String
-res = toString (fib1 10) || toString (fib2 10) || toString (fib3 10)
-
-main = printLine res
