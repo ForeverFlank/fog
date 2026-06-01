@@ -1,0 +1,6 @@
+fib : Int32 -> Int32
+fib 0 = 0
+fib 1 = 1
+fib n = fib (n - 1) + fib (n - 2)
+
+main = 67 |> fib |> toString |> printLine

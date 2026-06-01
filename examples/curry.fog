@@ -1,0 +1,4 @@
+add : Int32 -> Int32 -> Int32
+add a b = a + b
+
+main = (add 6 7) |> toString |> printLine

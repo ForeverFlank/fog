@@ -8,18 +8,29 @@ pub enum TokenType {
     LeftParenthesis,
     RightParenthesis,
 
+    IntLiteral,
+    FloatLiteral,
+    StringLiteral,
+
     Plus,
     Minus,
     Star,
     Slash,
     Caret,
 
+    Concat,
+
+    LeftPipe,
+    RightPipe,
+    LeftComposition,
+    RightComposition,
+
     If,
 }
 
 pub struct Token {
-    pub value: String,
     pub token_type: TokenType,
+    pub value: String,
     pub pos: usize,
 }
 
@@ -44,8 +55,8 @@ impl Lexer {
         self.pos += 1;
     }
 
-    fn peek(self: &Lexer) -> char {
-        self.chars[self.pos]
+    fn peek(self: &Lexer) -> Option<char> {
+        self.chars.get(self.pos).copied()
     }
 
     pub fn tokenize(src: &str) -> Vec<Token> {
@@ -53,29 +64,23 @@ impl Lexer {
         let mut res: Vec<Token> = Vec::new();
 
         while lexer.pos < lexer.chars.len() {
-            if let Some(token) = lexer.try_parse_word() {
+            if let Some(token) = lexer
+                .try_parse_word()
+                .or_else(|| lexer.try_parse_number())
+                .or_else(|| lexer.try_parse_two_char_symbol())
+                .or_else(|| lexer.try_parse_one_char_symbol())
+            {
                 res.push(token);
-                continue;
+            } else {
+                lexer.next();
             }
-
-            if let Some(token) = lexer.try_parse_one_char_symbol() {
-                res.push(token);
-                continue;
-            }
-
-            if let Some(token) = lexer.try_parse_two_char_symbol() {
-                res.push(token);
-                continue;
-            }
-
-            lexer.next();
         }
 
         res
     }
 
     fn try_parse_word(self: &mut Lexer) -> Option<Token> {
-        let mut ch: char = self.chars[self.pos];
+        let ch: char = self.peek()?;
 
         if !(ch.is_alphabetic() || ch == '_') {
             return None;
@@ -85,10 +90,13 @@ impl Lexer {
 
         let mut word: String = String::new();
 
-        while ch.is_alphabetic() || ch == '_' {
-            word.push(ch);
-            self.next();
-            ch = self.peek();
+        while let Some(ch) = self.peek() {
+            if ch.is_alphanumeric() || ch == '_' {
+                word.push(ch);
+                self.next();
+            } else {
+                break;
+            }
         }
 
         let token_type: TokenType = match word.as_str() {
@@ -103,8 +111,81 @@ impl Lexer {
         })
     }
 
+    fn try_parse_number(self: &mut Lexer) -> Option<Token> {
+        let ch: char = self.peek()?;
+
+        if !ch.is_numeric() {
+            return None;
+        }
+
+        let begin: usize = self.pos;
+
+        let mut num: String = String::new();
+        let mut decimal: bool = false;
+
+        while let Some(ch) = self.peek() {
+            if ch.is_numeric() || ch == '.' {
+                num.push(ch);
+                self.next();
+
+                if ch == '.' {
+                    if !decimal {
+                        decimal = true;
+                    } else {
+                        // error
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        let token_type = if decimal {
+            TokenType::FloatLiteral
+        } else {
+            TokenType::IntLiteral
+        };
+
+        Some(Token {
+            token_type,
+            value: num,
+            pos: begin,
+        })
+    }
+
+    fn try_parse_two_char_symbol(self: &mut Lexer) -> Option<Token> {
+        if self.pos + 1 >= self.chars.len() {
+            return None;
+        }
+
+        let sym: String = self.chars[self.pos..self.pos + 2].iter().collect();
+
+        let begin: usize = self.pos;
+
+        let token_type: TokenType = match sym.as_str() {
+            "->" => TokenType::Arrow,
+
+            "||" => TokenType::Concat,
+            "<|" => TokenType::LeftPipe,
+            "|>" => TokenType::RightPipe,
+            "<<" => TokenType::LeftComposition,
+            ">>" => TokenType::RightComposition,
+
+            _ => return None,
+        };
+
+        self.next();
+        self.next();
+
+        Some(Token {
+            token_type,
+            value: sym.to_string().to_owned(),
+            pos: begin,
+        })
+    }
+
     fn try_parse_one_char_symbol(self: &mut Lexer) -> Option<Token> {
-        let sym: char = self.chars[self.pos];
+        let sym: char = *self.chars.get(self.pos)?;
 
         let begin: usize = self.pos;
 
@@ -126,32 +207,8 @@ impl Lexer {
         self.next();
 
         Some(Token {
-            value: sym.to_string().to_owned(),
             token_type,
-            pos: begin,
-        })
-    }
-
-    fn try_parse_two_char_symbol(self: &mut Lexer) -> Option<Token> {
-        if self.pos + 1 >= self.chars.len() {
-            return None;
-        }
-
-        let sym: String = self.chars[self.pos..self.pos + 2].iter().collect();
-
-        let begin: usize = self.pos;
-
-        let token_type: TokenType = match sym.as_str() {
-            "->" => TokenType::Arrow,
-
-            _ => return None,
-        };
-
-        self.next();
-
-        Some(Token {
             value: sym.to_string().to_owned(),
-            token_type,
             pos: begin,
         })
     }
