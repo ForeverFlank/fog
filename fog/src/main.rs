@@ -13,36 +13,44 @@ fn main() {
     let (tokens, lexerErrors) = lexer::tokenize(src);
 
     for token in tokens {
-        let token_type_name: String = match token.kind {
-            lexer::TokenKind::Newline => "Newline".to_string(),
-            lexer::TokenKind::Identifier(val) => format!("Identifier ({})", val),
-            lexer::TokenKind::Equal => "Equal".to_string(),
-            lexer::TokenKind::Colon => "Colon".to_string(),
-            lexer::TokenKind::Arrow => "Arrow".to_string(),
-            lexer::TokenKind::LeftParenthesis => "LeftParenthesis".to_string(),
-            lexer::TokenKind::RightParenthesis => "RightParenthesis".to_string(),
-            lexer::TokenKind::LeftBrace => "LeftBrace".to_string(),
-            lexer::TokenKind::RightBrace => "RightBrace".to_string(),
-            lexer::TokenKind::Comma => "Comma".to_string(),
-            lexer::TokenKind::IntLiteral(val) => format!("Int ({})", val),
-            lexer::TokenKind::FloatLiteral(val) => format!("Float ({})", val),
+        let token_type_name: &str = match token.kind {
+            lexer::TokenKind::Newline => "Newline",
+            lexer::TokenKind::Identifier(val) => &format!("Identifier ({})", val),
+            lexer::TokenKind::Equal => "Equal",
+            lexer::TokenKind::Colon => "Colon",
+            lexer::TokenKind::Arrow => "Arrow",
+            lexer::TokenKind::FatArrow => "FatArrow",
+            lexer::TokenKind::LeftParenthesis => "LeftParenthesis",
+            lexer::TokenKind::RightParenthesis => "RightParenthesis",
+            lexer::TokenKind::LeftBrace => "LeftBrace",
+            lexer::TokenKind::RightBrace => "RightBrace",
+            lexer::TokenKind::Comma => "Comma",
+            lexer::TokenKind::IntLiteral(val) => &format!("Int ({})", val),
+            lexer::TokenKind::FloatLiteral(val) => &format!("Float ({})", val),
             // lexer::TokenKind::StringLiteral(val) => format!("String ({})", val),
-            lexer::TokenKind::Plus => "Plus".to_string(),
-            lexer::TokenKind::Minus => "Minus".to_string(),
-            lexer::TokenKind::Star => "Star".to_string(),
-            lexer::TokenKind::Slash => "Slash".to_string(),
-            lexer::TokenKind::Caret => "Caret".to_string(),
-            lexer::TokenKind::Concat => "Concat".to_string(),
-            lexer::TokenKind::LeftPipe => "LeftPipe".to_string(),
-            lexer::TokenKind::RightPipe => "RightPipe".to_string(),
-            lexer::TokenKind::LeftComposition => "LeftComposition".to_string(),
-            lexer::TokenKind::RightComposition => "RightComposition".to_string(),
-            lexer::TokenKind::If => "If".to_string(),
+            lexer::TokenKind::Plus => "Plus",
+            lexer::TokenKind::Minus => "Minus",
+            lexer::TokenKind::Star => "Star",
+            lexer::TokenKind::Slash => "Slash",
+            lexer::TokenKind::Caret => "Caret",
+            lexer::TokenKind::Concat => "Concat",
+            lexer::TokenKind::LeftPipe => "LeftPipe",
+            lexer::TokenKind::RightPipe => "RightPipe",
+            lexer::TokenKind::LeftComposition => "LeftComposition",
+            lexer::TokenKind::RightComposition => "RightComposition",
+            lexer::TokenKind::If => "If",
         };
 
         println!(
             " {: >4}:{: >4} | {}",
             token.line, token.column, token_type_name
+        )
+    }
+
+    for error in lexerErrors {
+        println!(
+            "Error: {} at {}:{}",
+            error.message, error.line, error.column
         )
     }
 }

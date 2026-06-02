@@ -1,4 +1,8 @@
-@startebnf
+@startebnf AST Parser
+
+title AST Parser (no sugars)
+
+(* Top level *)
 
 program = {type_annotation | declaration}-;
 
@@ -6,7 +10,22 @@ type_annotation = identifier, ":", expr;
 
 declaration = identifier, "=", expr;
 
+(* Expressions *)
+
 expr =
-    identifier, [binary_op, expr];
+    identifier
+  | literal
+  | lambda
+  | expr_unary
+  | expr_binary;
+
+lambda = (identifier | type_annotation), "=>", expr;
+
+expr_unary = unary_op, expr;
+
+expr_binary = expr, binary_op, expr;
+
+tuple = "(", [expr, {"," ,expr}, [","]], ")";
+
 
 @endebnf

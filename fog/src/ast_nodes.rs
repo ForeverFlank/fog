@@ -1,39 +1,42 @@
 // --- AST nodes ---
 
 pub struct Program {
-    pub items: Vec<Item>,
+    pub items: Vec<Statement>,
 }
 
-pub enum Item {
+pub enum Statement {
     TypeAnnotation(TypeAnnotation),
     Declaration(Declaration),
 }
 
 pub struct TypeAnnotation {
     pub identifier: Identifier,
-    pub r#type: TypeExpr,
+    pub typeExpr: Expr,
 }
 
-pub struct Declaration {}
+pub struct Declaration {
+    pub identifier: Identifier,
+    pub expr: Expr,
+}
 
 pub struct Identifier {
     pub name: String,
 }
 
-// --- value expressions ---
+// --- expressions ---
 
-pub enum ValueExpr {
+pub enum Expr {
     Identifier(Identifier),
-    Binary(ValueBinaryExpr),
+    Binary(BinaryExpr),
 }
 
-pub struct ValueBinaryExpr {
-    pub lhs: Box<ValueExpr>,
-    pub op: ValueBinaryOp,
-    pub rhs: Box<ValueExpr>,
+pub struct BinaryExpr {
+    pub lhs: Box<Expr>,
+    pub op: BinaryOp,
+    pub rhs: Box<Expr>,
 }
 
-pub enum ValueBinaryOp {
+pub enum BinaryOp {
     Plus,
     Minus,
     Star,
@@ -44,23 +47,4 @@ pub enum ValueBinaryOp {
     RightPipe,
     LeftComposition,
     RightComposition,
-}
-
-// --- type expressions ---
-
-pub enum TypeExpr {
-    Identifier(Identifier),
-    Binary(TypeBinaryExpr),
-}
-
-pub struct TypeBinaryExpr {
-    pub lhs: Box<ValueExpr>,
-    pub op: ValueBinaryOp,
-    pub rhs: Box<ValueExpr>,
-}
-
-pub enum TypeBinaryOp {
-    Plus,
-    Star,
-    Arrow,
 }

@@ -7,6 +7,7 @@ pub enum TokenKind {
     Equal,
     Colon,
     Arrow,
+    FatArrow,
     Comma,
     LeftParenthesis,
     RightParenthesis,
@@ -250,6 +251,7 @@ impl Lexer {
 
         let token_type: TokenKind = match sym.as_str() {
             "->" => TokenKind::Arrow,
+            "=>" => TokenKind::FatArrow,
 
             "||" => TokenKind::Concat,
             "<|" => TokenKind::LeftPipe,
