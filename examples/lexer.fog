@@ -1,0 +1,79 @@
+-- tokens
+
+TokenType : Type
+TokenType =
+    Terminator
+  + Identifier
+  + Equal
+  + Colon
+  + Arrow   -- ...
+
+Token : Type
+Token = {
+    type        : TokenType
+    value       : String
+    pos         : Int32
+}
+
+-- lexer
+
+Lexer : Type
+Lexer = {
+    chars       : Array Char
+    pos         : Int32
+    braceDepth  : Int32
+}
+
+LexerError : Type
+LexerError = {
+    message     : String
+    pos         : Int32
+}
+
+tryParseWord : Lexer -> Lexer * Option (Result Token LexerError)
+tryParseWord = -- ...
+
+-- tokenize
+
+TokenizeLoopState : Type
+TokenizeLoopState = Lexer * List Token * List LexerError
+
+tokenizeLoop : TokenizeLoopState -> TokenizeLoopState
+tokenizeLoop loopState =
+    lexer  = first  loopState
+    tokens = second loopState
+    errors = third  loopState
+
+    if getPos loopState >= length (getChars loopState)
+        (lexer, reverse tokens, reverse errors)
+    else
+        parserRes : Lexer * Option (Result Token LexerError)
+        parserRes =
+            (tryParseWord lexer)          or
+            (tryParseTwoCharSymbol lexer) or
+            (tryParseOneCharSymbol lexer)
+        
+        newLexer = first parserRes
+        res      = second parserRes
+
+        if res is Some Ok token
+            (newLexer, Cons token tokens, errors)
+        if res is Some Error error
+            (newLexer, tokens, Cons error errors)
+        else
+            (newLexer { pos = getPos newLexer + 1 }, tokens, errors)
+
+tokenize : String -> List Token * List LexerError
+tokenize src = 
+    lexer : Lexer
+    lexer = {
+        chars       = toCharArray src
+        pos         = 0
+        braceDepth  = 0
+    }
+
+    res : TokenizeLoopState
+    res = tokenizeLoop lexer [] []
+
+    (second res, third res)
+

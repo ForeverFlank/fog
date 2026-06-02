@@ -10,12 +10,10 @@ fib2 n =
     | else,   fib2 (n - 1) + fib2 (n - 2)
 
 fib3 : Int32 -> Int32
-fib3 n = {
-    if (n == 0) {
+fib3 n =
+    if n == 0
         0
-    }
-    if (n == 1) {
+    if n == 1
         1
-    }
-    fib3 (n - 1) + fib3 (n - 2)
-}
+    else
+        fib3 (n - 1) + fib3 (n - 2)

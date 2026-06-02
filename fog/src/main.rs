@@ -8,7 +8,7 @@ fn main() {
 
     let src: &str = &fs::read_to_string(path).expect("Failed to read source file");
 
-    let tokens: Vec<lexer::Token> = lexer::tokenize(src);
+    let (tokens, _) = lexer::tokenize(src);
 
     for token in tokens {
         let token_type_name: &str = match token.token_type {
@@ -27,6 +27,7 @@ fn main() {
             lexer::TokenType::Star => "STAR",
             lexer::TokenType::Slash => "SLASH",
             lexer::TokenType::Caret => "CARET",
+            lexer::TokenType::Bar => "BAR",
             lexer::TokenType::Concat => "CONCAT",
             lexer::TokenType::LeftPipe => "LPIPE",
             lexer::TokenType::RightPipe => "RPIPE",

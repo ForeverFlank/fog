@@ -1,3 +1,5 @@
+use crate::lexer::TokenType::Terminator;
+
 pub enum TokenType {
     Terminator,
 
@@ -17,7 +19,7 @@ pub enum TokenType {
     Star,
     Slash,
     Caret,
-
+    Bar,
     Concat,
 
     LeftPipe,
@@ -34,13 +36,16 @@ pub struct Token {
     pub pos: usize,
 }
 
-pub fn tokenize(src: &str) -> Vec<Token> {
-    Lexer::tokenize(src)
-}
-
 struct Lexer {
     chars: Vec<char>,
     pos: usize,
+    brace_depth: i32,
+    paren_depth: i32,
+}
+
+pub struct LexerError {
+    pub message: &'static str,
+    pub pos: usize,
 }
 
 impl Lexer {
@@ -48,6 +53,8 @@ impl Lexer {
         Lexer {
             chars: src.chars().collect(),
             pos: 0,
+            brace_depth: 0,
+            paren_depth: 0,
         }
     }
 
@@ -59,27 +66,33 @@ impl Lexer {
         self.chars.get(self.pos).copied()
     }
 
-    pub fn tokenize(src: &str) -> Vec<Token> {
+    pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {
         let mut lexer: Lexer = Lexer::new(src);
-        let mut res: Vec<Token> = Vec::new();
+        let mut tokens: Vec<Token> = Vec::new();
+        let mut errors: Vec<LexerError> = Vec::new();
 
         while lexer.pos < lexer.chars.len() {
-            if let Some(token) = lexer
+            if let Some(res) = lexer
                 .try_parse_word()
                 .or_else(|| lexer.try_parse_number())
                 .or_else(|| lexer.try_parse_two_char_symbol())
                 .or_else(|| lexer.try_parse_one_char_symbol())
+            // .or_else(|| lexer.try_terminate(tokens.last()))
             {
-                res.push(token);
+                if let Ok(token) = res {
+                    tokens.push(token);
+                } else if let Err(error) = res {
+                    errors.push(error)
+                }
             } else {
                 lexer.next();
             }
         }
 
-        res
+        (tokens, errors)
     }
 
-    fn try_parse_word(self: &mut Lexer) -> Option<Token> {
+    fn try_parse_word(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
         let ch: char = self.peek()?;
 
         if !(ch.is_alphabetic() || ch == '_') {
@@ -104,14 +117,14 @@ impl Lexer {
             _ => TokenType::Identifier,
         };
 
-        Some(Token {
+        Some(Ok(Token {
             token_type,
             value: word,
             pos: begin,
-        })
+        }))
     }
 
-    fn try_parse_number(self: &mut Lexer) -> Option<Token> {
+    fn try_parse_number(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
         let ch: char = self.peek()?;
 
         if !ch.is_numeric() {
@@ -124,36 +137,39 @@ impl Lexer {
         let mut decimal: bool = false;
 
         while let Some(ch) = self.peek() {
-            if ch.is_numeric() || ch == '.' {
-                num.push(ch);
-                self.next();
-
-                if ch == '.' {
-                    if !decimal {
-                        decimal = true;
-                    } else {
-                        // error
-                    }
-                }
-            } else {
+            if !(ch.is_numeric() || ch == '.') {
                 break;
+            }
+
+            num.push(ch);
+            self.next();
+
+            if ch == '.' {
+                if !decimal {
+                    decimal = true;
+                } else {
+                    return Some(Err(LexerError {
+                        message: "Malformed number",
+                        pos: begin,
+                    }));
+                }
             }
         }
 
-        let token_type = if decimal {
+        let token_type: TokenType = if decimal {
             TokenType::FloatLiteral
         } else {
             TokenType::IntLiteral
         };
 
-        Some(Token {
+        Some(Ok(Token {
             token_type,
             value: num,
             pos: begin,
-        })
+        }))
     }
 
-    fn try_parse_two_char_symbol(self: &mut Lexer) -> Option<Token> {
+    fn try_parse_two_char_symbol(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
         if self.pos + 1 >= self.chars.len() {
             return None;
         }
@@ -177,14 +193,14 @@ impl Lexer {
         self.next();
         self.next();
 
-        Some(Token {
+        Some(Ok(Token {
             token_type,
             value: sym.to_string().to_owned(),
             pos: begin,
-        })
+        }))
     }
 
-    fn try_parse_one_char_symbol(self: &mut Lexer) -> Option<Token> {
+    fn try_parse_one_char_symbol(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
         let sym: char = *self.chars.get(self.pos)?;
 
         let begin: usize = self.pos;
@@ -200,16 +216,52 @@ impl Lexer {
             '*' => TokenType::Star,
             '/' => TokenType::Slash,
             '^' => TokenType::Caret,
+            '|' => TokenType::Bar,
 
             _ => return None,
         };
 
         self.next();
 
-        Some(Token {
+        if sym == '(' {
+            self.paren_depth += 1;
+        }
+        if sym == ')' {
+            self.paren_depth -= 1;
+        }
+
+        Some(Ok(Token {
             token_type,
             value: sym.to_string().to_owned(),
             pos: begin,
-        })
+        }))
     }
+
+    // fn try_terminate(&mut self, last_token: Option<&Token>) -> Option<Result<Token, LexerError>> {
+    //     let last_token: &Token = last_token?;
+    //     let ch: char = self.peek()?;
+
+    //     if ch != '\n'
+    //         || self.paren_depth != 0
+    //         || !matches!(
+    //             last_token.token_type,
+    //             TokenType::Plus | TokenType::Minus /* ... */
+    //         )
+    //     {
+    //         return None;
+    //     }
+
+    //     let begin: usize = self.pos;
+    //     self.next();
+
+    //     Some(Ok(Token {
+    //         token_type: Terminator,
+    //         value: String::new(),
+    //         pos: begin,
+    //     }))
+    // }
+}
+
+pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {
+    Lexer::tokenize(src)
 }
