@@ -1,0 +1,12 @@
+@startebnf
+
+program = {type_annotation | declaration}-;
+
+type_annotation = identifier, ":", expr;
+
+declaration = identifier, "=", expr;
+
+expr =
+    identifier, [binary_op, expr];
+
+@endebnf

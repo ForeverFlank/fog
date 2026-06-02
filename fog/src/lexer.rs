@@ -1,3 +1,5 @@
+// --- tokens ---
+
 pub enum TokenKind {
     Newline,
 
@@ -5,9 +7,11 @@ pub enum TokenKind {
     Equal,
     Colon,
     Arrow,
+    Comma,
     LeftParenthesis,
     RightParenthesis,
-    Comma,
+    LeftBrace,
+    RightBrace,
 
     IntLiteral(i64),
     FloatLiteral(f64),
@@ -17,9 +21,7 @@ pub enum TokenKind {
     Star,
     Slash,
     Caret,
-    Bar,
     Concat,
-
     LeftPipe,
     RightPipe,
     LeftComposition,
@@ -34,18 +36,25 @@ pub struct Token {
     pub column: usize,
 }
 
+// --- lexer ---
+
 struct Lexer {
     chars: Vec<char>,
     pos: usize,
     line: usize,
     column: usize,
     paren_depth: i32,
+    brace_depth: i32,
 }
 
 pub struct LexerError {
     pub message: &'static str,
     pub line: usize,
     pub column: usize,
+}
+
+pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {
+    Lexer::tokenize(src)
 }
 
 impl Lexer {
@@ -56,6 +65,7 @@ impl Lexer {
             line: 1,
             column: 1,
             paren_depth: 0,
+            brace_depth: 0,
         }
     }
 
@@ -279,7 +289,6 @@ impl Lexer {
             '*' => TokenKind::Star,
             '/' => TokenKind::Slash,
             '^' => TokenKind::Caret,
-            '|' => TokenKind::Bar,
 
             _ => return None,
         };
@@ -291,6 +300,12 @@ impl Lexer {
         }
         if sym == ')' {
             self.paren_depth -= 1;
+        }
+        if sym == '{' {
+            self.brace_depth += 1;
+        }
+        if sym == '}' {
+            self.brace_depth -= 1;
         }
 
         Some(Ok(Token {
@@ -319,8 +334,4 @@ impl Lexer {
             column: start_column,
         }))
     }
-}
-
-pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {
-    Lexer::tokenize(src)
 }
