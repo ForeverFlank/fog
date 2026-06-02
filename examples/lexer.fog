@@ -44,9 +44,9 @@ tokenizeLoop loopState =
     tokens = second loopState
     errors = third  loopState
 
-    if getPos loopState >= length (getChars loopState)
+    if getPos loopState >= length (getChars loopState),
         (lexer, reverse tokens, reverse errors)
-    else
+    else,
         parserRes : Lexer * Option (Result Token LexerError)
         parserRes =
             (tryParseWord lexer)          or
@@ -56,11 +56,11 @@ tokenizeLoop loopState =
         newLexer = first parserRes
         res      = second parserRes
 
-        if res is Some Ok token
+        if res is Some Ok token,
             (newLexer, Cons token tokens, errors)
-        if res is Some Error error
+        if res is Some Error error,
             (newLexer, tokens, Cons error errors)
-        else
+        else,
             (newLexer { pos = getPos newLexer + 1 }, tokens, errors)
 
 tokenize : String -> List Token * List LexerError

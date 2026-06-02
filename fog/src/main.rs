@@ -11,34 +11,35 @@ fn main() {
     let (tokens, _) = lexer::tokenize(src);
 
     for token in tokens {
-        let token_type_name: &str = match token.token_type {
-            lexer::TokenType::Terminator => "TERMINATOR",
-            lexer::TokenType::Identifier => "IDENTIFIER",
-            lexer::TokenType::Equal => "EQUAL",
-            lexer::TokenType::Colon => "COLON",
-            lexer::TokenType::Arrow => "ARROW",
-            lexer::TokenType::LeftParenthesis => "LPAREN",
-            lexer::TokenType::RightParenthesis => "RPAREN",
-            lexer::TokenType::IntLiteral => "INT_LITERAL",
-            lexer::TokenType::FloatLiteral => "FLOAT_LITERAL",
-            lexer::TokenType::StringLiteral => "STRING_LITERAL",
-            lexer::TokenType::Plus => "PLUS",
-            lexer::TokenType::Minus => "MINUS",
-            lexer::TokenType::Star => "STAR",
-            lexer::TokenType::Slash => "SLASH",
-            lexer::TokenType::Caret => "CARET",
-            lexer::TokenType::Bar => "BAR",
-            lexer::TokenType::Concat => "CONCAT",
-            lexer::TokenType::LeftPipe => "LPIPE",
-            lexer::TokenType::RightPipe => "RPIPE",
-            lexer::TokenType::LeftComposition => "LCOMPOSE",
-            lexer::TokenType::RightComposition => "RCOMPOSE",
-            lexer::TokenType::If => "IF",
+        let token_type_name: &str = match token.kind {
+            lexer::TokenKind::Newline => "NEWLINE",
+            lexer::TokenKind::Identifier(val) => &format!("IDENT ({})", val),
+            lexer::TokenKind::Equal => "EQUAL",
+            lexer::TokenKind::Colon => "COLON",
+            lexer::TokenKind::Arrow => "ARROW",
+            lexer::TokenKind::LeftParenthesis => "LPAREN",
+            lexer::TokenKind::RightParenthesis => "RPAREN",
+            lexer::TokenKind::Comma => "COMMA",
+            lexer::TokenKind::IntLiteral(val) => &format!("INT ({})", val),
+            lexer::TokenKind::FloatLiteral(val) => &format!("FLOAT ({})", val),
+            // lexer::TokenKind::StringLiteral(val) => &format!("STRING ({})", val),
+            lexer::TokenKind::Plus => "PLUS",
+            lexer::TokenKind::Minus => "MINUS",
+            lexer::TokenKind::Star => "STAR",
+            lexer::TokenKind::Slash => "SLASH",
+            lexer::TokenKind::Caret => "CARET",
+            lexer::TokenKind::Bar => "BAR",
+            lexer::TokenKind::Concat => "CONCAT",
+            lexer::TokenKind::LeftPipe => "LPIPE",
+            lexer::TokenKind::RightPipe => "RPIPE",
+            lexer::TokenKind::LeftComposition => "LCOMPOSE",
+            lexer::TokenKind::RightComposition => "RCOMPOSE",
+            lexer::TokenKind::If => "IF",
         };
 
         println!(
-            "{: >15} | {: >3} | {}",
-            token_type_name, token.pos, token.value
+            " {: >4}:{: >4} | {}",
+            token.line, token.column, token_type_name
         )
     }
 }

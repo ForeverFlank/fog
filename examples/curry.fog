@@ -1,4 +1,8 @@
-add : Int32 -> Int32 -> Int32
-add a b = a + b
+multiply : Int32 -> Int32 -> Int32
+multiply a b = a * b
 
-main = (add 6 7) |> toString |> printLine
+doubleIt : Int32 -> Int32
+doubleIt = multiply 2
+
+nums = [1, 2, 3]
+doubleNums = map doubleIt nums

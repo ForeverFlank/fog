@@ -1,19 +1,17 @@
-use crate::lexer::TokenType::Terminator;
+pub enum TokenKind {
+    Newline,
 
-pub enum TokenType {
-    Terminator,
-
-    Identifier,
+    Identifier(String),
     Equal,
     Colon,
     Arrow,
     LeftParenthesis,
     RightParenthesis,
+    Comma,
 
-    IntLiteral,
-    FloatLiteral,
-    StringLiteral,
-
+    IntLiteral(i64),
+    FloatLiteral(f64),
+    // StringLiteral(String),
     Plus,
     Minus,
     Star,
@@ -31,21 +29,23 @@ pub enum TokenType {
 }
 
 pub struct Token {
-    pub token_type: TokenType,
-    pub value: String,
-    pub pos: usize,
+    pub kind: TokenKind,
+    pub line: usize,
+    pub column: usize,
 }
 
 struct Lexer {
     chars: Vec<char>,
     pos: usize,
-    brace_depth: i32,
+    line: usize,
+    column: usize,
     paren_depth: i32,
 }
 
 pub struct LexerError {
     pub message: &'static str,
-    pub pos: usize,
+    pub line: usize,
+    pub column: usize,
 }
 
 impl Lexer {
@@ -53,12 +53,21 @@ impl Lexer {
         Lexer {
             chars: src.chars().collect(),
             pos: 0,
-            brace_depth: 0,
+            line: 1,
+            column: 1,
             paren_depth: 0,
         }
     }
 
-    fn next(self: &mut Lexer) {
+    fn next(&mut self) {
+        if let Some(ch) = self.peek() {
+            if ch == '\n' {
+                self.line += 1;
+                self.column = 1;
+            } else {
+                self.column += 1;
+            }
+        }
         self.pos += 1;
     }
 
@@ -72,34 +81,62 @@ impl Lexer {
         let mut errors: Vec<LexerError> = Vec::new();
 
         while lexer.pos < lexer.chars.len() {
-            if let Some(res) = lexer
-                .try_parse_word()
-                .or_else(|| lexer.try_parse_number())
-                .or_else(|| lexer.try_parse_two_char_symbol())
-                .or_else(|| lexer.try_parse_one_char_symbol())
-            // .or_else(|| lexer.try_terminate(tokens.last()))
-            {
-                if let Ok(token) = res {
-                    tokens.push(token);
-                } else if let Err(error) = res {
-                    errors.push(error)
-                }
-            } else {
-                lexer.next();
+            if lexer.skip_comment() {
+                continue;
+            }
+
+            let start_line: usize = lexer.line;
+            let start_column: usize = lexer.column;
+
+            let result: Option<Result<Token, LexerError>> = lexer
+                .parse_newline(start_line, start_column)
+                .or_else(|| lexer.parse_word(start_line, start_column))
+                .or_else(|| lexer.parse_number(start_line, start_column))
+                .or_else(|| lexer.parse_two_char_symbol(start_line, start_column))
+                .or_else(|| lexer.parse_one_char_symbol(start_line, start_column));
+
+            match result {
+                Some(Ok(token)) => tokens.push(token),
+                Some(Err(error)) => errors.push(error),
+                None => lexer.next(),
             }
         }
 
         (tokens, errors)
     }
 
-    fn try_parse_word(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
+    fn skip_comment(&mut self) -> bool {
+        if self.pos + 1 >= self.chars.len() {
+            return false;
+        }
+
+        if self.chars[self.pos] == '-' && self.chars[self.pos + 1] == '-' {
+            self.next();
+            self.next();
+
+            while let Some(ch) = self.peek() {
+                if ch == '\n' {
+                    break;
+                }
+                self.next();
+            }
+
+            return true;
+        }
+
+        false
+    }
+
+    fn parse_word(
+        &mut self,
+        start_line: usize,
+        start_column: usize,
+    ) -> Option<Result<Token, LexerError>> {
         let ch: char = self.peek()?;
 
         if !(ch.is_alphabetic() || ch == '_') {
             return None;
         }
-
-        let begin: usize = self.pos;
 
         let mut word: String = String::new();
 
@@ -112,26 +149,28 @@ impl Lexer {
             }
         }
 
-        let token_type: TokenType = match word.as_str() {
-            "if" => TokenType::If,
-            _ => TokenType::Identifier,
+        let token_type: TokenKind = match word.as_str() {
+            "if" => TokenKind::If,
+            _ => TokenKind::Identifier(word),
         };
 
         Some(Ok(Token {
-            token_type,
-            value: word,
-            pos: begin,
+            kind: token_type,
+            line: start_line,
+            column: start_column,
         }))
     }
 
-    fn try_parse_number(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
+    fn parse_number(
+        &mut self,
+        start_line: usize,
+        start_column: usize,
+    ) -> Option<Result<Token, LexerError>> {
         let ch: char = self.peek()?;
 
         if !ch.is_numeric() {
             return None;
         }
-
-        let begin: usize = self.pos;
 
         let mut num: String = String::new();
         let mut decimal: bool = false;
@@ -150,42 +189,63 @@ impl Lexer {
                 } else {
                     return Some(Err(LexerError {
                         message: "Malformed number",
-                        pos: begin,
+                        line: start_line,
+                        column: start_column,
                     }));
                 }
             }
         }
 
-        let token_type: TokenType = if decimal {
-            TokenType::FloatLiteral
+        let kind = if decimal {
+            match num.parse::<f64>() {
+                Ok(v) => TokenKind::FloatLiteral(v),
+                Err(_) => {
+                    return Some(Err(LexerError {
+                        message: "Float parse error",
+                        line: start_line,
+                        column: start_column,
+                    }));
+                }
+            }
         } else {
-            TokenType::IntLiteral
+            match num.parse::<i64>() {
+                Ok(v) => TokenKind::IntLiteral(v),
+                Err(_) => {
+                    return Some(Err(LexerError {
+                        message: "Integer parse error",
+                        line: start_line,
+                        column: start_column,
+                    }));
+                }
+            }
         };
 
         Some(Ok(Token {
-            token_type,
-            value: num,
-            pos: begin,
+            kind,
+            line: start_line,
+            column: start_column,
         }))
     }
 
-    fn try_parse_two_char_symbol(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
+    fn parse_two_char_symbol(
+        &mut self,
+        start_line: usize,
+        start_column: usize,
+    ) -> Option<Result<Token, LexerError>> {
         if self.pos + 1 >= self.chars.len() {
             return None;
         }
 
         let sym: String = self.chars[self.pos..self.pos + 2].iter().collect();
 
-        let begin: usize = self.pos;
+        let token_type: TokenKind = match sym.as_str() {
+            "->" => TokenKind::Arrow,
 
-        let token_type: TokenType = match sym.as_str() {
-            "->" => TokenType::Arrow,
-
-            "||" => TokenType::Concat,
-            "<|" => TokenType::LeftPipe,
-            "|>" => TokenType::RightPipe,
-            "<<" => TokenType::LeftComposition,
-            ">>" => TokenType::RightComposition,
+            "||" => TokenKind::Concat,
+            "<|" => TokenKind::LeftPipe,
+            "|>" => TokenKind::RightPipe,
+            "<<" => TokenKind::LeftComposition,
+            ">>" => TokenKind::RightComposition,
 
             _ => return None,
         };
@@ -194,29 +254,32 @@ impl Lexer {
         self.next();
 
         Some(Ok(Token {
-            token_type,
-            value: sym.to_string().to_owned(),
-            pos: begin,
+            kind: token_type,
+            line: start_line,
+            column: start_column,
         }))
     }
 
-    fn try_parse_one_char_symbol(self: &mut Lexer) -> Option<Result<Token, LexerError>> {
-        let sym: char = *self.chars.get(self.pos)?;
+    fn parse_one_char_symbol(
+        &mut self,
+        start_line: usize,
+        start_column: usize,
+    ) -> Option<Result<Token, LexerError>> {
+        let sym: char = self.peek()?;
 
-        let begin: usize = self.pos;
+        let token_type: TokenKind = match sym {
+            ':' => TokenKind::Colon,
+            '=' => TokenKind::Equal,
+            '(' => TokenKind::LeftParenthesis,
+            ')' => TokenKind::RightParenthesis,
+            ',' => TokenKind::Comma,
 
-        let token_type: TokenType = match sym {
-            ':' => TokenType::Colon,
-            '=' => TokenType::Equal,
-            '(' => TokenType::LeftParenthesis,
-            ')' => TokenType::RightParenthesis,
-
-            '+' => TokenType::Plus,
-            '-' => TokenType::Minus,
-            '*' => TokenType::Star,
-            '/' => TokenType::Slash,
-            '^' => TokenType::Caret,
-            '|' => TokenType::Bar,
+            '+' => TokenKind::Plus,
+            '-' => TokenKind::Minus,
+            '*' => TokenKind::Star,
+            '/' => TokenKind::Slash,
+            '^' => TokenKind::Caret,
+            '|' => TokenKind::Bar,
 
             _ => return None,
         };
@@ -231,35 +294,31 @@ impl Lexer {
         }
 
         Some(Ok(Token {
-            token_type,
-            value: sym.to_string().to_owned(),
-            pos: begin,
+            kind: token_type,
+            line: start_line,
+            column: start_column,
         }))
     }
 
-    // fn try_terminate(&mut self, last_token: Option<&Token>) -> Option<Result<Token, LexerError>> {
-    //     let last_token: &Token = last_token?;
-    //     let ch: char = self.peek()?;
+    fn parse_newline(
+        &mut self,
+        start_line: usize,
+        start_column: usize,
+    ) -> Option<Result<Token, LexerError>> {
+        let ch: char = self.peek()?;
 
-    //     if ch != '\n'
-    //         || self.paren_depth != 0
-    //         || !matches!(
-    //             last_token.token_type,
-    //             TokenType::Plus | TokenType::Minus /* ... */
-    //         )
-    //     {
-    //         return None;
-    //     }
+        if ch != '\n' {
+            return None;
+        }
 
-    //     let begin: usize = self.pos;
-    //     self.next();
+        self.next();
 
-    //     Some(Ok(Token {
-    //         token_type: Terminator,
-    //         value: String::new(),
-    //         pos: begin,
-    //     }))
-    // }
+        Some(Ok(Token {
+            kind: TokenKind::Newline,
+            line: start_line,
+            column: start_column,
+        }))
+    }
 }
 
 pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {
