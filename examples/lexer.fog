@@ -1,4 +1,4 @@
--- tokens
+--- tokens ---
 
 TokenType : Type
 TokenType =
@@ -15,7 +15,7 @@ Token = {
     pos         : Int32
 }
 
--- lexer
+--- lexer ---
 
 Lexer : Type
 Lexer = {
@@ -33,35 +33,31 @@ LexerError = {
 tryParseWord : Lexer -> Lexer * Option (Result Token LexerError)
 tryParseWord = -- ...
 
--- tokenize
+--- tokenize ---
 
 TokenizeLoopState : Type
 TokenizeLoopState = Lexer * List Token * List LexerError
 
 tokenizeLoop : TokenizeLoopState -> TokenizeLoopState
 tokenizeLoop loopState =
-    lexer  = first  loopState
-    tokens = second loopState
-    errors = third  loopState
+    (lexer, token, errors) = loopState
 
-    if getPos loopState >= length (getChars loopState),
+    if getPos loopState >= length (getChars loopState) {
         (lexer, reverse tokens, reverse errors)
-    else,
-        parserRes : Lexer * Option (Result Token LexerError)
-        parserRes =
-            (tryParseWord lexer)          or
-            (tryParseTwoCharSymbol lexer) or
+    }
+    else {
+        (newLexer, res) =
+            (tryParseWord lexer)          orElse
+            (tryParseTwoCharSymbol lexer) orElse
             (tryParseOneCharSymbol lexer)
-        
-        newLexer = first parserRes
-        res      = second parserRes
 
-        if res is Some Ok token,
-            (newLexer, Cons token tokens, errors)
-        if res is Some Error error,
-            (newLexer, tokens, Cons error errors)
-        else,
-            (newLexer { pos = getPos newLexer + 1 }, tokens, errors)
+        match res {
+            Some Ok Token    -> (newLexer, [token] || tokens, errors)
+            Some Error error -> (newLexer, tokens, [error] || errors)
+            else             -> (newLexer { pos = getPos newLexer + 1 }, tokens, errors)
+        }
+    }
+
 
 tokenize : String -> List Token * List LexerError
 tokenize src = 

@@ -3,8 +3,8 @@
 tuple : Int32 * Float32
 tuple = (10, 2.4f)
 
-num1 = first tuple    -- 10
-num2 = second tuple   -- 2.4f
+num1 = tuple[0]   -- 10
+num2 = tuple[1]   -- 2.4f
 
 -- records --
 

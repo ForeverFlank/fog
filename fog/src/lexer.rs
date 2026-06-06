@@ -282,9 +282,11 @@ impl Lexer {
         let token_type: TokenKind = match sym {
             ':' => TokenKind::Colon,
             '=' => TokenKind::Equal,
+            ',' => TokenKind::Comma,
             '(' => TokenKind::LeftParenthesis,
             ')' => TokenKind::RightParenthesis,
-            ',' => TokenKind::Comma,
+            '{' => TokenKind::LeftBrace,
+            '}' => TokenKind::RightBrace,
 
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,

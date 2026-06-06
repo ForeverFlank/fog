@@ -10,7 +10,7 @@ fn main() {
 
     let src: &str = &fs::read_to_string(path).expect("Failed to read source file");
 
-    let (tokens, lexerErrors) = lexer::tokenize(src);
+    let (tokens, lexer_errors) = lexer::tokenize(src);
 
     for token in tokens {
         let token_type_name: &str = match token.kind {
@@ -47,7 +47,7 @@ fn main() {
         )
     }
 
-    for error in lexerErrors {
+    for error in lexer_errors {
         println!(
             "Error: {} at {}:{}",
             error.message, error.line, error.column

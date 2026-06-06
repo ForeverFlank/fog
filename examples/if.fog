@@ -1,0 +1,21 @@
+testNumber : Int32 -> String
+testNumber n =
+    if n > 0 {
+        if n >= 100, "number is positive and quite big"
+        else,        "number is positive"
+    }
+    if n < 0, "number is negative"
+    else,     "number is zero"
+
+
+str1 : String
+str1 = testNumber -1
+
+str2 : String
+str2 = testNumber 0
+
+str3 : String
+str3 = testNumber 1
+
+str4 : String
+str4 = testNumber 100

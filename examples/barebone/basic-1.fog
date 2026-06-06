@@ -1,0 +1,4 @@
+-- type annotation and assignment
+
+num : Int32
+num = 5
