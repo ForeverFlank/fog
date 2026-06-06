@@ -1,0 +1,8 @@
+Int : UInt32 -> Type
+Int n = ... -- ???
+
+(lhs : ??) + (rhs : ??) = ???
+
+bigNum : Int 10000
+bigNum = 10^6969 + 10^420 + 1
+

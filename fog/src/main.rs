@@ -12,8 +12,19 @@ fn main() {
 
     let (tokens, lexer_errors) = lexer::tokenize(src);
 
-    for token in tokens {
-        let token_type_name: &str = match token.kind {
+    print_tokens(&tokens);
+    print_lexer_errors(&lexer_errors);
+
+    let (ast, ast_parser_errors) = ast_parser::parse_program(tokens);
+
+    print_ast_parser_errors(&ast_parser_errors);
+}
+
+// --- Lexer ---
+
+fn print_tokens(tokens: &Vec<lexer::Token>) {
+    for token in tokens.as_slice() {
+        let token_type_name: &str = match &token.kind {
             lexer::TokenKind::Newline => "Newline",
             lexer::TokenKind::Identifier(val) => &format!("Identifier ({})", val),
             lexer::TokenKind::Equal => "Equal",
@@ -46,11 +57,24 @@ fn main() {
             token.line, token.column, token_type_name
         )
     }
+}
 
-    for error in lexer_errors {
+fn print_lexer_errors(errors: &Vec<lexer::LexerError>) {
+    for error in errors {
         println!(
             "Error: {} at {}:{}",
             error.message, error.line, error.column
+        )
+    }
+}
+
+// --- AST ---
+
+fn print_ast_parser_errors(errors: &Vec<ast_parser::ASTParserError>) {
+    for error in errors {
+        println!(
+            "Error: {} at {}:{}",
+            error.message, error.token.line, error.token.column
         )
     }
 }

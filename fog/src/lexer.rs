@@ -31,10 +31,51 @@ pub enum TokenKind {
     If,
 }
 
+impl Clone for TokenKind {
+    fn clone(&self) -> Self {
+        match self {
+            TokenKind::Newline => TokenKind::Newline,
+            TokenKind::Identifier(name) => TokenKind::Identifier(name.to_string()),
+            TokenKind::Equal => TokenKind::Equal,
+            TokenKind::Colon => TokenKind::Colon,
+            TokenKind::Arrow => TokenKind::Arrow,
+            TokenKind::FatArrow => TokenKind::FatArrow,
+            TokenKind::Comma => TokenKind::Comma,
+            TokenKind::LeftParenthesis => TokenKind::LeftParenthesis,
+            TokenKind::RightParenthesis => TokenKind::RightParenthesis,
+            TokenKind::LeftBrace => TokenKind::LeftBrace,
+            TokenKind::RightBrace => TokenKind::RightBrace,
+            TokenKind::IntLiteral(value) => TokenKind::IntLiteral(*value),
+            TokenKind::FloatLiteral(value) => TokenKind::FloatLiteral(*value),
+            TokenKind::Plus => TokenKind::Plus,
+            TokenKind::Minus => TokenKind::Minus,
+            TokenKind::Star => TokenKind::Star,
+            TokenKind::Slash => TokenKind::Slash,
+            TokenKind::Caret => TokenKind::Caret,
+            TokenKind::Concat => TokenKind::Concat,
+            TokenKind::LeftPipe => TokenKind::LeftPipe,
+            TokenKind::RightPipe => TokenKind::RightPipe,
+            TokenKind::LeftComposition => TokenKind::LeftComposition,
+            TokenKind::RightComposition => TokenKind::RightComposition,
+            TokenKind::If => TokenKind::If,
+        }
+    }
+}
+
 pub struct Token {
     pub kind: TokenKind,
     pub line: usize,
     pub column: usize,
+}
+
+impl Clone for Token {
+    fn clone(&self) -> Self {
+        Token {
+            kind: self.kind.clone(),
+            line: self.line,
+            column: self.column,
+        }
+    }
 }
 
 // --- lexer ---
@@ -59,7 +100,7 @@ pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {
 }
 
 impl Lexer {
-    fn new(src: &str) -> Lexer {
+    fn new(src: &str) -> Self {
         Lexer {
             chars: src.chars().collect(),
             pos: 0,
@@ -68,6 +109,10 @@ impl Lexer {
             paren_depth: 0,
             brace_depth: 0,
         }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.chars.get(self.pos).copied()
     }
 
     fn next(&mut self) {
@@ -80,10 +125,6 @@ impl Lexer {
             }
         }
         self.pos += 1;
-    }
-
-    fn peek(self: &Lexer) -> Option<char> {
-        self.chars.get(self.pos).copied()
     }
 
     pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {

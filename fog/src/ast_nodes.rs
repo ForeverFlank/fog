@@ -1,50 +1,39 @@
 // --- AST nodes ---
 
 pub struct Program {
-    pub items: Vec<Statement>,
+    pub statements: Vec<Statement>,
 }
 
 pub enum Statement {
-    TypeAnnotation(TypeAnnotation),
-    Declaration(Declaration),
+    TypeAnnotation(Identifier, Expr),
+    Declaration(Identifier, Expr),
 }
 
-pub struct TypeAnnotation {
-    pub identifier: Identifier,
-    pub typeExpr: Expr,
-}
+pub struct Identifier(pub String);
 
-pub struct Declaration {
-    pub identifier: Identifier,
-    pub expr: Expr,
-}
-
-pub struct Identifier {
-    pub name: String,
+impl Identifier {
+    pub fn new(name: &str) -> Self {
+        Identifier(name.to_string())
+    }
 }
 
 // --- expressions ---
 
 pub enum Expr {
     Identifier(Identifier),
-    Binary(BinaryExpr),
+    Lambda(Lambda),
+    FuncAppl(FuncAppl),
+    IntLiteral(i64),
+    FloatLiteral(f64),
+    StringLiteral(String),
 }
 
-pub struct BinaryExpr {
-    pub lhs: Box<Expr>,
-    pub op: BinaryOp,
-    pub rhs: Box<Expr>,
+pub struct Lambda {
+    pub parameter: Identifier,
+    pub body: Box<Expr>,
 }
 
-pub enum BinaryOp {
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Caret,
-    Concat,
-    LeftPipe,
-    RightPipe,
-    LeftComposition,
-    RightComposition,
+pub struct FuncAppl {
+    pub function: Identifier,
+    pub arguments: Vec<Box<Expr>>,
 }
