@@ -48,7 +48,7 @@ fn is_primary_starter(token: &Token) -> bool {
     }
 }
 
-pub fn parse_program(tokens: Vec<Token>) -> (Program, Vec<ASTParserError>) {
+pub fn parse_program(tokens: Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
     ASTParser::parse_program(tokens)
 }
 
@@ -91,7 +91,7 @@ impl ASTParser {
         token_op_key(token).and_then(|key| self.binary_ops.get(key))
     }
 
-    fn parse_program(tokens: Vec<Token>) -> (Program, Vec<ASTParserError>) {
+    fn parse_program(tokens: Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
         let mut parser: ASTParser = ASTParser::new(tokens);
         let mut statements: Vec<Statement> = Vec::new();
         let mut errors: Vec<ASTParserError> = Vec::new();
@@ -106,7 +106,7 @@ impl ASTParser {
             parser.next();
         }
 
-        let program: Program = Program { statements };
+        let program: Box<Program> = Box::new(Program { statements });
 
         (program, errors)
     }

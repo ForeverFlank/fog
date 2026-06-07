@@ -4,27 +4,47 @@ use std::path;
 
 use crate::ast_nodes::Statement::Declaration;
 use crate::ast_nodes::Statement::TypeAnnotation;
+
 mod ast_nodes;
 mod ast_parser;
+mod interpreter;
 mod lexer;
 
 fn main() {
+    // --- arguments and paths ---
     let args: Vec<String> = env::args().collect();
     let path: &String = args.get(1).expect("Usage: ./fog <path>");
 
+    let arg_print_tokens = args.contains(&"--print-tokens".to_string());
+    let arg_emit_ast = args.contains(&"--emit-ast".to_string());
+
+    // --- read file ---
     let src: &str = &fs::read_to_string(path).expect("Failed to read source file");
 
+    // --- compilation ---
+    // -- lexing
     let (tokens, lexer_errors) = lexer::tokenize(src);
 
-    print_tokens(&tokens);
+    if arg_print_tokens {
+        print_tokens(&tokens);
+    }
+
     print_lexer_errors(&lexer_errors);
 
+    // -- AST parsing
     let (ast, ast_parser_errors) = ast_parser::parse_program(tokens);
 
-    let puml: String = emit_ast_puml(&ast, path);
-    let output_path: path::PathBuf = path::Path::new(path).with_extension("puml");
-    let _ = fs::write(output_path, puml);
+    if arg_emit_ast {
+        let puml: String = emit_ast_puml(&ast, path);
+        let output_path: path::PathBuf = path::Path::new(path).with_extension("puml");
+        let _ = fs::write(output_path, puml);
+    }
+
     print_ast_parser_errors(&ast_parser_errors);
+
+    // -- interpreting
+
+    interpreter::run(ast);
 }
 
 // --- Lexer ---
