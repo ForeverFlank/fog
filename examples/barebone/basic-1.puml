@@ -1,0 +1,16 @@
+@startuml AST of ../examples/barebone/basic-1.fog
+title AST of ../examples/barebone/basic-1.fog
+rectangle "Program" as n0 #d0d0d0
+rectangle "TypeAnnotation" as n1 #aef1eb
+rectangle "Identifier: num" as n2 #fffc9f
+rectangle "Identifier: Int32" as n3 #fffc9f
+n1 <-- n2
+n1 <-- n3
+n0 <-- n1
+rectangle "Declaration" as n4 #aef1eb
+rectangle "Identifier: num" as n5 #fffc9f
+rectangle "Int: 5" as n6 #ffb0b0
+n4 <-- n5
+n4 <-- n6
+n0 <-- n4
+@enduml

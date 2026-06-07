@@ -13,24 +13,27 @@ pub struct ASTParserError {
     pub token: Token,
 }
 
+#[derive(Clone)]
 pub enum BinaryOpAssociativity {
     Left,
     Right,
-}
-
-impl Clone for BinaryOpAssociativity {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Left => Self::Left,
-            Self::Right => Self::Right,
-        }
-    }
 }
 
 pub struct BinaryOp {
     pub name: String,
     pub associativity: BinaryOpAssociativity,
     pub precedence: i32,
+}
+
+fn token_op_key(token: &Token) -> Option<&str> {
+    match &token.kind {
+        TokenKind::Plus => Some("+"),
+        TokenKind::Minus => Some("-"),
+        TokenKind::Star => Some("*"),
+        TokenKind::Slash => Some("/"),
+        TokenKind::Identifier(name) => Some(name.as_str()),
+        _ => None,
+    }
 }
 
 fn is_primary_starter(token: &Token) -> bool {
@@ -53,7 +56,24 @@ impl ASTParser {
         ASTParser {
             tokens: tokens,
             pos: 0,
-            binary_ops: HashMap::new(),
+            binary_ops: [
+                ("+", BinaryOpAssociativity::Left, 1),
+                ("-", BinaryOpAssociativity::Left, 1),
+                ("*", BinaryOpAssociativity::Left, 2),
+                ("/", BinaryOpAssociativity::Left, 2),
+            ]
+            .iter()
+            .map(|(sym, assoc, prec)| {
+                (
+                    sym.to_string(),
+                    BinaryOp {
+                        name: sym.to_string(),
+                        associativity: assoc.clone(),
+                        precedence: *prec,
+                    },
+                )
+            })
+            .collect(),
         }
     }
 
@@ -66,10 +86,7 @@ impl ASTParser {
     }
 
     fn get_binary_op(&self, token: &Token) -> Option<&BinaryOp> {
-        match &token.kind {
-            TokenKind::Identifier(name) => self.binary_ops.get(name.as_str()),
-            _ => None,
-        }
+        token_op_key(token).and_then(|key| self.binary_ops.get(key))
     }
 
     fn parse_program(tokens: Vec<Token>) -> (Program, Vec<ASTParserError>) {
@@ -186,12 +203,12 @@ impl ASTParser {
         // -2 should be negative two
         // - 2 should be x => x - 2
         if let TokenKind::Minus = token.kind {
-            let opnd = match self.parse_primary() {
+            let opnd: Expr = match self.parse_primary() {
                 Ok(opnd) => opnd,
                 Err(error) => return Err(error),
             };
             return Ok(Expr::FuncAppl(FuncAppl {
-                function: Identifier::new("__minus"),
+                function: Identifier::new("-"),
                 arguments: vec![Box::new(opnd)],
             }));
         }
