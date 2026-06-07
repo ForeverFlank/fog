@@ -15,8 +15,8 @@ pub enum TokenKind {
     LeftBrace,
     RightBrace,
 
-    IntLiteral(i64),
-    FloatLiteral(f64),
+    Int32Literal(i32),
+    Float32Literal(f32),
     // StringLiteral(String),
     Plus,
     Minus,
@@ -210,8 +210,8 @@ impl Lexer {
         }
 
         let kind = if decimal {
-            match num.parse::<f64>() {
-                Ok(v) => TokenKind::FloatLiteral(v),
+            match num.parse::<f32>() {
+                Ok(v) => TokenKind::Float32Literal(v),
                 Err(_) => {
                     return Some(Err(LexerError {
                         message: "Float parse error",
@@ -221,8 +221,8 @@ impl Lexer {
                 }
             }
         } else {
-            match num.parse::<i64>() {
-                Ok(v) => TokenKind::IntLiteral(v),
+            match num.parse::<i32>() {
+                Ok(v) => TokenKind::Int32Literal(v),
                 Err(_) => {
                     return Some(Err(LexerError {
                         message: "Integer parse error",

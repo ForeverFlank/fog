@@ -1,5 +1,2 @@
-# !/usr/bin
-
-make -C src
-mv ./src/fog ./
-make clean -C src
+mkdir -p bin
+rustc fog/src/main.rs -o bin/fog

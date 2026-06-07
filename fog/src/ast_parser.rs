@@ -40,8 +40,8 @@ fn token_op_key(token: &Token) -> Option<&str> {
 fn is_primary_starter(token: &Token) -> bool {
     match token.kind {
         TokenKind::Identifier(_)
-        | TokenKind::IntLiteral(_)
-        | TokenKind::FloatLiteral(_)
+        | TokenKind::Int32Literal(_)
+        | TokenKind::Float32Literal(_)
         | TokenKind::LeftParenthesis
         | TokenKind::Minus => true,
         _ => false,
@@ -193,12 +193,12 @@ impl ASTParser {
         let token: Token = self.peek().clone();
         self.next();
 
-        if let TokenKind::IntLiteral(value) = token.kind {
-            return Ok(Expr::IntLiteral(value));
+        if let TokenKind::Int32Literal(value) = token.kind {
+            return Ok(Expr::Int32Literal(value));
         }
 
-        if let TokenKind::FloatLiteral(value) = token.kind {
-            return Ok(Expr::FloatLiteral(value));
+        if let TokenKind::Float32Literal(value) = token.kind {
+            return Ok(Expr::Float32Literal(value));
         }
 
         // TODO: partial application

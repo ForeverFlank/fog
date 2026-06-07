@@ -1,37 +1,51 @@
 # fog
 
-a functional toy language made as a "fun" "side" project.
+A functional toy language made as a "fun" "side" project.
 
-## status
+## Feature
 
-- [x] lexer
-- [x] AST parser
-- [ ] interpreter
-- [ ] compiler (LLVM?)
+| Feature          | Status         |
+|------------------|----------------|
+| Lexer            | ✅ Done        |
+| AST Parser       | ✅ Done        |
+| Interpreter      | ⏳ In progress |
+| Compiler (LLVM?) | 💤 Pending     |
 
-## why name it fog?
+## Why name it fog?
 
-because
+Because
 
-- fog looks like f ∘ g, of which ∘ denotes function composition. this language is a functional language so it fits,
-- I had a brain fog making this language, and
-- you will have a brain fog writing in this language, too.
+- fog looks like f ∘ g, of which ∘ denotes function composition. This language is a functional language so it fits.
+- I had a brain fog making this language.
+- You will have a brain fog writing in this language, too.
 
-## why fog?
+## Why fog?
 
-because
+Because
 
-- it gives the power of a functionally pure language while having an imperative language-like syntaxes.
+- It gives the power of a functionally pure language while having an imperative language-like syntaxes.
+- etc.
 
-yup. a single bullet point. this is more of a "fun" "side" project, rather than something production-ready, or something usable in the real world. use this if you wish to have some "fun".
+This is more of a "fun" "side" project, rather than something usable in the real world. Use this if you wish to have some "fun", or to mess around with the language, although I'm happy to know if this language turns out to be actually good.
 
-## installation/usage
+## Usage
 
-not at this moment.
+Install [rustc](https://rust-lang.org/tools/install/), then run
 
-## examples
+```
+chmod +x build.sh
+./build.sh
+./bin/fog <path-to-source-file>
+```
 
-final state of the project should be able to run something like
+### Arguments
+
+- `--print-tokens` – will print the tokens produced by the lexer.
+- `--emit-ast` – will emit the AST in PlantUML format.
+
+## Examples
+
+Final state of the project should be able to run something like:
 
 ```fog
 fib : Int32 -> Int32
@@ -46,6 +60,6 @@ num = fib 6
 main = num |> toString |> printLine
 ```
 
-## license
+## License
 
 MIT

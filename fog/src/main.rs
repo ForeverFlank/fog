@@ -62,8 +62,8 @@ fn get_token_string(token: &lexer::Token) -> String {
         lexer::TokenKind::LeftBrace => "LeftBrace".to_string(),
         lexer::TokenKind::RightBrace => "RightBrace".to_string(),
         lexer::TokenKind::Comma => "Comma".to_string(),
-        lexer::TokenKind::IntLiteral(val) => format!("Int ({})", val),
-        lexer::TokenKind::FloatLiteral(val) => format!("Float ({})", val),
+        lexer::TokenKind::Int32Literal(val) => format!("Int ({})", val),
+        lexer::TokenKind::Float32Literal(val) => format!("Float ({})", val),
         // lexer::TokenKind::StringLiteral(val) => format!("String ({})", val),
         lexer::TokenKind::Plus => "Plus".to_string(),
         lexer::TokenKind::Minus => "Minus".to_string(),
@@ -168,8 +168,10 @@ fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast_nodes::Sta
 
 fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) -> i32 {
     match expr {
-        ast_nodes::Expr::IntLiteral(val) => new_node(out, id, &format!("{}", val), COLOR_LITERAL),
-        ast_nodes::Expr::FloatLiteral(val) => new_node(out, id, &format!("{}", val), COLOR_LITERAL),
+        ast_nodes::Expr::Int32Literal(val) => new_node(out, id, &format!("{}", val), COLOR_LITERAL),
+        ast_nodes::Expr::Float32Literal(val) => {
+            new_node(out, id, &format!("{}", val), COLOR_LITERAL)
+        }
         ast_nodes::Expr::StringLiteral(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }

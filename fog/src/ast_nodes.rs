@@ -20,12 +20,37 @@ impl Identifier {
 // --- expressions ---
 
 pub enum Expr {
-    Identifier(Identifier),
+    Identifier(Identifier), // TODO just use string lol
     Lambda(Lambda),
     FuncAppl(FuncAppl),
-    IntLiteral(i64),
-    FloatLiteral(f64),
+    Int32Literal(i32),
+    Float32Literal(f32),
     StringLiteral(String),
+}
+
+impl ToString for Expr {
+    fn to_string(&self) -> String {
+        match self {
+            Expr::Identifier(ident) => ident.0.clone(),
+            Expr::Lambda(Lambda { parameter, body }) => {
+                format!("{} => {}", parameter.0, body.to_string())
+            }
+            Expr::FuncAppl(FuncAppl {
+                function,
+                arguments,
+            }) => {
+                let args = arguments
+                    .iter()
+                    .map(|arg| arg.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{}({})", function.0, args)
+            }
+            Expr::Int32Literal(value) => value.to_string(),
+            Expr::Float32Literal(value) => value.to_string(),
+            Expr::StringLiteral(value) => format!("\"{}\"", value),
+        }
+    }
 }
 
 pub struct Lambda {
