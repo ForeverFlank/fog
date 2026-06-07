@@ -31,6 +31,7 @@ fn token_op_key(token: &Token) -> Option<&str> {
         TokenKind::Minus => Some("-"),
         TokenKind::Star => Some("*"),
         TokenKind::Slash => Some("/"),
+        TokenKind::Arrow => Some("->"),
         TokenKind::Identifier(name) => Some(name.as_str()),
         _ => None,
     }
@@ -57,10 +58,11 @@ impl ASTParser {
             tokens: tokens,
             pos: 0,
             binary_ops: [
-                ("+", BinaryOpAssociativity::Left, 1),
-                ("-", BinaryOpAssociativity::Left, 1),
-                ("*", BinaryOpAssociativity::Left, 2),
-                ("/", BinaryOpAssociativity::Left, 2),
+                ("*", BinaryOpAssociativity::Left, 3),
+                ("/", BinaryOpAssociativity::Left, 3),
+                ("+", BinaryOpAssociativity::Left, 2),
+                ("-", BinaryOpAssociativity::Left, 2),
+                ("->", BinaryOpAssociativity::Left, 1),
             ]
             .iter()
             .map(|(sym, assoc, prec)| {
@@ -252,6 +254,21 @@ impl ASTParser {
                     arguments: args,
                 }));
             }
+        }
+
+        if let TokenKind::LeftParenthesis = token.kind {
+            let res: Result<Expr, ASTParserError> = self.parse_expression(i32::MIN);
+
+            return match self.peek().kind {
+                TokenKind::RightParenthesis => {
+                    self.next();
+                    res
+                }
+                _ => Err(ASTParserError {
+                    message: "Expected ')'",
+                    token,
+                }),
+            };
         }
 
         Err(ASTParserError {
