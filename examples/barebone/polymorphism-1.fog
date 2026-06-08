@@ -1,0 +1,11 @@
+-- parametric polymorphism
+-- commonly known as generics
+
+id : a -> a
+id x = x
+
+num1 : Int32
+num1 = 5
+
+num2 : Int32
+num2 = id num1

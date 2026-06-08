@@ -1,8 +1,5 @@
--- functions
+-- order of operations
+-- should be -9.5
 
-f : Int32 -> Int32
-f = x => x + 2
-
-num1 : Int32
-num1 = f 67
-
+a : Float32
+a = 4 + 3 / 2 + 2 * (-1 + 6 / 3 - 9) - (-1)

@@ -1,0 +1,26 @@
+-- the type system.
+-- this program isn't meant to be executed,
+-- but to demonstrate how fog type system works.
+
+-- Kind is at the top of the type hierarchy.
+-- Kind itself has no "type".
+
+Kind : -- nothing
+
+
+-- the type itself
+
+Type       : Kind
+->         : Kind           -- used in Kind -> Kind
+Constraint : Kind           -- used in ad-hoc polymorphism, a.k.a. interfaces
+
+
+-- the primitive types
+
+Int32   : Type
+Float32 : Type
+Char    : Type
+-- ...
+
+-- the arrow type
+Function : Kind -> Kind     -- the '-> : Kind' above

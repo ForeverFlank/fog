@@ -1,14 +1,8 @@
--- the nᵗʰ Fibonacci number function
--- as a recurrence relation
+-- functions
 
-fib : Int32 -> Int32
-fib = n =>
-    if n == 0, 0
-    if n == 1, 1
-    else,      fib (n - 1) + fib (n - 2)
+f : Int32 -> Int32
+f = x => x + 2
 
 num1 : Int32
-num1 = fib 5    -- 5
+num1 = f 67
 
-num2 : Int32
-num2 = fib 6    -- 8

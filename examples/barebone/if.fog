@@ -1,0 +1,18 @@
+Bool : Type
+Bool = True | False
+
+if : Bool -> a -> a -> a
+if cond a b =
+    match cond {
+        True -> a
+        False -> b
+    }
+
+fib : Int32 -> Int32
+fib n = 
+    if (n == 0) 0
+    if (n == 1) 1
+    (fib (n - 1) + fib (n - 2))
+
+num : Int32
+num = fib 10
