@@ -24,7 +24,7 @@ main = num |> toString |> printLine
 - Purely functional
 - Eagerly evaluated
 - Imperative-like syntaxes
-- Strict type system, possible statically typed with full type erasure
+- Strict type system, possibly statically typed with full type erasure
 
 ## Progress
 

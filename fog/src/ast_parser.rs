@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{ast_nodes::*, lexer::*};
 
@@ -180,10 +180,10 @@ impl ASTParser {
                 Err(error) => return Err(error),
             });
 
-            lhs = Expr::FuncAppl(FuncAppl {
-                function: Identifier(op_name),
+            lhs = Expr::FuncAppl {
+                function_name: op_name,
                 arguments: vec![Box::new(lhs), rhs],
-            });
+            };
         }
 
         Ok(lhs)
@@ -209,10 +209,10 @@ impl ASTParser {
                 Ok(opnd) => opnd,
                 Err(error) => return Err(error),
             };
-            return Ok(Expr::FuncAppl(FuncAppl {
-                function: Identifier::new("-"),
+            return Ok(Expr::FuncAppl {
+                function_name: "-".to_string(),
                 arguments: vec![Box::new(opnd)],
-            }));
+            });
         }
 
         if let TokenKind::Identifier(name) = token.kind {
@@ -225,10 +225,10 @@ impl ASTParser {
                     Err(error) => return Err(error),
                 };
 
-                return Ok(Expr::Lambda(Lambda {
-                    parameter: Identifier(name),
-                    body: Box::new(body),
-                }));
+                return Ok(Expr::Lambda {
+                    parameter_name: name,
+                    body: Rc::new(body),
+                });
             }
 
             // check for arguments
@@ -247,12 +247,12 @@ impl ASTParser {
             }
 
             if args.is_empty() {
-                return Ok(Expr::Identifier(Identifier(name)));
+                return Ok(Expr::Identifier(name));
             } else {
-                return Ok(Expr::FuncAppl(FuncAppl {
-                    function: Identifier(name),
+                return Ok(Expr::FuncAppl {
+                    function_name: name,
                     arguments: args,
-                }));
+                });
             }
         }
 

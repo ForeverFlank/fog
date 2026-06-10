@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt::{Display, format};
 use std::rc::Rc;
 
 use crate::ast_nodes::Statement::*;
@@ -19,7 +18,12 @@ pub enum Value {
     Type(Rc<Type>),
     Int32(i32),
     Float32(f32),
-    Function(Rc<Identifier>, Rc<Expr>),
+    Function {
+        parameter_name: String,
+        body: Rc<Expr>,
+        captured_env: Box<Environment>,
+    },
+    NativeFunction(Rc<dyn Fn(Value) -> Result<Value, InterpreterError>>),
 }
 
 impl ToString for Value {
@@ -28,7 +32,14 @@ impl ToString for Value {
             Value::Type(r#type) => (*r#type).to_string(),
             Value::Int32(value) => value.to_string(),
             Value::Float32(value) => value.to_string(),
-            Value::Function(param, expr) => format!("{} => {}", param.0, (*expr).to_string()),
+            Value::Function {
+                parameter_name,
+                body,
+                ..
+            } => {
+                format!("{} => {}", parameter_name, (*body).to_string())
+            }
+            Value::NativeFunction(_) => "[native function]".to_string(),
         }
     }
 }
@@ -61,13 +72,14 @@ fn is_value_of_type(value: &Value, r#type: &Type) -> bool {
         (Value::Type(_), Type::Type) => true,
         (Value::Int32(_), Type::Int32) => true,
         (Value::Float32(_), Type::Float32) => true,
-        (Value::Function(_, _), Type::Function(_, _)) => true,
+        (Value::Function { .. }, Type::Function(_, _)) => true,
         _ => false,
     }
 }
 
 // --- environment ---
 
+#[derive(Clone)]
 pub struct Environment {
     pub variables: HashMap<String, Variable>,
     pub parent: Option<Box<Environment>>,
@@ -76,12 +88,10 @@ pub struct Environment {
 impl Environment {
     fn annotate_type(&mut self, name: &str, r#type: Rc<Type>) -> Result<(), InterpreterError> {
         if self.variables.contains_key(name) {
-            return Err(InterpreterError {
-                message: format!(
-                    "variable `{}` already annotated its type in the scope",
-                    name
-                ),
-            });
+            return Err(InterpreterError::from_string(format!(
+                "variable `{}` already annotated its type in the scope",
+                name
+            )));
         }
 
         self.variables.insert(
@@ -97,46 +107,45 @@ impl Environment {
     }
 
     fn declare(&mut self, name: &str, value: Value) -> Result<(), InterpreterError> {
-        let existing: Option<&mut Variable> = self.variables.get_mut(name);
+        let var: &mut Variable = self.variables.get_mut(name).ok_or_else(|| {
+            InterpreterError::from_string(format!(
+                "variable `{}` not found in the current scope",
+                name
+            ))
+        })?;
 
-        match existing {
-            Some(var) => match var.value {
-                Some(_) => Err(InterpreterError {
-                    message: format!("variable `{}` already declared in the current scope", name),
-                }),
-                None => {
-                    var.value = Some(value);
-                    Ok(())
-                }
-            },
-            None => Err(InterpreterError {
-                message: format!("variable `{}` already declared in the current scope", name),
-            }),
+        if var.value.is_some() {
+            return Err(InterpreterError::from_string(format!(
+                "variable `{}` already declared in the current scope",
+                name
+            )));
         }
+
+        if !is_value_of_type(&value, &var.r#type) {
+            return Err(InterpreterError::from_string(format!(
+                "type mismatch when assigning to variable `{}`",
+                name
+            )));
+        }
+
+        var.value = Some(value);
+        Ok(())
     }
 
     fn get_var(&self, name: &str) -> Result<Value, InterpreterError> {
-        match self.variables.get(name) {
-            Some(var) => match &var.value {
-                Some(value) => {
-                    if is_value_of_type(value, &var.r#type) {
-                        Ok(value.clone())
-                    } else {
-                        Err(InterpreterError::from_string(format!(
-                            "type mismatch when assigning to variable `{}`",
-                            name
-                        )))
-                    }
-                }
-                None => Err(InterpreterError {
-                    message: format!("variable `{}` already declared in the current scope", name),
-                }),
-            },
-            None => Err(InterpreterError::from_string(format!(
+        let var: &Variable = self.variables.get(name).ok_or_else(|| {
+            InterpreterError::from_string(format!(
+                "variable `{}` not found in the current scope",
+                name
+            ))
+        })?;
+
+        var.value.clone().ok_or_else(|| {
+            InterpreterError::from_string(format!(
                 "variable `{}` already declared in the current scope",
                 name
-            ))),
-        }
+            ))
+        })
     }
 }
 
@@ -144,15 +153,53 @@ impl Environment {
 
 fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterError> {
     match expr {
-        Expr::Identifier(ident) => match env.get_var(&ident.0) {
+        // literals
+        Expr::Int32Literal(value) => Ok(Value::Int32(*value)),
+        Expr::Float32Literal(value) => Ok(Value::Float32(*value)),
+
+        // variable
+        Expr::Identifier(name) => match env.get_var(&name) {
             Ok(value) => Ok(value),
             Err(error) => Err(error),
         },
-        Expr::Int32Literal(value) => Ok(Value::Int32(*value)),
-        Expr::Float32Literal(value) => Ok(Value::Float32(*value)),
-        // Expr::FuncAppl(FuncAppl { function, arguments }) => Ok()
+
+        // AST lambda -> interpreter function
+        Expr::Lambda {
+            parameter_name,
+            body,
+        } => Ok(Value::Function {
+            parameter_name: parameter_name.clone(),
+            body: Rc::clone(body),
+            captured_env: Box::new(env.clone()),
+        }),
+
+        // function application
+        Expr::FuncAppl {
+            function_name,
+            arguments,
+        } => {
+            let mut result: Value = eval_expr(&Expr::Identifier(function_name.clone()), env)?;
+            for arg in arguments {
+                result = apply_function(result, eval_expr(arg, env)?)?;
+            }
+            Ok(result)
+        }
+
         _ => Err(InterpreterError::from_str("Unsupported expression")),
     }
+}
+
+fn apply_function(function: Value, argument: Value) -> Result<Value, InterpreterError> {
+    let Value::Function {
+        parameter_name,
+        body,
+        captured_env,
+    } = function
+    else {
+        return Err(InterpreterError::from_str("TODO"));
+    };
+
+    Ok(Value::Int32(67))
 }
 
 // --- interpreter ---
@@ -193,9 +240,11 @@ impl Interpreter {
         };
 
         let rc_kind: Rc<Type> = Rc::new(Type::Kind);
+        let rc_type: Rc<Type> = Rc::new(Type::Type);
 
-        let r#type: Type = Type::Type;
-        let rc_type: Rc<Type> = Rc::new(r#type);
+        let rc_i32: Rc<Type> = Rc::new(Type::Int32);
+        let rc_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32, rc_i32));
+        let rc_i32_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32, rc_i32_i32));
 
         interpreter.top_env.variables.insert(
             "Type".to_string(),
@@ -221,6 +270,15 @@ impl Interpreter {
                 name: "Float32".to_string(),
                 value: Some(Value::Type(Rc::new(Type::Float32))),
                 r#type: rc_type.clone(),
+            },
+        );
+
+        interpreter.top_env.variables.insert(
+            "+".to_string(),
+            Variable {
+                name: "+".to_string(),
+                value: Some(Value::NativeFunction(Rc::new(|a| |b| a + b))),
+                r#type: rc_i32_i32_i32.clone(),
             },
         );
 

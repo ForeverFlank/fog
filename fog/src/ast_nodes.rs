@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 // --- AST nodes ---
 
 pub struct Program {
@@ -20,9 +22,15 @@ impl Identifier {
 // --- expressions ---
 
 pub enum Expr {
-    Identifier(Identifier), // TODO just use string lol
-    Lambda(Lambda),
-    FuncAppl(FuncAppl),
+    Identifier(String),
+    Lambda {
+        parameter_name: String,
+        body: Rc<Expr>,
+    },
+    FuncAppl {
+        function_name: String,
+        arguments: Vec<Box<Expr>>,
+    },
     Int32Literal(i32),
     Float32Literal(f32),
     StringLiteral(String),
@@ -31,34 +39,27 @@ pub enum Expr {
 impl ToString for Expr {
     fn to_string(&self) -> String {
         match self {
-            Expr::Identifier(ident) => ident.0.clone(),
-            Expr::Lambda(Lambda { parameter, body }) => {
-                format!("{} => {}", parameter.0, body.to_string())
+            Expr::Identifier(name) => name.clone(),
+            Expr::Lambda {
+                parameter_name,
+                body,
+            } => {
+                format!("{} => {}", parameter_name, body.to_string())
             }
-            Expr::FuncAppl(FuncAppl {
-                function,
+            Expr::FuncAppl {
+                function_name,
                 arguments,
-            }) => {
-                let args = arguments
+            } => {
+                let args: String = arguments
                     .iter()
                     .map(|arg| arg.to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("{}({})", function.0, args)
+                format!("{}({})", function_name, args)
             }
             Expr::Int32Literal(value) => value.to_string(),
             Expr::Float32Literal(value) => value.to_string(),
             Expr::StringLiteral(value) => format!("\"{}\"", value),
         }
     }
-}
-
-pub struct Lambda {
-    pub parameter: Identifier,
-    pub body: Box<Expr>,
-}
-
-pub struct FuncAppl {
-    pub function: Identifier,
-    pub arguments: Vec<Box<Expr>>,
 }
