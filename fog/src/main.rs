@@ -175,26 +175,27 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) ->
         ast_nodes::Expr::StringLiteral(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
-        ast_nodes::Expr::Identifier(ident) => {
-            new_node(out, id, &format!("{}", ident.0), COLOR_IDENTIFIER)
+        ast_nodes::Expr::Identifier(name) => {
+            new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
         }
-        ast_nodes::Expr::Lambda(lambda) => {
+        ast_nodes::Expr::Lambda {
+            parameter_name,
+            body,
+        } => {
             let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
-            let param_id: i32 = new_node(
-                out,
-                id,
-                &format!("{}", lambda.parameter.0),
-                COLOR_IDENTIFIER,
-            );
-            let body_id: i32 = emit_ast_puml_expr(out, id, &lambda.body);
+            let param_id: i32 = new_node(out, id, &format!("{}", parameter_name), COLOR_IDENTIFIER);
+            let body_id: i32 = emit_ast_puml_expr(out, id, &body);
 
             edge(out, lambda_id, param_id);
             edge(out, lambda_id, body_id);
             lambda_id
         }
-        ast_nodes::Expr::FuncAppl(appl) => {
-            let appl_id: i32 = new_node(out, id, &format!("{}", appl.function.0), COLOR_FUNC_APPL);
-            for arg in &appl.arguments {
+        ast_nodes::Expr::FuncAppl {
+            function_name,
+            arguments,
+        } => {
+            let appl_id: i32 = new_node(out, id, &format!("{}", function_name), COLOR_FUNC_APPL);
+            for arg in arguments {
                 let arg_id = emit_ast_puml_expr(out, id, arg);
                 edge(out, appl_id, arg_id);
             }

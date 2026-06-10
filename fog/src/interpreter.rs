@@ -185,21 +185,40 @@ fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterError> 
             Ok(result)
         }
 
-        _ => Err(InterpreterError::from_str("Unsupported expression")),
+        _ => Err(InterpreterError::from_str("unsupported expression")),
     }
 }
 
 fn apply_function(function: Value, argument: Value) -> Result<Value, InterpreterError> {
-    let Value::Function {
-        parameter_name,
-        body,
-        captured_env,
-    } = function
-    else {
-        return Err(InterpreterError::from_str("TODO"));
-    };
+    match function {
+        Value::Function {
+            parameter_name,
+            body,
+            captured_env,
+        } => {
+            let mut child_env: Environment = Environment {
+                variables: HashMap::new(),
+                parent: Some(captured_env),
+            };
 
-    Ok(Value::Int32(67))
+            child_env.variables.insert(
+                parameter_name.clone(),
+                Variable {
+                    name: parameter_name.clone(),
+                    value: Some(argument),
+                    r#type: Rc::new(Type::Kind), // placeholder — real type checking comes later
+                },
+            );
+
+            eval_expr(&body, &child_env)
+        }
+
+        Value::NativeFunction(f) => f(argument),
+
+        _ => Err(InterpreterError::from_str(
+            "cannot apply a non-function value",
+        )),
+    }
 }
 
 // --- interpreter ---
@@ -243,8 +262,8 @@ impl Interpreter {
         let rc_type: Rc<Type> = Rc::new(Type::Type);
 
         let rc_i32: Rc<Type> = Rc::new(Type::Int32);
-        let rc_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32, rc_i32));
-        let rc_i32_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32, rc_i32_i32));
+        let rc_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32.clone(), rc_i32.clone()));
+        let rc_i32_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32.clone(), rc_i32_i32.clone()));
 
         interpreter.top_env.variables.insert(
             "Type".to_string(),
@@ -277,7 +296,17 @@ impl Interpreter {
             "+".to_string(),
             Variable {
                 name: "+".to_string(),
-                value: Some(Value::NativeFunction(Rc::new(|a| |b| a + b))),
+                value: Some(Value::NativeFunction(Rc::new(|a| match a {
+                    Value::Int32(lhs) => Ok(Value::NativeFunction(Rc::new(move |b| match b {
+                        Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
+                        _ => Err(InterpreterError::from_str(
+                            "+: right operand is not an Int32",
+                        )),
+                    }))),
+                    _ => Err(InterpreterError::from_str(
+                        "+: left operand is not an Int32",
+                    )),
+                }))),
                 r#type: rc_i32_i32_i32.clone(),
             },
         );

@@ -46,14 +46,16 @@ Because
 
 ## Usage
 
-Clone this repo, install the [Rust compiler](https://rust-lang.org/tools/install/), then run
+Clone this repo. install the [Rust compiler](https://rust-lang.org/tools/install/), then run
 
 ```bash
 mkdir -p bin
 rustc fog/src/main.rs -o bin/fog
 ```
 
-to compile the compiler. To compile a fog program, simply run
+to compile the compiler, or simply run `./build.sh`.
+
+To compile a fog program, simply run
 
 ```bash
 ./bin/fog path-to-source-file
