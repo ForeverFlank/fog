@@ -262,7 +262,7 @@ impl InterpreterError {
     }
 }
 
-pub fn run(program: Box<Program>) {
+pub fn interpret(program: Box<Program>) {
     Interpreter::run(program);
 }
 

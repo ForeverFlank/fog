@@ -4,6 +4,14 @@ use std::path;
 
 use crate::ast::nodes::Statement::Declaration;
 use crate::ast::nodes::Statement::TypeAnnotation;
+use crate::ast::parser::*;
+use crate::ast::*;
+
+use crate::lexer::lexer::*;
+use crate::lexer::token::*;
+use crate::lexer::*;
+
+use crate::interpreter::*;
 
 mod ast;
 mod interpreter;
@@ -22,7 +30,7 @@ fn main() {
 
     // --- compilation ---
     // -- lexing
-    let (tokens, lexer_errors) = lexer::tokenize(src);
+    let (tokens, lexer_errors) = tokenize(src);
 
     if arg_print_tokens {
         print_tokens(&tokens);
@@ -31,7 +39,7 @@ fn main() {
     print_lexer_errors(&lexer_errors);
 
     // -- AST parsing
-    let (ast, ast_parser_errors) = ast::parser::parse_program(&tokens);
+    let (ast, ast_parser_errors) = parse_program(&tokens);
 
     if arg_emit_ast {
         let puml: String = emit_ast_puml(&ast, path);
@@ -43,12 +51,12 @@ fn main() {
 
     // -- interpreting
 
-    interpreter::run(ast);
+    interpret(ast);
 }
 
 // --- Lexer ---
 
-fn print_tokens(tokens: &Vec<lexer::Token>) {
+fn print_tokens(tokens: &Vec<Token>) {
     for token in tokens.as_slice() {
         println!(
             " {: >4}:{: >4} | {}",
@@ -59,7 +67,7 @@ fn print_tokens(tokens: &Vec<lexer::Token>) {
     }
 }
 
-fn print_lexer_errors(errors: &Vec<lexer::LexerError>) {
+fn print_lexer_errors(errors: &Vec<LexerError>) {
     for error in errors {
         println!(
             "Error: {} at {}:{}",
@@ -176,9 +184,9 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast::nodes::Expr) -
     }
 }
 
-fn print_ast_parser_errors(errors: &Vec<ast::parser::ASTParserError>, tokens: &Vec<lexer::Token>) {
+fn print_ast_parser_errors(errors: &Vec<ast::parser::ASTParserError>, tokens: &Vec<Token>) {
     for error in errors {
-        let token: &lexer::Token = &tokens[error.token_pos];
+        let token: &Token = &tokens[error.token_pos];
 
         println!(
             "Error: {} at {} at {}:{}",

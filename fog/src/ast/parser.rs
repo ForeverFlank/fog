@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::nodes::*;
-use crate::lexer::*;
+use crate::lexer::token::*;
 
-struct ASTParser<'a> {
+pub struct ASTParser<'a> {
     tokens: &'a Vec<Token>,
     pos: usize,
     binary_ops: HashMap<String, BinaryOp>,
@@ -50,10 +50,6 @@ fn is_primary_starter(token: &Token) -> bool {
     }
 }
 
-pub fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
-    ASTParser::parse_program(&tokens)
-}
-
 impl ASTParser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> ASTParser<'_> {
         ASTParser {
@@ -93,7 +89,7 @@ impl ASTParser<'_> {
         token_op_key(token).and_then(|key| self.binary_ops.get(key))
     }
 
-    fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
+    pub fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
         let mut parser: ASTParser = ASTParser::new(&tokens);
         let mut statements: Vec<Statement> = Vec::new();
         let mut errors: Vec<ASTParserError> = Vec::new();
