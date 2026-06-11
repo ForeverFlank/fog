@@ -1,7 +1,7 @@
 -- functions
 
 f : Int32 -> Int32
-f = x => x + 2
+f = x : Int32 => x + 2
 
 num1 : Int32
 num1 = f 67

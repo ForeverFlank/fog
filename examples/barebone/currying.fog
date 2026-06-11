@@ -1,0 +1,11 @@
+-- currying
+
+add : Int32 -> Int32 -> Int32
+add = x : Int32 => y : Int32 => x + y
+
+addFive : Int32 -> Int32
+addFive = add 5     -- y => 5 + y
+
+num : Int32
+num = addFive 6     -- 11
+

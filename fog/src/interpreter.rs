@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::ast_nodes::Statement::*;
-use crate::ast_nodes::*;
+use crate::ast::nodes::Statement::*;
+use crate::ast::nodes::*;
 
 // --- variables & types ---
 
@@ -20,10 +20,15 @@ pub enum Value {
     Float32(f32),
     Function {
         param: String,
+        param_type: Rc<Type>,
         body: Rc<Expr>,
         captured_env: Box<Environment>,
     },
-    NativeFunction(Rc<dyn Fn(Value) -> Result<Value, InterpreterError>>),
+    NativeFunction {
+        param_type: Rc<Type>,
+        return_type: Rc<Type>,
+        function: Rc<dyn Fn(Value) -> Result<Value, InterpreterError>>,
+    },
 }
 
 impl ToString for Value {
@@ -35,8 +40,27 @@ impl ToString for Value {
             Value::Function { param, body, .. } => {
                 format!("{} => {}", param, (*body).to_string())
             }
-            Value::NativeFunction(_) => "[native function]".to_string(),
+            Value::NativeFunction { .. } => "[native function]".to_string(),
         }
+    }
+}
+
+fn get_value_type(value: &Value, env: &Environment) -> Type {
+    match *value {
+        Value::Type(_) => Type::Kind,
+        Value::Int32(_) => Type::Int32,
+        Value::Float32(_) => Type::Float32,
+        Value::Function {
+            param_type, body, ..
+        } => Type::Function(param_type, get_expr_type(&body, env)),
+        Value::NativeFunction { .. } => Type::Function((), ()),
+    }
+}
+
+fn get_expr_type(expr: &Expr, env: &Environment) -> Type {
+    match *expr {
+        Expr::Int32Literal(_) => Type::Int32,
+        _ => 
     }
 }
 
@@ -161,8 +185,9 @@ fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterError> 
         },
 
         // AST lambda -> interpreter function
-        Expr::Lambda { param, body } => Ok(Value::Function {
+        Expr::Lambda { param, param_type, body } => Ok(Value::Function {
             param: param.clone(),
+            param_type: eval_expr(expr, env),
             body: Rc::clone(body),
             captured_env: Box::new(env.clone()),
         }),
@@ -184,7 +209,8 @@ fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterError> 
 fn apply_function(function: Value, argument: Value) -> Result<Value, InterpreterError> {
     match function {
         Value::Function {
-            param: parameter_name,
+            param,
+            param_type,
             body,
             captured_env,
         } => {
@@ -194,18 +220,18 @@ fn apply_function(function: Value, argument: Value) -> Result<Value, Interpreter
             };
 
             child_env.variables.insert(
-                parameter_name.clone(),
+                param.clone(),
                 Variable {
-                    name: parameter_name.clone(),
+                    name: param.clone(),
                     value: Some(argument),
-                    r#type: Rc::new(Type::Kind), // placeholder — real type checking comes later
+                    r#type: param_type,
                 },
             );
 
             eval_expr(&body, &child_env)
         }
 
-        Value::NativeFunction(f) => f(argument),
+        Value::NativeFunction {function, ..} => function(argument),
 
         _ => Err(InterpreterError::from_str(
             "cannot apply a non-function value",

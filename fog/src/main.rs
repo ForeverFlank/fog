@@ -2,11 +2,10 @@ use std::env;
 use std::fs;
 use std::path;
 
-use crate::ast_nodes::Statement::Declaration;
-use crate::ast_nodes::Statement::TypeAnnotation;
+use crate::ast::nodes::Statement::Declaration;
+use crate::ast::nodes::Statement::TypeAnnotation;
 
-mod ast_nodes;
-mod ast_parser;
+mod ast;
 mod interpreter;
 mod lexer;
 
@@ -32,7 +31,7 @@ fn main() {
     print_lexer_errors(&lexer_errors);
 
     // -- AST parsing
-    let (ast, ast_parser_errors) = ast_parser::parse_program(&tokens);
+    let (ast, ast_parser_errors) = ast::parser::parse_program(&tokens);
 
     if arg_emit_ast {
         let puml: String = emit_ast_puml(&ast, path);
@@ -71,7 +70,7 @@ fn print_lexer_errors(errors: &Vec<lexer::LexerError>) {
 
 // --- AST ---
 
-fn emit_ast_puml(program: &ast_nodes::Program, path: &str) -> String {
+fn emit_ast_puml(program: &ast::nodes::Program, path: &str) -> String {
     let mut out: String = String::new();
     let mut id: i32 = 0;
     out.push_str(&format!("@startuml AST of {}\n", path));
@@ -111,7 +110,7 @@ fn edge(out: &mut String, parent_id: i32, child_id: i32) {
     out.push_str(&format!("n{} <-- n{}\n", parent_id, child_id));
 }
 
-fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast_nodes::Statement) -> i32 {
+fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast::nodes::Statement) -> i32 {
     match stmt {
         TypeAnnotation(name, expr) => {
             let ta_id: i32 = new_node(out, id, ":", COLOR_STATEMENT);
@@ -136,20 +135,23 @@ fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast_nodes::Sta
     }
 }
 
-fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) -> i32 {
+fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast::nodes::Expr) -> i32 {
     match expr {
-        ast_nodes::Expr::Int32Literal(val) => new_node(out, id, &format!("{}", val), COLOR_LITERAL),
-        ast_nodes::Expr::Float32Literal(val) => {
+        ast::nodes::Expr::Int32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
-        // ast_nodes::Expr::StringLiteral(val) => {
+        ast::nodes::Expr::Float32Literal(val) => {
+            new_node(out, id, &format!("{}", val), COLOR_LITERAL)
+        }
+        // ast::nodes::Expr::StringLiteral(val) => {
         //     new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         // }
-        ast_nodes::Expr::Identifier(name) => {
+        ast::nodes::Expr::Identifier(name) => {
             new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
         }
-        ast_nodes::Expr::Lambda {
+        ast::nodes::Expr::Lambda {
             param: parameter_name,
+            param_type,
             body,
         } => {
             let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
@@ -160,7 +162,7 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) ->
             edge(out, lambda_id, body_id);
             lambda_id
         }
-        ast_nodes::Expr::FuncAppl {
+        ast::nodes::Expr::FuncAppl {
             function: function_name,
             args: arguments,
         } => {
@@ -174,7 +176,7 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) ->
     }
 }
 
-fn print_ast_parser_errors(errors: &Vec<ast_parser::ASTParserError>, tokens: &Vec<lexer::Token>) {
+fn print_ast_parser_errors(errors: &Vec<ast::parser::ASTParserError>, tokens: &Vec<lexer::Token>) {
     for error in errors {
         let token: &lexer::Token = &tokens[error.token_pos];
 
