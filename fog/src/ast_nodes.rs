@@ -7,16 +7,8 @@ pub struct Program {
 }
 
 pub enum Statement {
-    TypeAnnotation(Identifier, Expr),
-    Declaration(Identifier, Expr),
-}
-
-pub struct Identifier(pub String);
-
-impl Identifier {
-    pub fn new(name: &str) -> Self {
-        Identifier(name.to_string())
-    }
+    TypeAnnotation(String, Expr),
+    Declaration(String, Expr),
 }
 
 // --- expressions ---
@@ -24,16 +16,16 @@ impl Identifier {
 pub enum Expr {
     Identifier(String),
     Lambda {
-        parameter_name: String,
+        param: String,
         body: Rc<Expr>,
     },
     FuncAppl {
-        function_name: String,
-        arguments: Vec<Box<Expr>>,
+        function: String,
+        args: Vec<Box<Expr>>,
     },
     Int32Literal(i32),
     Float32Literal(f32),
-    StringLiteral(String),
+    // StringLiteral(String),
 }
 
 impl ToString for Expr {
@@ -41,14 +33,14 @@ impl ToString for Expr {
         match self {
             Expr::Identifier(name) => name.clone(),
             Expr::Lambda {
-                parameter_name,
+                param: parameter_name,
                 body,
             } => {
                 format!("{} => {}", parameter_name, body.to_string())
             }
             Expr::FuncAppl {
-                function_name,
-                arguments,
+                function: function_name,
+                args: arguments,
             } => {
                 let args: String = arguments
                     .iter()
@@ -59,7 +51,7 @@ impl ToString for Expr {
             }
             Expr::Int32Literal(value) => value.to_string(),
             Expr::Float32Literal(value) => value.to_string(),
-            Expr::StringLiteral(value) => format!("\"{}\"", value),
+            // Expr::StringLiteral(value) => format!("\"{}\"", value),
         }
     }
 }

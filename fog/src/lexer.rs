@@ -32,9 +32,42 @@ pub enum TokenKind {
     If,
 }
 
+impl ToString for TokenKind {
+    fn to_string(&self) -> String {
+        match self {
+            TokenKind::Newline => "Newline".to_string(),
+            TokenKind::Identifier(val) => format!("Identifier ({})", val),
+            TokenKind::Equal => "Equal".to_string(),
+            TokenKind::Colon => "Colon".to_string(),
+            TokenKind::Arrow => "Arrow".to_string(),
+            TokenKind::FatArrow => "FatArrow".to_string(),
+            TokenKind::LeftParenthesis => "LeftParenthesis".to_string(),
+            TokenKind::RightParenthesis => "RightParenthesis".to_string(),
+            TokenKind::LeftBrace => "LeftBrace".to_string(),
+            TokenKind::RightBrace => "RightBrace".to_string(),
+            TokenKind::Comma => "Comma".to_string(),
+            TokenKind::Int32Literal(val) => format!("Int ({})", val),
+            TokenKind::Float32Literal(val) => format!("Float ({})", val),
+            // TokenKind::StringLiteral(val) => format!("String ({})", val),
+            TokenKind::Plus => "Plus".to_string(),
+            TokenKind::Minus => "Minus".to_string(),
+            TokenKind::Star => "Star".to_string(),
+            TokenKind::Slash => "Slash".to_string(),
+            TokenKind::Caret => "Caret".to_string(),
+            TokenKind::Concat => "Concat".to_string(),
+            TokenKind::LeftPipe => "LeftPipe".to_string(),
+            TokenKind::RightPipe => "RightPipe".to_string(),
+            TokenKind::LeftComposition => "LeftComposition".to_string(),
+            TokenKind::RightComposition => "RightComposition".to_string(),
+            TokenKind::If => "If".to_string(),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Token {
     pub kind: TokenKind,
+    pub pos: usize,
     pub line: usize,
     pub column: usize,
 }
@@ -145,6 +178,7 @@ impl Lexer {
         start_line: usize,
         start_column: usize,
     ) -> Option<Result<Token, LexerError>> {
+        let pos: usize = self.pos;
         let ch: char = self.peek()?;
 
         if !(ch.is_alphabetic() || ch == '_') {
@@ -162,13 +196,14 @@ impl Lexer {
             }
         }
 
-        let token_type: TokenKind = match word.as_str() {
+        let kind: TokenKind = match word.as_str() {
             "if" => TokenKind::If,
             _ => TokenKind::Identifier(word),
         };
 
         Some(Ok(Token {
-            kind: token_type,
+            kind,
+            pos,
             line: start_line,
             column: start_column,
         }))
@@ -179,6 +214,7 @@ impl Lexer {
         start_line: usize,
         start_column: usize,
     ) -> Option<Result<Token, LexerError>> {
+        let pos: usize = self.pos;
         let ch: char = self.peek()?;
 
         if !ch.is_numeric() {
@@ -235,6 +271,7 @@ impl Lexer {
 
         Some(Ok(Token {
             kind,
+            pos,
             line: start_line,
             column: start_column,
         }))
@@ -249,9 +286,10 @@ impl Lexer {
             return None;
         }
 
+        let pos: usize = self.pos;
         let sym: String = self.chars[self.pos..self.pos + 2].iter().collect();
 
-        let token_type: TokenKind = match sym.as_str() {
+        let kind: TokenKind = match sym.as_str() {
             "->" => TokenKind::Arrow,
             "=>" => TokenKind::FatArrow,
 
@@ -268,7 +306,8 @@ impl Lexer {
         self.next();
 
         Some(Ok(Token {
-            kind: token_type,
+            kind,
+            pos,
             line: start_line,
             column: start_column,
         }))
@@ -279,6 +318,7 @@ impl Lexer {
         start_line: usize,
         start_column: usize,
     ) -> Option<Result<Token, LexerError>> {
+        let pos: usize = self.pos;
         let sym: char = self.peek()?;
 
         let token_type: TokenKind = match sym {
@@ -316,6 +356,7 @@ impl Lexer {
 
         Some(Ok(Token {
             kind: token_type,
+            pos,
             line: start_line,
             column: start_column,
         }))
@@ -326,6 +367,7 @@ impl Lexer {
         start_line: usize,
         start_column: usize,
     ) -> Option<Result<Token, LexerError>> {
+        let pos: usize = self.pos;
         let ch: char = self.peek()?;
 
         if ch != '\n' {
@@ -336,6 +378,7 @@ impl Lexer {
 
         Some(Ok(Token {
             kind: TokenKind::Newline,
+            pos,
             line: start_line,
             column: start_column,
         }))

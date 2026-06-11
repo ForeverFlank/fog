@@ -19,7 +19,7 @@ pub enum Value {
     Int32(i32),
     Float32(f32),
     Function {
-        parameter_name: String,
+        param: String,
         body: Rc<Expr>,
         captured_env: Box<Environment>,
     },
@@ -32,12 +32,8 @@ impl ToString for Value {
             Value::Type(r#type) => (*r#type).to_string(),
             Value::Int32(value) => value.to_string(),
             Value::Float32(value) => value.to_string(),
-            Value::Function {
-                parameter_name,
-                body,
-                ..
-            } => {
-                format!("{} => {}", parameter_name, (*body).to_string())
+            Value::Function { param, body, .. } => {
+                format!("{} => {}", param, (*body).to_string())
             }
             Value::NativeFunction(_) => "[native function]".to_string(),
         }
@@ -133,19 +129,20 @@ impl Environment {
     }
 
     fn get_var(&self, name: &str) -> Result<Value, InterpreterError> {
-        let var: &Variable = self.variables.get(name).ok_or_else(|| {
-            InterpreterError::from_string(format!(
-                "variable `{}` not found in the current scope",
-                name
-            ))
-        })?;
+        if let Some(var) = self.variables.get(name) {
+            return var.value.clone().ok_or_else(|| {
+                InterpreterError::from_string(format!("variable `{}` not declared", name))
+            });
+        }
 
-        var.value.clone().ok_or_else(|| {
-            InterpreterError::from_string(format!(
-                "variable `{}` already declared in the current scope",
-                name
-            ))
-        })
+        if let Some(parent) = &self.parent {
+            return parent.get_var(name);
+        }
+
+        Err(InterpreterError::from_string(format!(
+            "variable `{}` not found in the current scope",
+            name
+        )))
     }
 }
 
@@ -164,19 +161,16 @@ fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterError> 
         },
 
         // AST lambda -> interpreter function
-        Expr::Lambda {
-            parameter_name,
-            body,
-        } => Ok(Value::Function {
-            parameter_name: parameter_name.clone(),
+        Expr::Lambda { param, body } => Ok(Value::Function {
+            param: param.clone(),
             body: Rc::clone(body),
             captured_env: Box::new(env.clone()),
         }),
 
         // function application
         Expr::FuncAppl {
-            function_name,
-            arguments,
+            function: function_name,
+            args: arguments,
         } => {
             let mut result: Value = eval_expr(&Expr::Identifier(function_name.clone()), env)?;
             for arg in arguments {
@@ -184,15 +178,13 @@ fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterError> 
             }
             Ok(result)
         }
-
-        _ => Err(InterpreterError::from_str("unsupported expression")),
     }
 }
 
 fn apply_function(function: Value, argument: Value) -> Result<Value, InterpreterError> {
     match function {
         Value::Function {
-            parameter_name,
+            param: parameter_name,
             body,
             captured_env,
         } => {
@@ -265,74 +257,64 @@ impl Interpreter {
         let rc_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32.clone(), rc_i32.clone()));
         let rc_i32_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32.clone(), rc_i32_i32.clone()));
 
-        interpreter.top_env.variables.insert(
-            "Type".to_string(),
-            Variable {
-                name: "Type".to_string(),
-                value: Some(Value::Type(rc_type.clone())),
-                r#type: rc_kind.clone(),
-            },
-        );
+        let var_type: Variable = Variable {
+            name: "Type".to_string(),
+            value: Some(Value::Type(rc_type.clone())),
+            r#type: rc_kind.clone(),
+        };
 
-        interpreter.top_env.variables.insert(
-            "Int32".to_string(),
-            Variable {
-                name: "Int32".to_string(),
-                value: Some(Value::Type(Rc::new(Type::Int32))),
-                r#type: rc_type.clone(),
-            },
-        );
+        let var_int32: Variable = Variable {
+            name: "Int32".to_string(),
+            value: Some(Value::Type(Rc::new(Type::Int32))),
+            r#type: rc_type.clone(),
+        };
 
-        interpreter.top_env.variables.insert(
-            "Float32".to_string(),
-            Variable {
-                name: "Float32".to_string(),
-                value: Some(Value::Type(Rc::new(Type::Float32))),
-                r#type: rc_type.clone(),
-            },
-        );
+        let var_float32: Variable = Variable {
+            name: "Float32".to_string(),
+            value: Some(Value::Type(Rc::new(Type::Float32))),
+            r#type: rc_type.clone(),
+        };
 
-        interpreter.top_env.variables.insert(
-            "+".to_string(),
-            Variable {
-                name: "+".to_string(),
-                value: Some(Value::NativeFunction(Rc::new(|a| match a {
-                    Value::Int32(lhs) => Ok(Value::NativeFunction(Rc::new(move |b| match b {
-                        Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
-                        _ => Err(InterpreterError::from_str(
-                            "+: right operand is not an Int32",
-                        )),
-                    }))),
-                    _ => Err(InterpreterError::from_str(
-                        "+: left operand is not an Int32",
-                    )),
+        let var_plus_int_int: Variable = Variable {
+            name: "+".to_string(),
+            value: Some(Value::NativeFunction(Rc::new(|a| match a {
+                Value::Int32(lhs) => Ok(Value::NativeFunction(Rc::new(move |b| match b {
+                    Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
+                    _ => Err(InterpreterError::from_str("right operand is not an Int32")),
                 }))),
-                r#type: rc_i32_i32_i32.clone(),
-            },
-        );
+                _ => Err(InterpreterError::from_str("left operand is not an Int32")),
+            }))),
+            r#type: rc_i32_i32_i32.clone(),
+        };
+
+        vec![var_type, var_int32, var_float32, var_plus_int_int]
+            .iter()
+            .for_each(|var| {
+                interpreter
+                    .top_env
+                    .variables
+                    .insert(var.name.clone(), var.clone());
+            });
 
         interpreter
     }
 
     pub fn run(program: Box<Program>) {
         let mut interpreter: Interpreter = Interpreter::new(program);
-        let statements: Vec<Statement> = std::mem::take(&mut interpreter.program.statements);
         let mut errors: Vec<InterpreterError> = Vec::new();
 
-        for stmt in statements {
+        let top_env: &mut Environment = &mut interpreter.top_env;
+
+        for stmt in interpreter.program.statements {
             match stmt {
-                TypeAnnotation(ident, expr) => {
-                    match annotate_type(&ident.0, &expr, &mut interpreter.top_env) {
-                        Ok(_) => (),
-                        Err(error) => errors.push(error),
-                    }
-                }
-                Declaration(ident, expr) => {
-                    match declare(&ident.0, &expr, &mut interpreter.top_env) {
-                        Ok(_) => (),
-                        Err(error) => errors.push(error),
-                    }
-                }
+                TypeAnnotation(name, expr) => match annotate_type(&name, &expr, top_env) {
+                    Ok(_) => (),
+                    Err(error) => errors.push(error),
+                },
+                Declaration(name, expr) => match declare(&name, &expr, top_env) {
+                    Ok(_) => (),
+                    Err(error) => errors.push(error),
+                },
             };
         }
 
@@ -374,7 +356,7 @@ fn annotate_type(name: &str, expr: &Expr, env: &mut Environment) -> Result<(), I
 }
 
 fn declare(name: &str, expr: &Expr, env: &mut Environment) -> Result<(), InterpreterError> {
-    let value = match eval_expr(expr, env) {
+    let value: Value = match eval_expr(expr, env) {
         Ok(value) => value,
         Err(error) => return Err(error),
     };

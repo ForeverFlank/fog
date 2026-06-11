@@ -15,8 +15,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let path: &String = args.get(1).expect("Usage: ./fog <path>");
 
-    let arg_print_tokens = args.contains(&"--print-tokens".to_string());
-    let arg_emit_ast = args.contains(&"--emit-ast".to_string());
+    let arg_print_tokens: bool = args.contains(&"--print-tokens".to_string());
+    let arg_emit_ast: bool = args.contains(&"--emit-ast".to_string());
 
     // --- read file ---
     let src: &str = &fs::read_to_string(path).expect("Failed to read source file");
@@ -32,7 +32,7 @@ fn main() {
     print_lexer_errors(&lexer_errors);
 
     // -- AST parsing
-    let (ast, ast_parser_errors) = ast_parser::parse_program(tokens);
+    let (ast, ast_parser_errors) = ast_parser::parse_program(&tokens);
 
     if arg_emit_ast {
         let puml: String = emit_ast_puml(&ast, path);
@@ -40,7 +40,7 @@ fn main() {
         let _ = fs::write(output_path, puml);
     }
 
-    print_ast_parser_errors(&ast_parser_errors);
+    print_ast_parser_errors(&ast_parser_errors, &tokens);
 
     // -- interpreting
 
@@ -49,43 +49,13 @@ fn main() {
 
 // --- Lexer ---
 
-fn get_token_string(token: &lexer::Token) -> String {
-    match &token.kind {
-        lexer::TokenKind::Newline => "Newline".to_string(),
-        lexer::TokenKind::Identifier(val) => format!("Identifier ({})", val),
-        lexer::TokenKind::Equal => "Equal".to_string(),
-        lexer::TokenKind::Colon => "Colon".to_string(),
-        lexer::TokenKind::Arrow => "Arrow".to_string(),
-        lexer::TokenKind::FatArrow => "FatArrow".to_string(),
-        lexer::TokenKind::LeftParenthesis => "LeftParenthesis".to_string(),
-        lexer::TokenKind::RightParenthesis => "RightParenthesis".to_string(),
-        lexer::TokenKind::LeftBrace => "LeftBrace".to_string(),
-        lexer::TokenKind::RightBrace => "RightBrace".to_string(),
-        lexer::TokenKind::Comma => "Comma".to_string(),
-        lexer::TokenKind::Int32Literal(val) => format!("Int ({})", val),
-        lexer::TokenKind::Float32Literal(val) => format!("Float ({})", val),
-        // lexer::TokenKind::StringLiteral(val) => format!("String ({})", val),
-        lexer::TokenKind::Plus => "Plus".to_string(),
-        lexer::TokenKind::Minus => "Minus".to_string(),
-        lexer::TokenKind::Star => "Star".to_string(),
-        lexer::TokenKind::Slash => "Slash".to_string(),
-        lexer::TokenKind::Caret => "Caret".to_string(),
-        lexer::TokenKind::Concat => "Concat".to_string(),
-        lexer::TokenKind::LeftPipe => "LeftPipe".to_string(),
-        lexer::TokenKind::RightPipe => "RightPipe".to_string(),
-        lexer::TokenKind::LeftComposition => "LeftComposition".to_string(),
-        lexer::TokenKind::RightComposition => "RightComposition".to_string(),
-        lexer::TokenKind::If => "If".to_string(),
-    }
-}
-
 fn print_tokens(tokens: &Vec<lexer::Token>) {
     for token in tokens.as_slice() {
         println!(
             " {: >4}:{: >4} | {}",
             token.line,
             token.column,
-            get_token_string(token)
+            token.kind.to_string()
         )
     }
 }
@@ -143,9 +113,9 @@ fn edge(out: &mut String, parent_id: i32, child_id: i32) {
 
 fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast_nodes::Statement) -> i32 {
     match stmt {
-        TypeAnnotation(ident, expr) => {
+        TypeAnnotation(name, expr) => {
             let ta_id: i32 = new_node(out, id, ":", COLOR_STATEMENT);
-            let ident_id: i32 = new_node(out, id, &format!("{}", ident.0), COLOR_IDENTIFIER);
+            let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
             let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
 
             edge(out, ta_id, ident_id);
@@ -153,9 +123,9 @@ fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast_nodes::Sta
 
             ta_id
         }
-        Declaration(ident, expr) => {
+        Declaration(name, expr) => {
             let decl_id: i32 = new_node(out, id, "=", COLOR_STATEMENT);
-            let ident_id: i32 = new_node(out, id, &format!("{}", ident.0), COLOR_IDENTIFIER);
+            let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
             let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
 
             edge(out, decl_id, ident_id);
@@ -172,14 +142,14 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) ->
         ast_nodes::Expr::Float32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
-        ast_nodes::Expr::StringLiteral(val) => {
-            new_node(out, id, &format!("{}", val), COLOR_LITERAL)
-        }
+        // ast_nodes::Expr::StringLiteral(val) => {
+        //     new_node(out, id, &format!("{}", val), COLOR_LITERAL)
+        // }
         ast_nodes::Expr::Identifier(name) => {
             new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
         }
         ast_nodes::Expr::Lambda {
-            parameter_name,
+            param: parameter_name,
             body,
         } => {
             let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
@@ -191,8 +161,8 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) ->
             lambda_id
         }
         ast_nodes::Expr::FuncAppl {
-            function_name,
-            arguments,
+            function: function_name,
+            args: arguments,
         } => {
             let appl_id: i32 = new_node(out, id, &format!("{}", function_name), COLOR_FUNC_APPL);
             for arg in arguments {
@@ -204,14 +174,16 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast_nodes::Expr) ->
     }
 }
 
-fn print_ast_parser_errors(errors: &Vec<ast_parser::ASTParserError>) {
+fn print_ast_parser_errors(errors: &Vec<ast_parser::ASTParserError>, tokens: &Vec<lexer::Token>) {
     for error in errors {
+        let token: &lexer::Token = &tokens[error.token_pos];
+
         println!(
             "Error: {} at {} at {}:{}",
             error.message,
-            get_token_string(&error.token),
-            error.token.line,
-            error.token.column
+            &token.kind.to_string(),
+            token.line,
+            token.column
         )
     }
 }

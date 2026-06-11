@@ -2,15 +2,15 @@ use std::{collections::HashMap, rc::Rc};
 
 use crate::{ast_nodes::*, lexer::*};
 
-struct ASTParser {
-    tokens: Vec<Token>,
+struct ASTParser<'a> {
+    tokens: &'a Vec<Token>,
     pos: usize,
     binary_ops: HashMap<String, BinaryOp>,
 }
 
 pub struct ASTParserError {
     pub message: &'static str,
-    pub token: Token,
+    pub token_pos: usize,
 }
 
 #[derive(Clone)]
@@ -48,14 +48,14 @@ fn is_primary_starter(token: &Token) -> bool {
     }
 }
 
-pub fn parse_program(tokens: Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
-    ASTParser::parse_program(tokens)
+pub fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
+    ASTParser::parse_program(&tokens)
 }
 
-impl ASTParser {
-    fn new(tokens: Vec<Token>) -> ASTParser {
+impl ASTParser<'_> {
+    fn new(tokens: &'_ Vec<Token>) -> ASTParser<'_> {
         ASTParser {
-            tokens: tokens,
+            tokens,
             pos: 0,
             binary_ops: [
                 ("*", BinaryOpAssociativity::Left, 3),
@@ -91,8 +91,8 @@ impl ASTParser {
         token_op_key(token).and_then(|key| self.binary_ops.get(key))
     }
 
-    fn parse_program(tokens: Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
-        let mut parser: ASTParser = ASTParser::new(tokens);
+    fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
+        let mut parser: ASTParser = ASTParser::new(&tokens);
         let mut statements: Vec<Statement> = Vec::new();
         let mut errors: Vec<ASTParserError> = Vec::new();
 
@@ -112,8 +112,8 @@ impl ASTParser {
     }
 
     fn parse_statement(&mut self) -> Option<Result<Statement, ASTParserError>> {
-        let identifier: Identifier = match &self.peek().kind {
-            TokenKind::Identifier(name) => Identifier(name.clone()),
+        let name: String = match &self.peek().kind {
+            TokenKind::Identifier(name) => name.clone(),
             _ => return None,
         };
 
@@ -126,7 +126,7 @@ impl ASTParser {
                 let result: Result<Expr, ASTParserError> = self.parse_expression(i32::MIN);
 
                 match result {
-                    Ok(expr) => Ok(Statement::TypeAnnotation(identifier, expr)),
+                    Ok(expr) => Ok(Statement::TypeAnnotation(name, expr)),
                     Err(error) => Err(error),
                 }
             }
@@ -136,13 +136,13 @@ impl ASTParser {
                 let result: Result<Expr, ASTParserError> = self.parse_expression(i32::MIN);
 
                 match result {
-                    Ok(expr) => Ok(Statement::Declaration(identifier, expr)),
+                    Ok(expr) => Ok(Statement::Declaration(name, expr)),
                     Err(error) => Err(error),
                 }
             }
             _ => Err(ASTParserError {
                 message: "Expected ':' or '='",
-                token: self.peek().clone(),
+                token_pos: self.peek().pos,
             }),
         };
 
@@ -181,8 +181,8 @@ impl ASTParser {
             });
 
             lhs = Expr::FuncAppl {
-                function_name: op_name,
-                arguments: vec![Box::new(lhs), rhs],
+                function: op_name,
+                args: vec![Box::new(lhs), rhs],
             };
         }
 
@@ -210,8 +210,8 @@ impl ASTParser {
                 Err(error) => return Err(error),
             };
             return Ok(Expr::FuncAppl {
-                function_name: "-".to_string(),
-                arguments: vec![Box::new(opnd)],
+                function: "-".to_string(),
+                args: vec![Box::new(opnd)],
             });
         }
 
@@ -226,7 +226,7 @@ impl ASTParser {
                 };
 
                 return Ok(Expr::Lambda {
-                    parameter_name: name,
+                    param: name,
                     body: Rc::new(body),
                 });
             }
@@ -250,8 +250,8 @@ impl ASTParser {
                 return Ok(Expr::Identifier(name));
             } else {
                 return Ok(Expr::FuncAppl {
-                    function_name: name,
-                    arguments: args,
+                    function: name,
+                    args,
                 });
             }
         }
@@ -266,14 +266,14 @@ impl ASTParser {
                 }
                 _ => Err(ASTParserError {
                     message: "Expected ')'",
-                    token,
+                    token_pos: token.pos,
                 }),
             };
         }
 
         Err(ASTParserError {
             message: "Primary expression parsing error",
-            token,
+            token_pos: token.pos,
         })
     }
 }
