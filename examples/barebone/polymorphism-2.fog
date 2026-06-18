@@ -1,7 +1,6 @@
--- ad-hoc polymorphism
+-- ad hoc polymorphism
 -- commonly known as interfaces
 
---- style 1 ---
 
 Equatable : Type -> Constraint
 Equatable t = {
@@ -15,16 +14,5 @@ Equatable t = {
 -- not sure about this one yet
 PartialOrdered : Equatable -> Constraint
 PartialOrdered t {
-    <= : t -> t -> Bool
-}
-
---- style 2 ---
-
-trait Equatable t {
-    == : t -> t -> Bool
-}
-
-trait PartialOrdered t
-impl Equatable {
     <= : t -> t -> Bool
 }

@@ -4,8 +4,8 @@ GradeLetter = A + B + C + D + F + S + U
 isPassed : GradeLetter -> Bool
 isPassed grade =
     match grade {
-        A, B, C, D, S -> True
-        F, U          -> False
+        A, B, C, D, S => True
+        F, U          => False
     }
 
 didIPass : Bool

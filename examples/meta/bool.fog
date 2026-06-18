@@ -3,26 +3,26 @@ Bool = True + False
 
 not : Bool -> Bool
 not b = match b {
-    True  -> False
-    False -> True
+    True  => False
+    False => True
 }
 
 and : Bool -> Bool -> Bool
 b1 and b2 = match (b1, b2) {
-    (True, True) -> True
-    _            -> False
+    (True, True) => True
+    _            => False
 }
 
 or : Bool -> Bool -> Bool
 b1 or b2 = match (b1, b2) {
-    (False, False) -> False
-    _              -> True
+    (False, False) => False
+    _              => True
 }
 
 impl Equatable for Bool {
     b1 == b2 = match (b1, b2) {
-        (True, True)   -> True
-        (False, False) -> True
-        _              -> False
+        (True, True)   => True
+        (False, False) => True
+        _              => False
     }
 }

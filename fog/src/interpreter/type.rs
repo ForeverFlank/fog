@@ -12,6 +12,14 @@ pub enum Type {
     Int32,
     Float32,
     Function(Rc<Type>, Rc<Type>),
+    Sum(Vec<DataConstructor>),
+    Product(Vec<Rc<Type>>),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct DataConstructor {
+    pub variant: String,
+    pub types: Vec<Rc<Type>>,
 }
 
 impl PartialEq for Type {
@@ -34,22 +42,36 @@ impl ToString for Type {
             Type::Type => "Type".to_string(),
             Type::Int32 => "Int32".to_string(),
             Type::Float32 => "Float32".to_string(),
-            Type::Function(domain, codomain) => {
-                format!("{} -> {}", (*domain).to_string(), (*codomain).to_string())
+            Type::Function(param_type, return_type) => {
+                format!(
+                    "{} -> {}",
+                    (*param_type).to_string(),
+                    (*return_type).to_string()
+                )
             }
+            // Type::Constructor(type_constructor) => type_constructor
+            //     .types
+            //     .iter()
+            //     .fold(String::new(), |str, t| str + " " + &t.to_string()),
+            Type::Sum(items) => todo!(),
+            Type::Product(items) => todo!(),
         }
     }
 }
 
 pub fn get_value_type(value: &Value, env: &Environment) -> Type {
-    match *value {
+    match value {
         Value::Type(_) => Type::Kind,
         Value::Int32(_) => Type::Int32,
         Value::Float32(_) => Type::Float32,
         Value::Function {
             param_type, body, ..
-        } => Type::Function(param_type, get_expr_type(&body, env)),
-        Value::NativeFunction { .. } => Type::Function((), ()),
+        } => Type::Function(param_type.clone(), get_expr_type(&body, env).into()),
+        Value::NativeFunction {
+            param_type,
+            return_type,
+            ..
+        } => Type::Function(param_type.clone(), return_type.clone()),
     }
 }
 

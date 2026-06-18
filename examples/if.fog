@@ -1,6 +1,6 @@
 testNumber : Int32 -> String
 testNumber n =
-    if n > 0 {
+    if n > 0, {
         if n >= 100, "number is positive and quite big"
         else,        "number is positive"
     }
