@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::path;
 
+use crate::ast::nodes::Expr;
 use crate::ast::nodes::Statement::Declaration;
 use crate::ast::nodes::Statement::TypeAnnotation;
 use crate::ast::parser::*;
@@ -72,10 +73,7 @@ fn print_lexer_errors(errors: &Vec<FogError>) {
     for error in errors {
         let span = error.span.as_ref();
         match span {
-            Some(span) => println!(
-                "Error: {} at {}:{}",
-                error.message, span.line, span.column
-            ),
+            Some(span) => println!("Error: {} at {}:{}", error.message, span.line, span.column),
             None => println!("Error: {}", error.message),
         }
     }
@@ -125,56 +123,65 @@ fn edge(out: &mut String, parent_id: i32, child_id: i32) {
 
 fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast::nodes::Statement) -> i32 {
     match stmt {
-        TypeAnnotation(name, expr) => {
-            let ta_id: i32 = new_node(out, id, ":", COLOR_STATEMENT);
-            let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
-            let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
-
-            edge(out, ta_id, ident_id);
-            edge(out, ta_id, expr_id);
-
-            ta_id
-        }
-        Declaration(name, expr) => {
-            let decl_id: i32 = new_node(out, id, "=", COLOR_STATEMENT);
-            let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
-            let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
-
-            edge(out, decl_id, ident_id);
-            edge(out, decl_id, expr_id);
-
-            decl_id
-        }
+        TypeAnnotation(name, expr, _) => emit_ast_puml_type_annotation(out, id, name, expr),
+        Declaration(name, expr, _) => emit_ast_puml_declaration(out, id, name, expr),
     }
+}
+
+fn emit_ast_puml_type_annotation(
+    out: &mut String,
+    id: &mut i32,
+    name: &String,
+    expr: &Expr,
+) -> i32 {
+    let ta_id: i32 = new_node(out, id, ":", COLOR_STATEMENT);
+    let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
+    let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
+
+    edge(out, ta_id, ident_id);
+    edge(out, ta_id, expr_id);
+
+    ta_id
+}
+
+fn emit_ast_puml_declaration(out: &mut String, id: &mut i32, name: &String, expr: &Expr) -> i32 {
+    let decl_id: i32 = new_node(out, id, "=", COLOR_STATEMENT);
+    let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
+    let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
+
+    edge(out, decl_id, ident_id);
+    edge(out, decl_id, expr_id);
+
+    decl_id
 }
 
 fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast::nodes::Expr) -> i32 {
     match expr {
+        ast::nodes::Expr::Identifier(name) => {
+            new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
+        }
+
         ast::nodes::Expr::Int32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
         ast::nodes::Expr::Float32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
-        // ast::nodes::Expr::StringLiteral(val) => {
-        //     new_node(out, id, &format!("{}", val), COLOR_LITERAL)
-        // }
-        ast::nodes::Expr::Identifier(name) => {
-            new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
-        }
+
         ast::nodes::Expr::Lambda {
-            param: parameter_name,
+            param,
             param_type,
             body,
         } => {
             let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
-            let param_id: i32 = new_node(out, id, &format!("{}", parameter_name), COLOR_IDENTIFIER);
+            let param_id: i32 = emit_ast_puml_type_annotation(out, id, param, param_type);
             let body_id: i32 = emit_ast_puml_expr(out, id, &body);
 
             edge(out, lambda_id, param_id);
             edge(out, lambda_id, body_id);
             lambda_id
         }
+
         ast::nodes::Expr::FuncAppl {
             function: function_name,
             args: arguments,

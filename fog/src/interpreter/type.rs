@@ -10,11 +10,15 @@ use crate::interpreter::value::Value;
 pub enum Type {
     Kind,
     Type,
+    Function(Box<Type>, Box<Type>),
+
+    // primitive types
     Int32,
     Float32,
-    Function(Box<Type>, Box<Type>),
-    Sum(Vec<DataConstructor>),
+
+    // ADTs
     Product(Vec<Type>),
+    Sum(Vec<DataConstructor>),
 }
 
 impl Type {
@@ -41,8 +45,6 @@ impl ToString for Type {
         match self {
             Type::Kind => "Kind".to_string(),
             Type::Type => "Type".to_string(),
-            Type::Int32 => "Int32".to_string(),
-            Type::Float32 => "Float32".to_string(),
             Type::Function(param_type, return_type) => {
                 format!(
                     "{} -> {}",
@@ -50,11 +52,15 @@ impl ToString for Type {
                     (*return_type).to_string()
                 )
             }
-            Type::Sum(ctors) => ctors.iter().fold(String::new(), |acc, r#type| {
-                acc + " + " + &r#type.to_string()
-            }),
+
+            Type::Int32 => "Int32".to_string(),
+            Type::Float32 => "Float32".to_string(),
+
             Type::Product(types) => types.iter().fold(String::new(), |acc, r#type| {
                 acc + " * " + &r#type.to_string()
+            }),
+            Type::Sum(ctors) => ctors.iter().fold(String::new(), |acc, r#type| {
+                acc + " + " + &r#type.to_string()
             }),
         }
     }
@@ -136,7 +142,7 @@ pub fn get_expr_type(expr: &Expr, env: &Environment) -> FogResult<Type> {
                         return Err(FogError::runtime(
                             "expected function type".to_string(),
                             None,
-                        ))
+                        ));
                     }
                 }
             }

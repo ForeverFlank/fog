@@ -112,6 +112,12 @@ impl ASTParser<'_> {
             _ => return None,
         };
 
+        let span: Span = Span {
+            pos: self.peek().pos,
+            line: self.peek().line,
+            column: self.peek().column,
+        };
+
         self.next();
 
         let result: FogResult<Statement> = match self.peek().kind {
@@ -119,13 +125,13 @@ impl ASTParser<'_> {
                 self.next();
 
                 self.parse_expression(i32::MIN)
-                    .map(|expr| Statement::TypeAnnotation(name, expr))
+                    .map(|expr| Statement::TypeAnnotation(name, expr, span))
             }
             TokenKind::Equal => {
                 self.next();
 
                 self.parse_expression(i32::MIN)
-                    .map(|expr| Statement::Declaration(name, expr))
+                    .map(|expr| Statement::Declaration(name, expr, span))
             }
             _ => Err(FogError::parse(
                 "expected `:` or `=`".to_string(),
@@ -176,6 +182,29 @@ impl ASTParser<'_> {
     }
 
     fn parse_primary(&mut self) -> FogResult<Expr> {
+        let head: Expr = self.parse_atom()?;
+
+        // check for function application
+        if let Expr::Identifier(name) = &head {
+            let mut args: Vec<Box<Expr>> = Vec::new();
+
+            while self.pos < self.tokens.len() && is_primary_starter(self.peek()) {
+                let arg: Expr = self.parse_atom()?;
+                args.push(Box::new(arg));
+            }
+
+            if !args.is_empty() {
+                return Ok(Expr::FuncAppl {
+                    function: name.clone(),
+                    args,
+                });
+            }
+        }
+
+        Ok(head)
+    }
+
+    fn parse_atom(&mut self) -> FogResult<Expr> {
         let token: Token = self.peek().clone();
         self.next();
 
@@ -187,11 +216,6 @@ impl ASTParser<'_> {
             return Ok(Expr::Float32Literal(value));
         }
 
-        // TODO: partial application
-        // -2 should be negative two
-        // - 2 should be x => x - 2
-
-        // update: maybe not?
         if let TokenKind::Minus = token.kind {
             let opnd: Expr = match self.parse_primary() {
                 Ok(opnd) => opnd,
@@ -204,7 +228,7 @@ impl ASTParser<'_> {
         }
 
         if let TokenKind::Identifier(name) = token.kind {
-            // check for lambda
+            // check if it's a lambda
             if let TokenKind::Colon = self.peek().kind {
                 self.next();
 
@@ -221,7 +245,7 @@ impl ASTParser<'_> {
                     ));
                 };
 
-                let body: Expr = self.parse_expression(0)?;
+                let body: Expr = self.parse_expression(i32::MIN)?;
 
                 return Ok(Expr::Lambda {
                     param: name,
@@ -230,26 +254,8 @@ impl ASTParser<'_> {
                 });
             }
 
-            // check for function application arguments
-            let mut args: Vec<Box<Expr>> = Vec::new();
-            while self.pos < self.tokens.len() {
-                if !is_primary_starter(self.peek()) {
-                    break;
-                }
-
-                let arg: Expr = self.parse_primary()?;
-
-                args.push(Box::new(arg))
-            }
-
-            if args.is_empty() {
-                return Ok(Expr::Identifier(name));
-            } else {
-                return Ok(Expr::FuncAppl {
-                    function: name,
-                    args,
-                });
-            }
+            // otherwise, it's an identifier
+            return Ok(Expr::Identifier(name));
         }
 
         if let TokenKind::LeftParenthesis = token.kind {
@@ -272,7 +278,7 @@ impl ASTParser<'_> {
         }
 
         Err(FogError::parse(
-            "primary expression parsing error".to_string(),
+            "atomic expression parsing error".to_string(),
             Some(Span {
                 pos: token.pos,
                 line: token.line,

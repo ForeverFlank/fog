@@ -4,6 +4,7 @@ use std::rc::Rc;
 use crate::ast::nodes::Expr;
 use crate::ast::nodes::Program;
 use crate::ast::nodes::Statement::*;
+use crate::error::Span;
 use crate::error::{FogError, FogResult};
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_expr;
@@ -14,35 +15,7 @@ use crate::interpreter::variable::Variable;
 pub struct Interpreter {
     pub program: Box<Program>,
     pub top_env: Environment,
-    // pub type_interner: TypeInterner,
 }
-
-// pub struct TypeInterner {
-//     pub type_map: HashMap<Type, TypeId>,
-//     pub total_type_id: TypeId,
-// }
-
-// pub type TypeId = i32;
-
-// impl TypeInterner {
-//     pub fn new() -> TypeInterner {
-//         TypeInterner {
-//             type_map: HashMap::new(),
-//             total_type_id: 0,
-//         }
-//     }
-
-//     pub fn get_or_add_type(&mut self, r#type: Type) -> TypeId {
-//         if let Some(id) = self.type_map.get(&r#type) {
-//             *id
-//         } else {
-//             let id: i32 = self.total_type_id;
-//             self.type_map.insert(r#type, id);
-//             self.total_type_id += 1;
-//             id
-//         }
-//     }
-// }
 
 impl Interpreter {
     fn new(program: Box<Program>) -> Interpreter {
@@ -52,14 +25,17 @@ impl Interpreter {
                 variables: HashMap::new(),
                 parent: None,
             },
-            // type_interner: TypeInterner::new(),
         };
+
+        // the Type itself
 
         let var_type: Variable = Variable {
             name: "Type".to_string(),
             value: Some(Value::Type(Type::Type)),
             r#type: Type::Kind,
         };
+
+        // primitive types
 
         let var_int32: Variable = Variable {
             name: "Int32".to_string(),
@@ -72,6 +48,40 @@ impl Interpreter {
             value: Some(Value::Type(Type::Float32)),
             r#type: Type::Kind,
         };
+
+        // function type
+
+        let var_function: Variable = Variable {
+            name: "Function".to_string(),
+            value: Some(Value::NativeFunction {
+                param_type: Type::Type,
+                return_type: Type::function(Type::Type, Type::Type),
+                function: Rc::new(|arg: Value| match arg {
+                    Value::Type(domain) => Ok(Value::NativeFunction {
+                        param_type: Type::Type,
+                        return_type: Type::Type,
+                        function: Rc::new(move |arg: Value| match arg {
+                            Value::Type(codomain) => Ok(Value::Type(Type::Function(
+                                Box::new(domain.clone()),
+                                Box::new(codomain.clone()),
+                            ))),
+                            _ => Err(FogError::runtime(
+                                "expected a type argument".to_string(),
+                                None,
+                            )),
+                        }),
+                    }),
+                    _ => Err(FogError::runtime(
+                        "expected a type argument".to_string(),
+                        None,
+                    )),
+                }),
+            }),
+            r#type: Type::function(Type::Type, Type::function(Type::Type, Type::Type)),
+        };
+
+        // builtin functions
+
         let var_plus_int_int: Variable = Variable {
             name: "_builtin_plus_int_int".to_string(),
             value: Some(Value::NativeFunction {
@@ -98,14 +108,20 @@ impl Interpreter {
             r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
         };
 
-        vec![var_type, var_int32, var_float32, var_plus_int_int]
-            .iter()
-            .for_each(|var: &Variable| {
-                interpreter
-                    .top_env
-                    .variables
-                    .insert(var.name.clone(), var.clone());
-            });
+        vec![
+            var_type,
+            var_int32,
+            var_float32,
+            var_function,
+            var_plus_int_int,
+        ]
+        .iter()
+        .for_each(|var: &Variable| {
+            interpreter
+                .top_env
+                .variables
+                .insert(var.name.clone(), var.clone());
+        });
 
         interpreter
     }
@@ -118,8 +134,8 @@ impl Interpreter {
 
         for stmt in &interpreter.program.statements {
             let result = match stmt {
-                TypeAnnotation(name, expr) => annotate_type(name, expr, top_env),
-                Declaration(name, expr) => declare(name, expr, top_env),
+                TypeAnnotation(name, expr, span) => annotate_type(name, expr, top_env, span),
+                Declaration(name, expr, span) => declare(name, expr, top_env, span),
             };
 
             if let Err(error) = result {
@@ -145,18 +161,21 @@ impl Interpreter {
         println!();
 
         for error in errors {
-            println!("error: {}", error.message)
+            match error.span {
+                Some(span) => println!("error ({}:{}): {}", span.line, span.column, error.message),
+                None => println!("error: {}", error.message),
+            }
         }
     }
 }
 
-fn annotate_type(name: &str, expr: &Expr, env: &mut Environment) -> FogResult<()> {
-    let r#type: Rc<Type> = match eval_expr(&expr, env)? {
+fn annotate_type(name: &str, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
+    let r#type: Rc<Type> = match eval_expr(&expr, env, span)? {
         Value::Type(r#type) => r#type.into(),
         _ => {
             return Err(FogError::runtime(
                 "expression is not a type".to_string(),
-                None,
+                Some(span.clone()),
             ));
         }
     };
@@ -164,8 +183,8 @@ fn annotate_type(name: &str, expr: &Expr, env: &mut Environment) -> FogResult<()
     (*env).annotate_type(name, (*r#type).clone())
 }
 
-fn declare(name: &str, expr: &Expr, env: &mut Environment) -> FogResult<()> {
-    let value: Value = eval_expr(expr, env)?;
+fn declare(name: &str, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
+    let value: Value = eval_expr(expr, env, span)?;
 
     (*env).declare(name, value)
 }

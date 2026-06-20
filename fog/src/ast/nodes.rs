@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::error::Span;
+
 // --- AST nodes ---
 
 pub struct Program {
@@ -7,8 +9,8 @@ pub struct Program {
 }
 
 pub enum Statement {
-    TypeAnnotation(String, Expr),
-    Declaration(String, Expr),
+    TypeAnnotation(String, Expr, Span),
+    Declaration(String, Expr, Span),
 }
 
 // --- expressions ---

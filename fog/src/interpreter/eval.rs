@@ -2,19 +2,23 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::nodes::Expr;
-use crate::error::{FogError, FogResult};
+use crate::error::FogError;
+use crate::error::FogResult;
+use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 
-pub fn eval_expr(expr: &Expr, env: &Environment) -> FogResult<Value> {
+pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
         // variable
-        Expr::Identifier(name) => env
-            .get_var(&name)?
-            .value
-            .ok_or_else(|| FogError::runtime(format!("undeclared variable `{}`", name), None)),
+        Expr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
+            FogError::runtime(
+                format!("undeclared variable `{}`", name),
+                Some(span.clone()),
+            )
+        }),
 
         // literals
         Expr::Int32Literal(value) => Ok(Value::Int32(*value)),
@@ -37,9 +41,10 @@ pub fn eval_expr(expr: &Expr, env: &Environment) -> FogResult<Value> {
             function: function_name,
             args: arguments,
         } => {
-            let mut result: Value = eval_expr(&Expr::Identifier(function_name.clone()), env)?;
+            let mut result: Value = eval_expr(&Expr::Identifier(function_name.clone()), env, span)?;
             for arg in arguments {
-                result = apply_function(result, eval_expr(arg, env)?)?;
+                let argument: Value = eval_expr(arg, env, span)?;
+                result = apply_function(result, argument, span)?;
             }
             Ok(result)
         }
@@ -103,7 +108,7 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
     }
 }
 
-fn apply_function(function: Value, argument: Value) -> FogResult<Value> {
+fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
     match function {
         Value::Function {
             param,
@@ -125,14 +130,14 @@ fn apply_function(function: Value, argument: Value) -> FogResult<Value> {
                 },
             );
 
-            eval_expr(&body, &child_env)
+            eval_expr(&body, &child_env, span)
         }
 
         Value::NativeFunction { function, .. } => function(argument),
 
         _ => Err(FogError::runtime(
             "cannot apply a non-function value".to_string(),
-            None,
+            Some(span.clone()),
         )),
     }
 }
