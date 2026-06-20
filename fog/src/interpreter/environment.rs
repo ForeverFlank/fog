@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use crate::interpreter::interpreter::InterpreterError;
+use crate::error::FogError;
+use crate::error::FogResult;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::is_value_of_type;
 use crate::interpreter::value::Value;
@@ -13,12 +14,15 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn annotate_type(&mut self, name: &str, r#type: Type) -> Result<(), InterpreterError> {
+    pub fn annotate_type(&mut self, name: &str, r#type: Type) -> FogResult<()> {
         if self.variables.contains_key(name) {
-            return Err(InterpreterError::from_string(format!(
-                "variable `{}` already annotated its type in the scope",
-                name
-            )));
+            return Err(FogError::runtime(
+                format!(
+                    "variable `{}` already annotated its type in the scope",
+                    name
+                ),
+                None,
+            ));
         }
 
         self.variables.insert(
@@ -33,33 +37,33 @@ impl Environment {
         Ok(())
     }
 
-    pub fn declare(&mut self, name: &str, value: Value) -> Result<(), InterpreterError> {
+    pub fn declare(&mut self, name: &str, value: Value) -> FogResult<()> {
         let var: &mut Variable = self.variables.get_mut(name).ok_or_else(|| {
-            InterpreterError::from_string(format!(
-                "variable `{}` not found in the current scope",
-                name
-            ))
+            FogError::runtime(
+                format!("variable `{}` not found in the current scope", name),
+                None,
+            )
         })?;
 
         if var.value.is_some() {
-            return Err(InterpreterError::from_string(format!(
-                "variable `{}` already declared in the current scope",
-                name
-            )));
+            return Err(FogError::runtime(
+                format!("variable `{}` already declared in the current scope", name),
+                None,
+            ));
         }
 
         if !is_value_of_type(&value, &var.r#type) {
-            return Err(InterpreterError::from_string(format!(
-                "type mismatch when assigning to variable `{}`",
-                name
-            )));
+            return Err(FogError::runtime(
+                format!("type mismatch when assigning to variable `{}`", name),
+                None,
+            ));
         }
 
         var.value = Some(value);
         Ok(())
     }
 
-    pub fn get_var(&self, name: &str) -> Result<Variable, InterpreterError> {
+    pub fn get_var(&self, name: &str) -> FogResult<Variable> {
         if let Some(var) = self.variables.get(name) {
             return Ok(var.clone());
         }
@@ -68,9 +72,9 @@ impl Environment {
             return parent.get_var(name);
         }
 
-        Err(InterpreterError::from_string(format!(
-            "variable `{}` not found in the current scope",
-            name
-        )))
+        Err(FogError::runtime(
+            format!("variable `{}` not found in the current scope", name),
+            None,
+        ))
     }
 }

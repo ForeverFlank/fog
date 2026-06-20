@@ -1,7 +1,7 @@
 use crate::ast::nodes::Expr;
+use crate::error::{FogError, FogResult};
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_type_expr;
-use crate::interpreter::interpreter::InterpreterError;
 use crate::interpreter::value::Value;
 
 // --- type ---
@@ -83,7 +83,7 @@ impl ToString for DataConstructor {
 
 // --- functions ---
 
-pub fn get_value_type(value: &Value, env: &Environment) -> Result<Type, InterpreterError> {
+pub fn get_value_type(value: &Value, env: &Environment) -> FogResult<Type> {
     match value {
         Value::Type(_) => Ok(Type::Kind),
 
@@ -105,7 +105,7 @@ pub fn get_value_type(value: &Value, env: &Environment) -> Result<Type, Interpre
     }
 }
 
-pub fn get_expr_type(expr: &Expr, env: &Environment) -> Result<Type, InterpreterError> {
+pub fn get_expr_type(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
         Expr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
 
@@ -121,10 +121,10 @@ pub fn get_expr_type(expr: &Expr, env: &Environment) -> Result<Type, Interpreter
 
         Expr::FuncAppl { function, args } => {
             let Type::Function(_, return_type) = env.get_var(&function)?.r#type else {
-                return Err(InterpreterError::from_string(format!(
-                    "`{}` is not a function",
-                    function
-                )));
+                return Err(FogError::runtime(
+                    format!("`{}` is not a function", function),
+                    None,
+                ));
             };
 
             let mut curr_return_type: Type = *return_type;
@@ -132,7 +132,12 @@ pub fn get_expr_type(expr: &Expr, env: &Environment) -> Result<Type, Interpreter
             for _ in args {
                 curr_return_type = match curr_return_type {
                     Type::Function(_, r) => *r,
-                    _ => return Err(InterpreterError::from_str("expected function type")),
+                    _ => {
+                        return Err(FogError::runtime(
+                            "expected function type".to_string(),
+                            None,
+                        ))
+                    }
                 }
             }
 

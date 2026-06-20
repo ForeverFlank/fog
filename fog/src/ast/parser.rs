@@ -2,17 +2,14 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::nodes::*;
+use crate::error::Span;
+use crate::error::{FogError, FogResult};
 use crate::lexer::token::*;
 
 pub struct ASTParser<'a> {
     tokens: &'a Vec<Token>,
     pos: usize,
     binary_ops: HashMap<String, BinaryOp>,
-}
-
-pub struct ASTParserError {
-    pub message: &'static str,
-    pub token_pos: usize,
 }
 
 #[derive(Clone)]
@@ -89,10 +86,10 @@ impl ASTParser<'_> {
         token_op_key(token).and_then(|key| self.binary_ops.get(key))
     }
 
-    pub fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<ASTParserError>) {
+    pub fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<FogError>) {
         let mut parser: ASTParser = ASTParser::new(&tokens);
         let mut statements: Vec<Statement> = Vec::new();
-        let mut errors: Vec<ASTParserError> = Vec::new();
+        let mut errors: Vec<FogError> = Vec::new();
 
         while parser.pos < parser.tokens.len() {
             if let Some(result) = parser.parse_statement() {
@@ -109,7 +106,7 @@ impl ASTParser<'_> {
         (program, errors)
     }
 
-    fn parse_statement(&mut self) -> Option<Result<Statement, ASTParserError>> {
+    fn parse_statement(&mut self) -> Option<FogResult<Statement>> {
         let name: String = match &self.peek().kind {
             TokenKind::Identifier(name) => name.clone(),
             _ => return None,
@@ -117,7 +114,7 @@ impl ASTParser<'_> {
 
         self.next();
 
-        let result: Result<Statement, ASTParserError> = match self.peek().kind {
+        let result: FogResult<Statement> = match self.peek().kind {
             TokenKind::Colon => {
                 self.next();
 
@@ -130,16 +127,20 @@ impl ASTParser<'_> {
                 self.parse_expression(i32::MIN)
                     .map(|expr| Statement::Declaration(name, expr))
             }
-            _ => Err(ASTParserError {
-                message: "expected `:` or `=`",
-                token_pos: self.peek().pos,
-            }),
+            _ => Err(FogError::parse(
+                "expected `:` or `=`".to_string(),
+                Some(Span {
+                    pos: self.peek().pos,
+                    line: self.peek().line,
+                    column: self.peek().column,
+                }),
+            )),
         };
 
         Some(result)
     }
 
-    fn parse_expression(&mut self, min_prec: i32) -> Result<Expr, ASTParserError> {
+    fn parse_expression(&mut self, min_prec: i32) -> FogResult<Expr> {
         let mut lhs: Expr = self.parse_primary()?;
 
         while self.pos < self.tokens.len() {
@@ -174,7 +175,7 @@ impl ASTParser<'_> {
         Ok(lhs)
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, ASTParserError> {
+    fn parse_primary(&mut self) -> FogResult<Expr> {
         let token: Token = self.peek().clone();
         self.next();
 
@@ -210,10 +211,14 @@ impl ASTParser<'_> {
                 let param_type: Expr = self.parse_expression(i32::MIN)?;
 
                 let TokenKind::FatArrow = self.peek().kind else {
-                    return Err(ASTParserError {
-                        message: "expected `=>`",
-                        token_pos: self.pos,
-                    });
+                    return Err(FogError::parse(
+                        "expected `=>`".to_string(),
+                        Some(Span {
+                            pos: self.peek().pos,
+                            line: self.peek().line,
+                            column: self.peek().column,
+                        }),
+                    ));
                 };
 
                 let body: Expr = self.parse_expression(0)?;
@@ -248,23 +253,31 @@ impl ASTParser<'_> {
         }
 
         if let TokenKind::LeftParenthesis = token.kind {
-            let res: Result<Expr, ASTParserError> = self.parse_expression(i32::MIN);
+            let res: FogResult<Expr> = self.parse_expression(i32::MIN);
 
             return match self.peek().kind {
                 TokenKind::RightParenthesis => {
                     self.next();
                     res
                 }
-                _ => Err(ASTParserError {
-                    message: "expected `)`",
-                    token_pos: token.pos,
-                }),
+                _ => Err(FogError::parse(
+                    "expected `)`".to_string(),
+                    Some(Span {
+                        pos: token.pos,
+                        line: token.line,
+                        column: token.column,
+                    }),
+                )),
             };
         }
 
-        Err(ASTParserError {
-            message: "primary expression parsing error",
-            token_pos: token.pos,
-        })
+        Err(FogError::parse(
+            "primary expression parsing error".to_string(),
+            Some(Span {
+                pos: token.pos,
+                line: token.line,
+                column: token.column,
+            }),
+        ))
     }
 }

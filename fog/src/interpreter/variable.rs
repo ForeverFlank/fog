@@ -1,5 +1,5 @@
+use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::interpreter::InterpreterError;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::get_value_type;
 use crate::interpreter::value::Value;
@@ -16,7 +16,7 @@ impl Variable {
         name: String,
         value: Value,
         env: &Environment,
-    ) -> Result<Variable, InterpreterError> {
+    ) -> FogResult<Variable> {
         Ok(Variable {
             name,
             value: Some(value.clone()),

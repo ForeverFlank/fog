@@ -1,3 +1,5 @@
+use crate::error::Span;
+use crate::error::{FogError, FogResult};
 use crate::lexer::token::*;
 
 pub struct Lexer {
@@ -7,12 +9,6 @@ pub struct Lexer {
     column: usize,
     paren_depth: i32,
     brace_depth: i32,
-}
-
-pub struct LexerError {
-    pub message: &'static str,
-    pub line: usize,
-    pub column: usize,
 }
 
 impl Lexer {
@@ -43,10 +39,10 @@ impl Lexer {
         self.pos += 1;
     }
 
-    pub fn tokenize(src: &str) -> (Vec<Token>, Vec<LexerError>) {
+    pub fn tokenize(src: &str) -> (Vec<Token>, Vec<FogError>) {
         let mut lexer: Lexer = Lexer::new(src);
         let mut tokens: Vec<Token> = Vec::new();
-        let mut errors: Vec<LexerError> = Vec::new();
+        let mut errors: Vec<FogError> = Vec::new();
 
         while lexer.pos < lexer.chars.len() {
             if lexer.skip_comment() {
@@ -56,7 +52,7 @@ impl Lexer {
             let start_line: usize = lexer.line;
             let start_column: usize = lexer.column;
 
-            let result: Option<Result<Token, LexerError>> = lexer
+            let result: Option<FogResult<Token>> = lexer
                 .parse_newline(start_line, start_column)
                 .or_else(|| lexer.parse_word(start_line, start_column))
                 .or_else(|| lexer.parse_number(start_line, start_column))
@@ -95,11 +91,7 @@ impl Lexer {
         false
     }
 
-    fn parse_word(
-        &mut self,
-        start_line: usize,
-        start_column: usize,
-    ) -> Option<Result<Token, LexerError>> {
+    fn parse_word(&mut self, start_line: usize, start_column: usize) -> Option<FogResult<Token>> {
         let pos: usize = self.pos;
         let ch: char = self.peek()?;
 
@@ -131,11 +123,7 @@ impl Lexer {
         }))
     }
 
-    fn parse_number(
-        &mut self,
-        start_line: usize,
-        start_column: usize,
-    ) -> Option<Result<Token, LexerError>> {
+    fn parse_number(&mut self, start_line: usize, start_column: usize) -> Option<FogResult<Token>> {
         let pos: usize = self.pos;
         let ch: char = self.peek()?;
 
@@ -158,11 +146,14 @@ impl Lexer {
                 if !decimal {
                     decimal = true;
                 } else {
-                    return Some(Err(LexerError {
-                        message: "Malformed number",
-                        line: start_line,
-                        column: start_column,
-                    }));
+                    return Some(Err(FogError::lex(
+                        "Malformed number".to_string(),
+                        Some(Span {
+                            pos,
+                            line: start_line,
+                            column: start_column,
+                        }),
+                    )));
                 }
             }
         }
@@ -171,22 +162,28 @@ impl Lexer {
             match num.parse::<f32>() {
                 Ok(v) => TokenKind::Float32Literal(v),
                 Err(_) => {
-                    return Some(Err(LexerError {
-                        message: "Float parse error",
-                        line: start_line,
-                        column: start_column,
-                    }));
+                    return Some(Err(FogError::lex(
+                        "Float parse error".to_string(),
+                        Some(Span {
+                            pos,
+                            line: start_line,
+                            column: start_column,
+                        }),
+                    )));
                 }
             }
         } else {
             match num.parse::<i32>() {
                 Ok(v) => TokenKind::Int32Literal(v),
                 Err(_) => {
-                    return Some(Err(LexerError {
-                        message: "Integer parse error",
-                        line: start_line,
-                        column: start_column,
-                    }));
+                    return Some(Err(FogError::lex(
+                        "Integer parse error".to_string(),
+                        Some(Span {
+                            pos,
+                            line: start_line,
+                            column: start_column,
+                        }),
+                    )));
                 }
             }
         };
@@ -203,7 +200,7 @@ impl Lexer {
         &mut self,
         start_line: usize,
         start_column: usize,
-    ) -> Option<Result<Token, LexerError>> {
+    ) -> Option<FogResult<Token>> {
         if self.pos + 1 >= self.chars.len() {
             return None;
         }
@@ -239,7 +236,7 @@ impl Lexer {
         &mut self,
         start_line: usize,
         start_column: usize,
-    ) -> Option<Result<Token, LexerError>> {
+    ) -> Option<FogResult<Token>> {
         let pos: usize = self.pos;
         let sym: char = self.peek()?;
 
@@ -288,7 +285,7 @@ impl Lexer {
         &mut self,
         start_line: usize,
         start_column: usize,
-    ) -> Option<Result<Token, LexerError>> {
+    ) -> Option<FogResult<Token>> {
         let pos: usize = self.pos;
         let ch: char = self.peek()?;
 

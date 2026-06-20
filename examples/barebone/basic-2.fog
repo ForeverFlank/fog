@@ -2,7 +2,4 @@ a : Int32
 a = 5
 
 b : Int32
-b = a + 6       -- 11
-
-c : Int32
-c = a + b + 7   -- 23
+b = _builtin_plus_int_int a 6   -- 11

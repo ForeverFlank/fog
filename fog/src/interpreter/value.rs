@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::ast::nodes::Expr;
+use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::interpreter::InterpreterError;
 use crate::interpreter::r#type::Type;
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ pub enum Value {
     NativeFunction {
         param_type: Type,
         return_type: Type,
-        function: Rc<dyn Fn(Value) -> Result<Value, InterpreterError>>,
+        function: Rc<dyn Fn(Value) -> FogResult<Value>>,
     },
 }
 

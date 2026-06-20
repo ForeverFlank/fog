@@ -2,18 +2,19 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::nodes::Expr;
+use crate::error::{FogError, FogResult};
 use crate::interpreter::environment::Environment;
-use crate::interpreter::interpreter::InterpreterError;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 
-pub fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterError> {
+pub fn eval_expr(expr: &Expr, env: &Environment) -> FogResult<Value> {
     match expr {
         // variable
-        Expr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
-            InterpreterError::from_string(format!("undeclared variable `{}`", name,))
-        }),
+        Expr::Identifier(name) => env
+            .get_var(&name)?
+            .value
+            .ok_or_else(|| FogError::runtime(format!("undeclared variable `{}`", name), None)),
 
         // literals
         Expr::Int32Literal(value) => Ok(Value::Int32(*value)),
@@ -45,14 +46,11 @@ pub fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterErr
     }
 }
 
-pub fn eval_type_expr(expr: &Expr, env: &Environment) -> Result<Type, InterpreterError> {
+pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
         Expr::Identifier(name) => {
             let Some(Value::Type(r#type)) = env.get_var(name)?.value else {
-                return Err(InterpreterError::from_string(format!(
-                    "`{}` is not a type",
-                    name
-                )));
+                return Err(FogError::runtime(format!("`{}` is not a type", name), None));
             };
 
             Ok(r#type)
@@ -74,18 +72,18 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> Result<Type, Interprete
                     Type::Function(param, ret) => {
                         let arg_type: Type = eval_type_expr(arg.as_ref(), env)?;
                         if arg_type != *param {
-                            return Err(InterpreterError::from_string(format!(
-                                "type mismatch applying `{}`",
-                                function
-                            )));
+                            return Err(FogError::runtime(
+                                format!("type mismatch applying `{}`", function),
+                                None,
+                            ));
                         }
                         *ret
                     }
                     _ => {
-                        return Err(InterpreterError::from_string(format!(
-                            "`{}` is not a valid type constructor",
-                            function
-                        )));
+                        return Err(FogError::runtime(
+                            format!("`{}` is not a valid type constructor", function),
+                            None,
+                        ));
                     }
                 };
             }
@@ -93,13 +91,19 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> Result<Type, Interprete
             Ok(current)
         }
 
-        Expr::Lambda { .. } => Err(InterpreterError::from_str("lambda is not a type")),
-        Expr::Int32Literal(_) => Err(InterpreterError::from_str("Int32 literal is not a type")),
-        Expr::Float32Literal(_) => Err(InterpreterError::from_str("Float32 literal is not a type")),
+        Expr::Lambda { .. } => Err(FogError::runtime("lambda is not a type".to_string(), None)),
+        Expr::Int32Literal(_) => Err(FogError::runtime(
+            "Int32 literal is not a type".to_string(),
+            None,
+        )),
+        Expr::Float32Literal(_) => Err(FogError::runtime(
+            "Float32 literal is not a type".to_string(),
+            None,
+        )),
     }
 }
 
-fn apply_function(function: Value, argument: Value) -> Result<Value, InterpreterError> {
+fn apply_function(function: Value, argument: Value) -> FogResult<Value> {
     match function {
         Value::Function {
             param,
@@ -126,8 +130,9 @@ fn apply_function(function: Value, argument: Value) -> Result<Value, Interpreter
 
         Value::NativeFunction { function, .. } => function(argument),
 
-        _ => Err(InterpreterError::from_str(
-            "cannot apply a non-function value",
+        _ => Err(FogError::runtime(
+            "cannot apply a non-function value".to_string(),
+            None,
         )),
     }
 }

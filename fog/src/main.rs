@@ -6,14 +6,15 @@ use crate::ast::nodes::Statement::Declaration;
 use crate::ast::nodes::Statement::TypeAnnotation;
 use crate::ast::parser::*;
 use crate::ast::*;
+use crate::error::FogError;
 
-use crate::lexer::lexer::*;
 use crate::lexer::token::*;
 use crate::lexer::*;
 
 use crate::interpreter::*;
 
 mod ast;
+mod error;
 mod interpreter;
 mod lexer;
 
@@ -67,12 +68,16 @@ fn print_tokens(tokens: &Vec<Token>) {
     }
 }
 
-fn print_lexer_errors(errors: &Vec<LexerError>) {
+fn print_lexer_errors(errors: &Vec<FogError>) {
     for error in errors {
-        println!(
-            "Error: {} at {}:{}",
-            error.message, error.line, error.column
-        )
+        let span = error.span.as_ref();
+        match span {
+            Some(span) => println!(
+                "Error: {} at {}:{}",
+                error.message, span.line, span.column
+            ),
+            None => println!("Error: {}", error.message),
+        }
     }
 }
 
@@ -184,16 +189,21 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast::nodes::Expr) -
     }
 }
 
-fn print_ast_parser_errors(errors: &Vec<ast::parser::ASTParserError>, tokens: &Vec<Token>) {
+fn print_ast_parser_errors(errors: &Vec<FogError>, tokens: &Vec<Token>) {
     for error in errors {
-        let token: &Token = &tokens[error.token_pos];
-
-        println!(
-            "Error: {} at {} at {}:{}",
-            error.message,
-            &token.kind.to_string(),
-            token.line,
-            token.column
-        )
+        let span = error.span.as_ref();
+        match span {
+            Some(span) => {
+                let token: &Token = &tokens[span.pos];
+                println!(
+                    "Error: {} at {} at {}:{}",
+                    error.message,
+                    token.kind.to_string(),
+                    token.line,
+                    token.column
+                )
+            }
+            None => println!("Error: {}", error.message),
+        }
     }
 }
