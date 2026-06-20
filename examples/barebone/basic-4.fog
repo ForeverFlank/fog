@@ -1,6 +1,6 @@
 -- functions
 
-f : Int32 -> Int32
+f : Function Int32 Int32
 f = x : Int32 => x + 2
 
 num1 : Int32

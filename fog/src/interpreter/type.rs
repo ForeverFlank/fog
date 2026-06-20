@@ -17,6 +17,12 @@ pub enum Type {
     Product(Vec<Type>),
 }
 
+impl Type {
+    pub fn function(param_type: Type, return_type: Type) -> Type {
+        Type::Function(Box::new(param_type), Box::new(return_type))
+    }
+}
+
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -86,19 +92,16 @@ pub fn get_value_type(value: &Value, env: &Environment) -> Result<Type, Interpre
 
         Value::Function {
             param_type, body, ..
-        } => Ok(Type::Function(
-            Box::new(param_type.clone()),
-            get_expr_type(&body, env)?.into(),
+        } => Ok(Type::function(
+            param_type.clone(),
+            get_expr_type(&body, env)?,
         )),
 
         Value::NativeFunction {
             param_type,
             return_type,
             ..
-        } => Ok(Type::Function(
-            Box::new(param_type.clone()),
-            Box::new(return_type.clone()),
-        )),
+        } => Ok(Type::function(param_type.clone(), return_type.clone())),
     }
 }
 

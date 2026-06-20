@@ -5,6 +5,7 @@ use crate::ast::nodes::Expr;
 use crate::ast::nodes::Program;
 use crate::ast::nodes::Statement::*;
 use crate::interpreter::environment::Environment;
+use crate::interpreter::eval::eval_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
@@ -69,46 +70,46 @@ impl Interpreter {
             type_interner: TypeInterner::new(),
         };
 
-        let rc_kind: Rc<Type> = Rc::new(Type::Kind);
-        let rc_type: Rc<Type> = Rc::new(Type::Type);
-
-        let rc_i32: Rc<Type> = Rc::new(Type::Int32);
-        let rc_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32.clone(), rc_i32.clone()));
-        let rc_i32_i32_i32: Rc<Type> = Rc::new(Type::Function(rc_i32.clone(), rc_i32_i32.clone()));
-
         let var_type: Variable = Variable {
             name: "Type".to_string(),
-            value: Some(Value::Type(rc_type.clone())),
-            r#type: rc_kind.clone(),
+            value: Some(Value::Type(Type::Type)),
+            r#type: Type::Kind,
         };
 
         let var_int32: Variable = Variable {
             name: "Int32".to_string(),
-            value: Some(Value::Type(Rc::new(Type::Int32))),
-            r#type: rc_type.clone(),
+            value: Some(Value::Type(Type::Int32)),
+            r#type: Type::Kind,
         };
 
         let var_float32: Variable = Variable {
             name: "Float32".to_string(),
-            value: Some(Value::Type(Rc::new(Type::Float32))),
-            r#type: rc_type.clone(),
+            value: Some(Value::Type(Type::Float32)),
+            r#type: Type::Kind,
         };
-
         let var_plus_int_int: Variable = Variable {
-            name: "+".to_string(),
-            value: Some(Value::NativeFunction(Rc::new(|a| match a {
-                Value::Int32(lhs) => Ok(Value::NativeFunction(Rc::new(move |b| match b {
-                    Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
-                    _ => Err(InterpreterError::from_str("right operand is not an Int32")),
-                }))),
-                _ => Err(InterpreterError::from_str("left operand is not an Int32")),
-            }))),
-            r#type: rc_i32_i32_i32.clone(),
+            name: "_builtin_plus_int_int".to_string(),
+            value: Some(Value::NativeFunction {
+                param_type: Type::Int32,
+                return_type: Type::Function(Box::new(Type::Int32), Box::new(Type::Int32)),
+                function: Rc::new(|a: Value| match a {
+                    Value::Int32(lhs) => Ok(Value::NativeFunction {
+                        param_type: Type::Int32,
+                        return_type: Type::Int32,
+                        function: Rc::new(move |b: Value| match b {
+                            Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
+                            _ => Err(InterpreterError::from_str("right operand is not an Int32")),
+                        }),
+                    }),
+                    _ => Err(InterpreterError::from_str("left operand is not an Int32")),
+                }),
+            }),
+            r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
         };
 
         vec![var_type, var_int32, var_float32, var_plus_int_int]
             .iter()
-            .for_each(|var| {
+            .for_each(|var: &Variable| {
                 interpreter
                     .top_env
                     .variables
@@ -124,17 +125,15 @@ impl Interpreter {
 
         let top_env: &mut Environment = &mut interpreter.top_env;
 
-        for stmt in interpreter.program.statements {
-            match stmt {
-                TypeAnnotation(name, expr) => match annotate_type(&name, &expr, top_env) {
-                    Ok(_) => (),
-                    Err(error) => errors.push(error),
-                },
-                Declaration(name, expr) => match declare(&name, &expr, top_env) {
-                    Ok(_) => (),
-                    Err(error) => errors.push(error),
-                },
+        for stmt in &interpreter.program.statements {
+            let result = match stmt {
+                TypeAnnotation(name, expr) => annotate_type(name, expr, top_env),
+                Declaration(name, expr) => declare(name, expr, top_env),
             };
+
+            if let Err(error) = result {
+                errors.push(error);
+            }
         }
 
         let mut all_vars: Vec<Variable> = interpreter.top_env.variables.values().cloned().collect();
@@ -161,24 +160,18 @@ impl Interpreter {
 }
 
 fn annotate_type(name: &str, expr: &Expr, env: &mut Environment) -> Result<(), InterpreterError> {
-    let r#type: Rc<Type> = match eval_expr(&expr, env) {
-        Ok(value) => match value {
-            Value::Type(r#type) => r#type,
-            _ => {
-                return Err(InterpreterError::from_str("expression is not a type"));
-            }
-        },
-        Err(error) => return Err(error),
+    let r#type: Rc<Type> = match eval_expr(&expr, env)? {
+        Value::Type(r#type) => r#type.into(),
+        _ => {
+            return Err(InterpreterError::from_str("expression is not a type"));
+        }
     };
 
-    (*env).annotate_type(name, r#type)
+    (*env).annotate_type(name, (*r#type).clone())
 }
 
 fn declare(name: &str, expr: &Expr, env: &mut Environment) -> Result<(), InterpreterError> {
-    let value: Value = match eval_expr(expr, env) {
-        Ok(value) => value,
-        Err(error) => return Err(error),
-    };
+    let value: Value = eval_expr(expr, env)?;
 
     (*env).declare(name, value)
 }

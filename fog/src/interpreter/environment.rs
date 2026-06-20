@@ -13,7 +13,7 @@ pub struct Environment {
 }
 
 impl Environment {
-    fn annotate_type(&mut self, name: &str, r#type: Type) -> Result<(), InterpreterError> {
+    pub fn annotate_type(&mut self, name: &str, r#type: Type) -> Result<(), InterpreterError> {
         if self.variables.contains_key(name) {
             return Err(InterpreterError::from_string(format!(
                 "variable `{}` already annotated its type in the scope",
