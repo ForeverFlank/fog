@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 
@@ -7,5 +5,5 @@ use crate::interpreter::value::Value;
 pub struct Variable {
     pub name: String,
     pub value: Option<Value>,
-    pub r#type: Rc<Type>,
+    pub r#type: Type,
 }

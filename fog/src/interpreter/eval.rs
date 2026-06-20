@@ -4,6 +4,7 @@ use std::rc::Rc;
 use crate::ast::nodes::Expr;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::interpreter::InterpreterError;
+use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 
@@ -25,7 +26,7 @@ pub fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterErr
             body,
         } => Ok(Value::Function {
             param: param.clone(),
-            param_type: eval_expr(expr, env),
+            param_type: eval_type_expr(param_type, env)?,
             body: Rc::clone(body),
             captured_env: Box::new(env.clone()),
         }),
@@ -42,6 +43,10 @@ pub fn eval_expr(expr: &Expr, env: &Environment) -> Result<Value, InterpreterErr
             Ok(result)
         }
     }
+}
+
+pub fn eval_type_expr(expr: &Expr, env: &Environment) -> Result<Type, InterpreterError> {
+    match expr {}
 }
 
 fn apply_function(function: Value, argument: Value) -> Result<Value, InterpreterError> {

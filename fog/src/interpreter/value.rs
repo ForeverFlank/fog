@@ -7,18 +7,18 @@ use crate::interpreter::r#type::Type;
 
 #[derive(Clone)]
 pub enum Value {
-    Type(Rc<Type>),
+    Type(Type),
     Int32(i32),
     Float32(f32),
     Function {
         param: String,
-        param_type: Rc<Type>,
+        param_type: Type,
         body: Rc<Expr>,
         captured_env: Box<Environment>,
     },
     NativeFunction {
-        param_type: Rc<Type>,
-        return_type: Rc<Type>,
+        param_type: Type,
+        return_type: Type,
         function: Rc<dyn Fn(Value) -> Result<Value, InterpreterError>>,
     },
 }

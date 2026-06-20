@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::interpreter::interpreter::InterpreterError;
 use crate::interpreter::r#type::Type;
@@ -14,7 +13,7 @@ pub struct Environment {
 }
 
 impl Environment {
-    fn annotate_type(&mut self, name: &str, r#type: Rc<Type>) -> Result<(), InterpreterError> {
+    fn annotate_type(&mut self, name: &str, r#type: Type) -> Result<(), InterpreterError> {
         if self.variables.contains_key(name) {
             return Err(InterpreterError::from_string(format!(
                 "variable `{}` already annotated its type in the scope",
