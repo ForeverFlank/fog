@@ -1,11 +1,15 @@
 -- currying
 
-add : Int32 -> Int32 -> Int32
-add = x : Int32 => y : Int32 => x + y
+--  : Int32 -> Int32 -> Int32
+add : Function Int32 (Function Int32 Int32)
+add = lhs : Int32 => rhs : Int32 => _builtin_plus_Int32_Int32 lhs rhs
 
-addFive : Int32 -> Int32
-addFive = add 5     -- y => 5 + y
 
-num : Int32
-num = addFive 6     -- 11
+--      : Int32 -> Int32
+addFive : Function Int32 Int32
+addFive = add 5
+
+
+twelfth : Int32
+twelfth = addFive 7
 

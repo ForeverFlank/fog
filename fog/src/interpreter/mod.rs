@@ -1,5 +1,5 @@
-use crate::ast::nodes::Program;
 use crate::interpreter::interpreter::Interpreter;
+use crate::parser::nodes::Program;
 
 pub mod environment;
 pub mod eval;

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::ast::nodes::*;
 use crate::error::Span;
 use crate::error::{FogError, FogResult};
 use crate::lexer::token::*;
+use crate::parser::nodes::*;
 
 pub struct ASTParser<'a> {
     tokens: &'a Vec<Token>,
@@ -182,14 +182,14 @@ impl ASTParser<'_> {
     }
 
     fn parse_primary(&mut self) -> FogResult<Expr> {
-        let head: Expr = self.parse_atom()?;
+        let head: Expr = self.parse_atomic()?;
 
         // check for function application
         if let Expr::Identifier(name) = &head {
             let mut args: Vec<Box<Expr>> = Vec::new();
 
             while self.pos < self.tokens.len() && is_primary_starter(self.peek()) {
-                let arg: Expr = self.parse_atom()?;
+                let arg: Expr = self.parse_atomic()?;
                 args.push(Box::new(arg));
             }
 
@@ -204,7 +204,7 @@ impl ASTParser<'_> {
         Ok(head)
     }
 
-    fn parse_atom(&mut self) -> FogResult<Expr> {
+    fn parse_atomic(&mut self) -> FogResult<Expr> {
         let token: Token = self.peek().clone();
         self.next();
 
@@ -244,6 +244,7 @@ impl ASTParser<'_> {
                         }),
                     ));
                 };
+                self.next();
 
                 let body: Expr = self.parse_expression(i32::MIN)?;
 

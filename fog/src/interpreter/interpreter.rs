@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::ast::nodes::Expr;
-use crate::ast::nodes::Program;
-use crate::ast::nodes::Statement::*;
 use crate::error::Span;
 use crate::error::{FogError, FogResult};
 use crate::interpreter::environment::Environment;
@@ -11,6 +8,9 @@ use crate::interpreter::eval::eval_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
+use crate::parser::nodes::Expr;
+use crate::parser::nodes::Program;
+use crate::parser::nodes::Statement::*;
 
 pub struct Interpreter {
     pub program: Box<Program>,
@@ -83,7 +83,7 @@ impl Interpreter {
         // builtin functions
 
         let var_plus_int_int: Variable = Variable {
-            name: "_builtin_plus_int_int".to_string(),
+            name: "_builtin_plus_Int32_Int32".to_string(),
             value: Some(Value::NativeFunction {
                 param_type: Type::Int32,
                 return_type: Type::Function(Box::new(Type::Int32), Box::new(Type::Int32)),
@@ -162,8 +162,11 @@ impl Interpreter {
 
         for error in errors {
             match error.span {
-                Some(span) => println!("error ({}:{}): {}", span.line, span.column, error.message),
-                None => println!("error: {}", error.message),
+                Some(span) => println!(
+                    "runtime error ({}:{}): {}",
+                    span.line, span.column, error.message
+                ),
+                None => println!("runtime error: {}", error.message),
             }
         }
     }

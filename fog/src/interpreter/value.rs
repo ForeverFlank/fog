@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
-use crate::ast::nodes::Expr;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::r#type::Type;
+use crate::parser::nodes::Expr;
 
 #[derive(Clone)]
 pub enum Value {

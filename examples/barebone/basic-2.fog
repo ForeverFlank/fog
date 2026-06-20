@@ -1,5 +1,0 @@
-a : Int32
-a = 5
-
-b : Int32
-b = _builtin_plus_int_int a 6   -- 11

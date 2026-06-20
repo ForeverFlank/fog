@@ -2,22 +2,22 @@ use std::env;
 use std::fs;
 use std::path;
 
-use crate::ast::nodes::Expr;
-use crate::ast::nodes::Statement::Declaration;
-use crate::ast::nodes::Statement::TypeAnnotation;
-use crate::ast::parser::*;
-use crate::ast::*;
 use crate::error::FogError;
+use crate::parser::nodes::Expr;
+use crate::parser::nodes::Statement::Declaration;
+use crate::parser::nodes::Statement::TypeAnnotation;
+use crate::parser::parser::*;
+use crate::parser::*;
 
 use crate::lexer::token::*;
 use crate::lexer::*;
 
 use crate::interpreter::*;
 
-mod ast;
 mod error;
 mod interpreter;
 mod lexer;
+mod parser;
 
 fn main() {
     // --- arguments and paths ---
@@ -41,7 +41,7 @@ fn main() {
     print_lexer_errors(&lexer_errors);
 
     // -- AST parsing
-    let (ast, ast_parser_errors) = parse_program(&tokens);
+    let (ast, parser_errors) = parse_program(&tokens);
 
     if arg_emit_ast {
         let puml: String = emit_ast_puml(&ast, path);
@@ -49,7 +49,7 @@ fn main() {
         let _ = fs::write(output_path, puml);
     }
 
-    print_ast_parser_errors(&ast_parser_errors, &tokens);
+    print_parser_errors(&parser_errors);
 
     // -- interpreting
 
@@ -73,15 +73,18 @@ fn print_lexer_errors(errors: &Vec<FogError>) {
     for error in errors {
         let span = error.span.as_ref();
         match span {
-            Some(span) => println!("Error: {} at {}:{}", error.message, span.line, span.column),
-            None => println!("Error: {}", error.message),
+            Some(span) => println!(
+                "lexer error ({}:{}): {}",
+                span.line, span.column, error.message
+            ),
+            None => println!("lexer error: {}", error.message),
         }
     }
 }
 
 // --- AST ---
 
-fn emit_ast_puml(program: &ast::nodes::Program, path: &str) -> String {
+fn emit_ast_puml(program: &parser::nodes::Program, path: &str) -> String {
     let mut out: String = String::new();
     let mut id: i32 = 0;
     out.push_str(&format!("@startuml AST of {}\n", path));
@@ -121,7 +124,7 @@ fn edge(out: &mut String, parent_id: i32, child_id: i32) {
     out.push_str(&format!("n{} <-- n{}\n", parent_id, child_id));
 }
 
-fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &ast::nodes::Statement) -> i32 {
+fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &parser::nodes::Statement) -> i32 {
     match stmt {
         TypeAnnotation(name, expr, _) => emit_ast_puml_type_annotation(out, id, name, expr),
         Declaration(name, expr, _) => emit_ast_puml_declaration(out, id, name, expr),
@@ -155,20 +158,20 @@ fn emit_ast_puml_declaration(out: &mut String, id: &mut i32, name: &String, expr
     decl_id
 }
 
-fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast::nodes::Expr) -> i32 {
+fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr) -> i32 {
     match expr {
-        ast::nodes::Expr::Identifier(name) => {
+        parser::nodes::Expr::Identifier(name) => {
             new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
         }
 
-        ast::nodes::Expr::Int32Literal(val) => {
+        parser::nodes::Expr::Int32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
-        ast::nodes::Expr::Float32Literal(val) => {
+        parser::nodes::Expr::Float32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
 
-        ast::nodes::Expr::Lambda {
+        parser::nodes::Expr::Lambda {
             param,
             param_type,
             body,
@@ -182,7 +185,7 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast::nodes::Expr) -
             lambda_id
         }
 
-        ast::nodes::Expr::FuncAppl {
+        parser::nodes::Expr::FuncAppl {
             function: function_name,
             args: arguments,
         } => {
@@ -196,21 +199,17 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &ast::nodes::Expr) -
     }
 }
 
-fn print_ast_parser_errors(errors: &Vec<FogError>, tokens: &Vec<Token>) {
+fn print_parser_errors(errors: &Vec<FogError>) {
     for error in errors {
         let span = error.span.as_ref();
         match span {
             Some(span) => {
-                let token: &Token = &tokens[span.pos];
                 println!(
-                    "Error: {} at {} at {}:{}",
-                    error.message,
-                    token.kind.to_string(),
-                    token.line,
-                    token.column
+                    "parser error ({}:{}): {}",
+                    span.line, span.column, error.message,
                 )
             }
-            None => println!("Error: {}", error.message),
+            None => println!("parser error: {}", error.message),
         }
     }
 }

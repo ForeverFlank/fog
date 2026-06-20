@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::ast::nodes::Expr;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
@@ -9,6 +8,7 @@ use crate::interpreter::environment::Environment;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
+use crate::parser::nodes::Expr;
 
 pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {

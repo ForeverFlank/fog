@@ -1,0 +1,5 @@
+a : Int32
+a = 5
+
+b : Int32
+b = _builtin_plus_Int32_Int32 a 6   -- 11

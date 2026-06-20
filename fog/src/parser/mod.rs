@@ -1,7 +1,7 @@
 use crate::ASTParser;
 use crate::Token;
-use crate::ast::nodes::Program;
 use crate::error::FogError;
+use crate::parser::nodes::Program;
 
 pub mod nodes;
 pub mod parser;

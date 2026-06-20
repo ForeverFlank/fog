@@ -1,8 +1,8 @@
-use crate::ast::nodes::Expr;
 use crate::error::{FogError, FogResult};
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::value::Value;
+use crate::parser::nodes::Expr;
 
 // --- type ---
 
