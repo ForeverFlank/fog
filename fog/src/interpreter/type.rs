@@ -15,6 +15,7 @@ pub enum Type {
     // primitive types
     Int32,
     Float32,
+    Unit,
 
     // ADTs
     Product(Vec<Type>),
@@ -32,9 +33,12 @@ impl PartialEq for Type {
         match (self, other) {
             (Type::Kind, Type::Kind) => true,
             (Type::Type, Type::Type) => true,
+            (Type::Function(d1, r1), Type::Function(d2, r2)) => d1 == d2 && r1 == r2,
+
             (Type::Int32, Type::Int32) => true,
             (Type::Float32, Type::Float32) => true,
-            (Type::Function(d1, r1), Type::Function(d2, r2)) => d1 == r1 && d2 == r2,
+            (Type::Unit, Type::Unit) => true,
+
             _ => false,
         }
     }
@@ -55,6 +59,7 @@ impl ToString for Type {
 
             Type::Int32 => "Int32".to_string(),
             Type::Float32 => "Float32".to_string(),
+            Type::Unit => "Unit".to_string(),
 
             Type::Product(types) => types.iter().fold(String::new(), |acc, r#type| {
                 acc + " * " + &r#type.to_string()
@@ -108,6 +113,8 @@ pub fn get_value_type(value: &Value, env: &Environment) -> FogResult<Type> {
             return_type,
             ..
         } => Ok(Type::function(param_type.clone(), return_type.clone())),
+
+        Value::EmptyTuple => Ok(Type::Unit),
     }
 }
 
@@ -115,8 +122,8 @@ pub fn get_expr_type(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
         Expr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
 
-        Expr::Int32Literal(_) => Ok(env.get_var("Int32")?.r#type),
-        Expr::Float32Literal(_) => Ok(env.get_var("Float32")?.r#type),
+        Expr::Int32Literal(_) => Ok(Type::Int32),
+        Expr::Float32Literal(_) => Ok(Type::Float32),
 
         Expr::Lambda {
             param_type, body, ..
@@ -149,15 +156,5 @@ pub fn get_expr_type(expr: &Expr, env: &Environment) -> FogResult<Type> {
 
             Ok(curr_return_type)
         }
-    }
-}
-
-pub fn is_value_of_type(value: &Value, r#type: &Type) -> bool {
-    match (value, r#type) {
-        (Value::Type(_), Type::Type) => true,
-        (Value::Int32(_), Type::Int32) => true,
-        (Value::Float32(_), Type::Float32) => true,
-        (Value::Function { .. }, Type::Function(_, _)) => true,
-        _ => false,
     }
 }

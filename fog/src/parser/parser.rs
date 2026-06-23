@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::error::FogError;
+use crate::error::FogResult;
 use crate::error::Span;
-use crate::error::{FogError, FogResult};
 use crate::lexer::token::*;
 use crate::parser::nodes::*;
 
@@ -13,14 +14,14 @@ pub struct ASTParser<'a> {
 }
 
 #[derive(Clone)]
-pub enum BinaryOpAssociativity {
+pub enum OpAssociativity {
     Left,
     Right,
 }
 
 pub struct BinaryOp {
     pub name: String,
-    pub associativity: BinaryOpAssociativity,
+    pub associativity: OpAssociativity,
     pub precedence: i32,
 }
 
@@ -53,11 +54,11 @@ impl ASTParser<'_> {
             tokens,
             pos: 0,
             binary_ops: [
-                ("*", BinaryOpAssociativity::Left, 3),
-                ("/", BinaryOpAssociativity::Left, 3),
-                ("+", BinaryOpAssociativity::Left, 2),
-                ("-", BinaryOpAssociativity::Left, 2),
-                ("->", BinaryOpAssociativity::Left, 1),
+                ("*", OpAssociativity::Left, 3),
+                ("/", OpAssociativity::Left, 3),
+                ("+", OpAssociativity::Left, 2),
+                ("-", OpAssociativity::Left, 2),
+                ("->", OpAssociativity::Left, 1),
             ]
             .iter()
             .map(|(sym, assoc, prec)| {
@@ -163,13 +164,13 @@ impl ASTParser<'_> {
 
             let op_name: String = op.name.clone();
             let op_prec: i32 = op.precedence;
-            let op_assoc: BinaryOpAssociativity = op.associativity.clone();
+            let op_assoc: OpAssociativity = op.associativity.clone();
 
             self.next();
 
             let rhs: Box<Expr> = Box::new(match op_assoc {
-                BinaryOpAssociativity::Left => self.parse_expression(op_prec + 1),
-                BinaryOpAssociativity::Right => self.parse_expression(op_prec),
+                OpAssociativity::Left => self.parse_expression(op_prec + 1),
+                OpAssociativity::Right => self.parse_expression(op_prec),
             }?);
 
             lhs = Expr::FuncAppl {
@@ -217,10 +218,8 @@ impl ASTParser<'_> {
         }
 
         if let TokenKind::Minus = token.kind {
-            let opnd: Expr = match self.parse_primary() {
-                Ok(opnd) => opnd,
-                Err(error) => return Err(error),
-            };
+            let opnd: Expr = self.parse_primary()?;
+
             return Ok(Expr::FuncAppl {
                 function: "-".to_string(),
                 args: vec![Box::new(opnd)],
@@ -260,6 +259,11 @@ impl ASTParser<'_> {
         }
 
         if let TokenKind::LeftParenthesis = token.kind {
+            if let TokenKind::RightParenthesis = self.peek().kind {
+                self.next();
+                return Ok(Expr::Identifier("()".to_string()));
+            };
+
             let res: FogResult<Expr> = self.parse_expression(i32::MIN);
 
             return match self.peek().kind {

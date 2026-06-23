@@ -35,11 +35,7 @@ impl ToString for Expr {
     fn to_string(&self) -> String {
         match self {
             Expr::Identifier(name) => name.clone(),
-            Expr::Lambda {
-                param,
-                param_type,
-                body,
-            } => {
+            Expr::Lambda { param, body, .. } => {
                 format!("{} => {}", param, body.to_string())
             }
             Expr::FuncAppl {
@@ -48,10 +44,17 @@ impl ToString for Expr {
             } => {
                 let args: String = arguments
                     .iter()
-                    .map(|arg| arg.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!("{}({})", function_name, args)
+                    .map(|arg| {
+                        let str: String = arg.to_string();
+                        if str.contains(' ') {
+                            format!("({})", str)
+                        } else {
+                            str
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                format!("{} {}", function_name, args)
             }
             Expr::Int32Literal(value) => value.to_string(),
             Expr::Float32Literal(value) => value.to_string(),

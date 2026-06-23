@@ -1,0 +1,11 @@
+-- Unit is the unit type.
+-- () is the 0-ary tuple,
+-- and is the only element in Unit.
+
+-- () : Unit
+
+lazyFive : Unit -> Int32
+lazyFive = _ : Unit => 5
+
+five : Int32
+five = lazyFive ()

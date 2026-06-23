@@ -208,18 +208,7 @@ impl Lexer {
         let pos: usize = self.pos;
         let sym: String = self.chars[self.pos..self.pos + 2].iter().collect();
 
-        let kind: TokenKind = match sym.as_str() {
-            "->" => TokenKind::Arrow,
-            "=>" => TokenKind::FatArrow,
-
-            "||" => TokenKind::Concat,
-            "<|" => TokenKind::LeftPipe,
-            "|>" => TokenKind::RightPipe,
-            "<<" => TokenKind::LeftComposition,
-            ">>" => TokenKind::RightComposition,
-
-            _ => return None,
-        };
+        let kind: TokenKind = match_two_char_token(&sym)?;
 
         self.next();
         self.next();
@@ -240,23 +229,7 @@ impl Lexer {
         let pos: usize = self.pos;
         let sym: char = self.peek()?;
 
-        let token_type: TokenKind = match sym {
-            ':' => TokenKind::Colon,
-            '=' => TokenKind::Equal,
-            ',' => TokenKind::Comma,
-            '(' => TokenKind::LeftParenthesis,
-            ')' => TokenKind::RightParenthesis,
-            '{' => TokenKind::LeftBrace,
-            '}' => TokenKind::RightBrace,
-
-            '+' => TokenKind::Plus,
-            '-' => TokenKind::Minus,
-            '*' => TokenKind::Star,
-            '/' => TokenKind::Slash,
-            '^' => TokenKind::Caret,
-
-            _ => return None,
-        };
+        let token_type: TokenKind = match_one_char_token(sym)?;
 
         self.next();
 

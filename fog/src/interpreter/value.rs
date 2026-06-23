@@ -21,6 +21,7 @@ pub enum Value {
         return_type: Type,
         function: Rc<dyn Fn(Value) -> FogResult<Value>>,
     },
+    EmptyTuple,
 }
 
 impl ToString for Value {
@@ -33,6 +34,7 @@ impl ToString for Value {
                 format!("{} => {}", param, (*body).to_string())
             }
             Value::NativeFunction { .. } => "[native function]".to_string(),
+            Value::EmptyTuple => "()".to_string(),
         }
     }
 }

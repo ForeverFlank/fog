@@ -49,10 +49,16 @@ impl Interpreter {
             r#type: Type::Kind,
         };
 
+        let var_unit: Variable = Variable {
+            name: "Unit".to_string(),
+            value: Some(Value::Type(Type::Unit)),
+            r#type: Type::Kind,
+        };
+
         // function type
 
         let var_function: Variable = Variable {
-            name: "Function".to_string(),
+            name: "->".to_string(),
             value: Some(Value::NativeFunction {
                 param_type: Type::Type,
                 return_type: Type::function(Type::Type, Type::Type),
@@ -82,7 +88,7 @@ impl Interpreter {
 
         // builtin functions
 
-        let var_plus_int_int: Variable = Variable {
+        let var_plus_int32_int32: Variable = Variable {
             name: "_builtin_plus_Int32_Int32".to_string(),
             value: Some(Value::NativeFunction {
                 param_type: Type::Int32,
@@ -108,12 +114,22 @@ impl Interpreter {
             r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
         };
 
+        // built-in values
+
+        let var_empty_tuple: Variable = Variable {
+            name: "()".to_string(),
+            value: Some(Value::EmptyTuple),
+            r#type: Type::Kind,
+        };
+
         vec![
             var_type,
             var_int32,
             var_float32,
+            var_unit,
             var_function,
-            var_plus_int_int,
+            var_plus_int32_int32,
+            var_empty_tuple,
         ]
         .iter()
         .for_each(|var: &Variable| {
@@ -133,7 +149,7 @@ impl Interpreter {
         let top_env: &mut Environment = &mut interpreter.top_env;
 
         for stmt in &interpreter.program.statements {
-            let result = match stmt {
+            let result: Result<(), FogError> = match stmt {
                 TypeAnnotation(name, expr, span) => annotate_type(name, expr, top_env, span),
                 Declaration(name, expr, span) => declare(name, expr, top_env, span),
             };
@@ -183,11 +199,11 @@ fn annotate_type(name: &str, expr: &Expr, env: &mut Environment, span: &Span) ->
         }
     };
 
-    (*env).annotate_type(name, (*r#type).clone())
+    (*env).annotate_type(name, (*r#type).clone(), span)
 }
 
 fn declare(name: &str, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
     let value: Value = eval_expr(expr, env, span)?;
 
-    (*env).declare(name, value)
+    (*env).declare(name, value, span)
 }
