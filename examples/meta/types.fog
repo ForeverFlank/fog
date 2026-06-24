@@ -24,6 +24,6 @@ Char    : Type
 
 -- the arrow types (all are written like -> in actual codes)
 
-->' : Kind ->" Kind ->" Kind   -- as in Type -> Type
-->  : Type ->' Type ->' Type   -- as in Int32 -> Int32
+->' : Kind ->'' Kind ->'' Kind   -- as in Type -> Type
+->  : Type ->'  Type ->'  Type   -- as in Int32 -> Int32
 

@@ -2,25 +2,30 @@
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
     "name": "fog",
     "patterns": [
-        {
-            "include": "#keywords"
-        },
-        {
-            "include": "#strings"
-        },
-        {
-            "include": "#types"
-        },
-        {
-            "include": "#variables"
-        }
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#keywords" },
+        { "include": "#constants" },
+        { "include": "#types" },
+        { "include": "#functions" },
+        { "include": "#operators" },
+        { "include": "#variables" }
     ],
     "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-dash.fog",
+                    "match": "--.*$"
+                }
+            ]
+        },
         "keywords": {
             "patterns": [
                 {
                     "name": "keyword.control.fog",
-                    "match": "\\b(if|match)\\b"
+                    "match": "\\b(if|match|else)\\b"
                 }
             ]
         },
@@ -35,22 +40,39 @@
                 }
             ]
         },
-        "types": {
-            "patterns": []
-        },
-        "typeNames": {
+        "numbers": {
             "patterns": [
                 {
-                    "name": "entity.name.type",
-                    "match": "[A-Z]([A-Z]|[a-z]|[0-9]|_)*"
+                    "name": "constant.numeric.integer.fog",
+                    "match": "\\b\\d+\\b"
+                },
+                {
+                    "name": "constant.numeric.float.fog",
+                    "match": "\\b\\d+\\.\\d+\\b"
                 }
             ]
         },
-        "infixOps": {
+        "types": {
             "patterns": [
                 {
-                    "name": "keyword.operator",
-                    "match": "\\+|-(>)?|\\*|\\/"
+                    "name": "entity.name.type.fog",
+                    "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.fog",
+                    "match": "=|:|->|\\+|-|\\*|\/"
+                }
+            ]
+        },
+        "variables": {
+            "patterns": [
+                {
+                    "name": "variable.other.fog",
+                    "match": "\\b[a-z_][A-Za-z0-9_]*\\b"
                 }
             ]
         }
