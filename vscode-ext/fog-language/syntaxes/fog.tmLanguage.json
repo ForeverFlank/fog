@@ -1,0 +1,59 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "fog",
+    "patterns": [
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#types"
+        },
+        {
+            "include": "#variables"
+        }
+    ],
+    "repository": {
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.fog",
+                    "match": "\\b(if|match)\\b"
+                }
+            ]
+        },
+        "strings": {
+            "name": "string.quoted.double.fog",
+            "begin": "\"",
+            "end": "\"",
+            "patterns": [
+                {
+                    "name": "constant.character.escape.fog",
+                    "match": "\\\\."
+                }
+            ]
+        },
+        "types": {
+            "patterns": []
+        },
+        "typeNames": {
+            "patterns": [
+                {
+                    "name": "entity.name.type",
+                    "match": "[A-Z]([A-Z]|[a-z]|[0-9]|_)*"
+                }
+            ]
+        },
+        "infixOps": {
+            "patterns": [
+                {
+                    "name": "keyword.operator",
+                    "match": "\\+|-(>)?|\\*|\\/"
+                }
+            ]
+        }
+    },
+    "scopeName": "source.fog"
+}

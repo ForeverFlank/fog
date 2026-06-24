@@ -22,16 +22,17 @@ mod parser;
 fn main() {
     // --- arguments and paths ---
     let args: Vec<String> = env::args().collect();
-    let path: &String = args.get(1).expect("Usage: ./fog <path>");
+    let path: &String = args.get(1).expect("usage: ./fog <path>");
 
     let arg_print_tokens: bool = args.contains(&"--print-tokens".to_string());
     let arg_emit_ast: bool = args.contains(&"--emit-ast".to_string());
 
     // --- read file ---
-    let src: &str = &fs::read_to_string(path).expect("Failed to read source file");
+    let src: &str =
+        &fs::read_to_string(path).expect(&format!("failed to read source file `{}`", path));
 
     // --- compilation ---
-    // -- lexing
+    // lexing
     let (tokens, lexer_errors) = tokenize(src);
 
     if arg_print_tokens {
@@ -40,7 +41,7 @@ fn main() {
 
     print_lexer_errors(&lexer_errors);
 
-    // -- AST parsing
+    // AST parsing
     let (ast, parser_errors) = parse_program(&tokens);
 
     if arg_emit_ast {
@@ -51,7 +52,7 @@ fn main() {
 
     print_parser_errors(&parser_errors);
 
-    // -- interpreting
+    // interpreting
 
     interpret(ast);
 }

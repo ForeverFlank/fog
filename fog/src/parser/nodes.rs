@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::Display;
 use std::rc::Rc;
 
 use crate::error::Span;
@@ -17,48 +19,83 @@ pub enum Statement {
 
 pub enum Expr {
     Identifier(String),
+
+    Int32Literal(i32),
+    Float32Literal(f32),
+
     Lambda {
         param: String,
         param_type: Box<Expr>,
         body: Rc<Expr>,
     },
+
+    // bunch of names, undecided if it's a
+    // function application or a data constructor
+    NameCollection(Vec<Box<Expr>>),
+
     FuncAppl {
         function: String,
         args: Vec<Box<Expr>>,
     },
-    Int32Literal(i32),
-    Float32Literal(f32),
-    // StringLiteral(String),
+
+    DataConstructor(String, Vec<Box<Expr>>),
 }
 
-impl ToString for Expr {
-    fn to_string(&self) -> String {
+impl Expr {
+    fn fmt_parenthesized(expr: &Expr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s: String = expr.to_string();
+
+        if s.contains(' ') {
+            write!(f, "({s})")
+        } else {
+            write!(f, "{s}")
+        }
+    }
+}
+
+impl Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::Identifier(name) => name.clone(),
+            Expr::Identifier(name) => write!(f, "{name}"),
+
+            Expr::Int32Literal(value) => write!(f, "{value}"),
+            Expr::Float32Literal(value) => write!(f, "{value}"),
+
             Expr::Lambda { param, body, .. } => {
-                format!("{} => {}", param, body.to_string())
+                write!(f, "{param} => {body}")
             }
-            Expr::FuncAppl {
-                function: function_name,
-                args: arguments,
-            } => {
-                let args: String = arguments
-                    .iter()
-                    .map(|arg| {
-                        let str: String = arg.to_string();
-                        if str.contains(' ') {
-                            format!("({})", str)
-                        } else {
-                            str
-                        }
-                    })
-                    .collect::<Vec<String>>()
-                    .join(" ");
-                format!("{} {}", function_name, args)
+
+            Expr::NameCollection(names) => {
+                for (i, name) in names.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " ")?;
+                    }
+                    Self::fmt_parenthesized(name, f)?;
+                }
+                Ok(())
             }
-            Expr::Int32Literal(value) => value.to_string(),
-            Expr::Float32Literal(value) => value.to_string(),
-            // Expr::StringLiteral(value) => format!("\"{}\"", value),
+
+            Expr::FuncAppl { function, args } => {
+                write!(f, "{function}")?;
+
+                for arg in args {
+                    write!(f, " ")?;
+                    Self::fmt_parenthesized(arg, f)?;
+                }
+
+                Ok(())
+            }
+
+            Expr::DataConstructor(name, types) => {
+                write!(f, "{name}")?;
+
+                for ty in types {
+                    write!(f, " ")?;
+                    Self::fmt_parenthesized(ty, f)?;
+                }
+
+                Ok(())
+            }
         }
     }
 }
