@@ -1,4 +1,5 @@
-use crate::error::{FogError, FogResult};
+use crate::error::FogError;
+use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::value::Value;
@@ -9,6 +10,7 @@ use crate::parser::nodes::Expr;
 #[derive(Clone, Eq, Hash)]
 pub enum Type {
     Kind,
+
     Type,
     Function(Box<Type>, Box<Type>),
 
@@ -94,10 +96,8 @@ impl ToString for DataConstructor {
 
 // --- functions ---
 
-pub fn get_type_of_value(value: &Value, env: &Environment) -> FogResult<Type> {
+pub fn value_type_of(value: &Value, env: &Environment) -> FogResult<Type> {
     match value {
-        Value::Type(_) => Ok(Type::Kind),
-
         Value::Int32(_) => Ok(Type::Int32),
         Value::Float32(_) => Ok(Type::Float32),
 
@@ -105,7 +105,7 @@ pub fn get_type_of_value(value: &Value, env: &Environment) -> FogResult<Type> {
             param_type, body, ..
         } => Ok(Type::function(
             param_type.clone(),
-            get_type_of_expr(&body, env)?,
+            expr_type_of(&body, env)?,
         )),
 
         Value::NativeFunction {
@@ -118,7 +118,7 @@ pub fn get_type_of_value(value: &Value, env: &Environment) -> FogResult<Type> {
     }
 }
 
-pub fn get_type_of_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
+pub fn expr_type_of(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
         Expr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
 
@@ -129,7 +129,7 @@ pub fn get_type_of_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
             param_type, body, ..
         } => Ok(Type::Function(
             eval_type_expr(&param_type, env)?.into(),
-            get_type_of_expr(&body, env)?.into(),
+            expr_type_of(&body, env)?.into(),
         )),
 
         Expr::FuncAppl {
@@ -160,11 +160,7 @@ pub fn get_type_of_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
             Ok(curr_return_type)
         }
 
-        Expr::DataConstructor {
-            type_name,
-            ctor_name,
-            args,
-        } => Ok(Type::Sum(*type_name)),
+        Expr::DataConstructor { type_name, .. } => Ok(env.get_type(type_name)?),
 
         Expr::NameCollection(_) => Err(FogError::runtime(
             "unresolved name collection".to_string(),

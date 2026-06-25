@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::error::FogError;
@@ -63,13 +62,7 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
 
 pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
-        Expr::Identifier(name) => {
-            let Some(Value::Type(r#type)) = env.get_var(name)?.value else {
-                return Err(FogError::runtime(format!("`{}` is not a type", name), None));
-            };
-
-            Ok(r#type)
-        }
+        Expr::Identifier(name) => Ok(env.get_type(name)?),
 
         // Expr::FuncAppl { function, args } if function == "->" && args.len() == 2 => {
         //     let left: Type = eval_type_expr(args[0].as_ref(), env)?;
@@ -108,14 +101,6 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
             Ok(current)
         }
 
-        Expr::DataConstructor {
-            type_name,
-            ctor_name,
-            args,
-        } => {
-            // ???
-        }
-
         Expr::Lambda { .. } => Err(FogError::runtime("lambda is not a type".to_string(), None)),
         Expr::Int32Literal(_) => Err(FogError::runtime(
             "Int32 literal is not a type".to_string(),
@@ -123,6 +108,10 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
         )),
         Expr::Float32Literal(_) => Err(FogError::runtime(
             "Float32 literal is not a type".to_string(),
+            None,
+        )),
+        Expr::DataConstructor { .. } => Err(FogError::runtime(
+            "data constructor is not a type".to_string(),
             None,
         )),
         Expr::NameCollection(_) => Err(FogError::runtime(
@@ -140,10 +129,7 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
             body,
             captured_env,
         } => {
-            let mut child_env: Environment = Environment {
-                variables: HashMap::new(),
-                parent: Some(captured_env),
-            };
+            let mut child_env: Environment = Environment::new(Some(captured_env));
 
             child_env.variables.insert(
                 param.clone(),

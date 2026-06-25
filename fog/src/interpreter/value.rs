@@ -7,7 +7,6 @@ use crate::parser::nodes::Expr;
 
 #[derive(Clone)]
 pub enum Value {
-    Type(Type),
     Int32(i32),
     Float32(f32),
     Function {
@@ -27,7 +26,6 @@ pub enum Value {
 impl ToString for Value {
     fn to_string(&self) -> String {
         match self {
-            Value::Type(r#type) => (*r#type).to_string(),
             Value::Int32(value) => value.to_string(),
             Value::Float32(value) => value.to_string(),
             Value::Function { param, body, .. } => {
