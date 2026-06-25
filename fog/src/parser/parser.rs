@@ -5,7 +5,7 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::lexer::token::*;
-use crate::parser::nodes::*;
+use crate::parser::parsed_expr::*;
 
 pub struct ASTParser<'a> {
     tokens: &'a Vec<Token>,
@@ -147,8 +147,8 @@ impl ASTParser<'_> {
         Some(result)
     }
 
-    fn parse_expression(&mut self, min_prec: i32) -> FogResult<Expr> {
-        let mut lhs: Expr = self.parse_primary()?;
+    fn parse_expression(&mut self, min_prec: i32) -> FogResult<ParsedExpr> {
+        let mut lhs: ParsedExpr = self.parse_primary()?;
 
         while self.pos < self.tokens.len() {
             let token: &Token = self.peek();
@@ -168,62 +168,53 @@ impl ASTParser<'_> {
 
             self.next();
 
-            let rhs: Expr = match op_assoc {
+            let rhs: ParsedExpr = match op_assoc {
                 OpAssociativity::Left => self.parse_expression(op_prec + 1),
                 OpAssociativity::Right => self.parse_expression(op_prec),
             }?;
 
-            lhs = Expr::FuncAppl {
-                fn_name: op_name,
-                args: vec![lhs, rhs],
-            };
+            lhs = ParsedExpr::FuncAppl(op_name, vec![lhs, rhs]);
         }
 
         Ok(lhs)
     }
 
-    fn parse_primary(&mut self) -> FogResult<Expr> {
-        let head: Expr = self.parse_atomic()?;
+    fn parse_primary(&mut self) -> FogResult<ParsedExpr> {
+        let head: ParsedExpr = self.parse_atomic()?;
 
         // check for function application
-        if let Expr::Identifier(name) = &head {
-            let mut args: Vec<Expr> = Vec::new();
+        if let ParsedExpr::Identifier(name) = &head {
+            let mut args: Vec<ParsedExpr> = Vec::new();
 
             while self.pos < self.tokens.len() && is_primary_starter(self.peek()) {
-                let arg: Expr = self.parse_atomic()?;
+                let arg: ParsedExpr = self.parse_atomic()?;
                 args.push(arg);
             }
 
             if !args.is_empty() {
-                return Ok(Expr::FuncAppl {
-                    fn_name: name.clone(),
-                    args,
-                });
+                return Ok(ParsedExpr::FuncAppl(name.clone(), args));
             }
         }
 
         Ok(head)
     }
 
-    fn parse_atomic(&mut self) -> FogResult<Expr> {
+    fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
         let token: Token = self.peek().clone();
         self.next();
 
         if let TokenKind::Int32Literal(value) = token.kind {
-            return Ok(Expr::Int32Literal(value));
+            return Ok(ParsedExpr::Int32Literal(value));
         }
 
         if let TokenKind::Float32Literal(value) = token.kind {
-            return Ok(Expr::Float32Literal(value));
+            return Ok(ParsedExpr::Float32Literal(value));
         }
 
         if let TokenKind::Minus = token.kind {
-            let opnd: Expr = self.parse_primary()?;
+            let opnd: ParsedExpr = self.parse_primary()?;
 
-            return Ok(Expr::FuncAppl {
-                fn_name: "-".to_string(),
-                args: vec![opnd],
-            });
+            return Ok(ParsedExpr::FuncAppl("-".to_string(), vec![opnd]));
         }
 
         if let TokenKind::Identifier(name) = token.kind {
@@ -231,7 +222,7 @@ impl ASTParser<'_> {
             if let TokenKind::Colon = self.peek().kind {
                 self.next();
 
-                let param_type: Expr = self.parse_expression(i32::MIN)?;
+                let param_type: ParsedExpr = self.parse_expression(i32::MIN)?;
 
                 let TokenKind::FatArrow = self.peek().kind else {
                     return Err(FogError::parse(
@@ -245,9 +236,9 @@ impl ASTParser<'_> {
                 };
                 self.next();
 
-                let body: Expr = self.parse_expression(i32::MIN)?;
+                let body: ParsedExpr = self.parse_expression(i32::MIN)?;
 
-                return Ok(Expr::Lambda {
+                return Ok(ParsedExpr::Lambda {
                     param_name: name,
                     param_type: Box::new(param_type),
                     body: Rc::new(body),
@@ -255,16 +246,16 @@ impl ASTParser<'_> {
             }
 
             // otherwise, it's an identifier
-            return Ok(Expr::Identifier(name));
+            return Ok(ParsedExpr::Identifier(name));
         }
 
         if let TokenKind::LeftParenthesis = token.kind {
             if let TokenKind::RightParenthesis = self.peek().kind {
                 self.next();
-                return Ok(Expr::Tuple(Vec::new()));
+                return Ok(ParsedExpr::Tuple(Vec::new()));
             };
 
-            let res: FogResult<Expr> = self.parse_expression(i32::MIN);
+            let res: FogResult<ParsedExpr> = self.parse_expression(i32::MIN);
 
             return match self.peek().kind {
                 TokenKind::RightParenthesis => {

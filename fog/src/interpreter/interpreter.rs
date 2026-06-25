@@ -9,9 +9,9 @@ use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
-use crate::parser::nodes::Expr;
-use crate::parser::nodes::Program;
-use crate::parser::nodes::Statement::*;
+use crate::parser::parsed_expr::ParsedExpr;
+use crate::parser::parsed_expr::Program;
+use crate::parser::parsed_expr::Statement::*;
 
 pub struct Interpreter {
     pub program: Box<Program>,
@@ -106,7 +106,7 @@ impl Interpreter {
         }
 
         let mut all_vars: Vec<Variable> = interpreter.top_env.variables.values().cloned().collect();
-        all_vars.sort_by(|a, b| a.name.cmp(&b.name));
+        all_vars.sort_by(|a: &Variable, b: &Variable| a.name.cmp(&b.name));
 
         println!();
         for var in all_vars {
@@ -134,12 +134,12 @@ impl Interpreter {
     }
 }
 
-fn annotate_type(name: &str, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
+fn annotate_type(name: &str, expr: &ParsedExpr, env: &mut Environment, span: &Span) -> FogResult<()> {
     let r#type: Type = eval_type_expr(&expr, env)?;
     (*env).annotate_type(name, r#type, span)
 }
 
-fn declare(name: &String, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
+fn declare(name: &String, expr: &ParsedExpr, env: &mut Environment, span: &Span) -> FogResult<()> {
     if env.variables.contains_key(name) {
         (*env).declare_value(name, eval_expr(expr, env, span)?, span)?;
         return Ok(());

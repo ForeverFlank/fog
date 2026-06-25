@@ -4,15 +4,16 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
+use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
-use crate::parser::nodes::Expr;
+use crate::parser::parsed_expr::ParsedExpr;
 
-pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value> {
+pub fn eval_expr(expr: &ParsedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
         // variable
-        Expr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
+        ParsedExpr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
             FogError::runtime(
                 format!("undeclared variable `{}`", name),
                 Some(span.clone()),
@@ -20,11 +21,11 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
         }),
 
         // literals
-        Expr::Int32Literal(value) => Ok(Value::Int32(*value)),
-        Expr::Float32Literal(value) => Ok(Value::Float32(*value)),
+        ParsedExpr::Int32Literal(value) => Ok(Value::Int32(*value)),
+        ParsedExpr::Float32Literal(value) => Ok(Value::Float32(*value)),
 
         // AST lambda -> interpreter function
-        Expr::Lambda {
+        ParsedExpr::Lambda {
             param_name: param,
             param_type,
             body,
@@ -36,12 +37,9 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
         }),
 
         // function application
-        Expr::FuncAppl {
-            fn_name: function_name,
-            args: arguments,
-        } => {
-            let mut result: Value = eval_expr(&Expr::Identifier(function_name.clone()), env, span)?;
-            for arg in arguments {
+        ParsedExpr::FuncAppl(fn_name, args) => {
+            let mut result: Value = eval_expr(&ParsedExpr::Identifier(fn_name.clone()), env, span)?;
+            for arg in args {
                 let argument: Value = eval_expr(arg, env, span)?;
                 result = apply_function(result, argument, span)?;
             }
@@ -49,7 +47,7 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
         }
 
         // tuple
-        Expr::Tuple(exprs) => Ok(Value::Tuple(
+        ParsedExpr::Tuple(exprs) => Ok(Value::Tuple(
             exprs
                 .iter()
                 .map(|expr| Ok(eval_expr(expr, env, span)?.into()))
@@ -57,73 +55,124 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
         )),
 
         // etc.
-        Expr::DataConstructor { .. } => Err(FogError::runtime(
+        ParsedExpr::DataConstructor { .. } => Err(FogError::runtime(
             "cannot evaluate data constructor as value".to_string(),
             Some(span.clone()),
         )),
-        Expr::NameCollection(_) => Err(FogError::runtime(
+        ParsedExpr::Collection(_) => Err(FogError::runtime(
             "unresolved name collection".to_string(),
             Some(span.clone()),
         )),
     }
 }
 
-pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
+pub fn eval_type_expr(expr: &ParsedExpr, env: &Environment) -> FogResult<Type> {
     match expr {
-        Expr::Identifier(name) => Ok(env.get_type(name)?),
+        ParsedExpr::Identifier(name) => Ok(env.get_type(name)?),
 
-        Expr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
+        ParsedExpr::FuncAppl(fn_name, args) if fn_name == "->" && args.len() == 2 => {
             let left: Type = eval_type_expr(&args[0], env)?;
             let right: Type = eval_type_expr(&args[1], env)?;
 
             Ok(Type::Function(Box::new(left), Box::new(right)))
         }
 
-        Expr::FuncAppl { fn_name, args } if fn_name == "+" && args.len() == 2 => {
-            let t1: Type = eval_type_expr(&args[0], env)?;
-            let t2: Type = eval_type_expr(&args[1], env)?;
+        ParsedExpr::FuncAppl(fn_name, args) if fn_name == "*" && args.len() == 2 => {
+            let left: Type = eval_type_expr(&args[0], env)?;
+            let right: Type = eval_type_expr(&args[1], env)?;
 
-            todo!()
-            // Ok(Type::Sum())
+            let mut types: Vec<Type> = Vec::new();
+
+            match left {
+                Type::Product(ts) => types.extend(ts),
+                t => types.push(t),
+            }
+
+            match right {
+                Type::Product(ts) => types.extend(ts),
+                t => types.push(t),
+            }
+
+            Ok(Type::Product(types))
         }
 
-        Expr::FuncAppl {
-            fn_name: function,
-            args,
-        } => {
-            let fn_type: Type = eval_type_expr(&Expr::Identifier(function.clone()), env)?;
+        ParsedExpr::FuncAppl(fn_name, args) if fn_name == "+" && args.len() == 2 => {
+            let left: Type = eval_type_expr(&args[0], env)?;
+            let right: Type = eval_type_expr(&args[1], env)?;
+
+            let Type::Sum(ctors1) = left else {
+                return Err(FogError::runtime(
+                    format!(
+                        "`{}` is not a data constructor or a sum type",
+                        left.to_string()
+                    ),
+                    None,
+                ));
+            };
+            let Type::Sum(ctors2) = right else {
+                return Err(FogError::runtime(
+                    format!(
+                        "`{}` is not a data constructor or a sum type",
+                        right.to_string()
+                    ),
+                    None,
+                ));
+            };
+
+            let concatenated: Vec<DataConstructor> = [&ctors1[..], &ctors2[..]].concat();
+
+            Ok(Type::Sum(concatenated))
+        }
+
+        ParsedExpr::FuncAppl(fn_name, args) => {
+            let fn_type: Type = eval_type_expr(&ParsedExpr::Identifier(fn_name.clone()), env)?;
             let mut current_type: Type = fn_type;
 
             for arg in args {
-                if let Type::Function(param_type, return_type) = current_type {
-                    let arg_type: Type = eval_type_expr(&arg, env)?;
-
-                    if arg_type != *param_type {
-                        return Err(FogError::runtime(
-                            format!(
-                                "type mismatch applying `{}`\n\
-                                 expected `{}`, found `{}`",
-                                function,
-                                param_type.to_string(),
-                                arg_type.to_string()
-                            ),
-                            None,
-                        ));
-                    }
-
-                    current_type = *return_type
-                } else {
+                let Type::Function(param_type, return_type) = current_type else {
                     return Err(FogError::runtime(
-                        format!("`{}` is not a valid type constructor", function),
+                        format!(
+                            "`{}` is not a valid type constructor",
+                            current_type.to_string()
+                        ),
+                        None,
+                    ));
+                };
+
+                let arg_type: Type = eval_type_expr(&arg, env)?;
+
+                if arg_type != *param_type {
+                    return Err(FogError::runtime(
+                        format!(
+                            "type mismatch applying `{}`\n\
+                             expected `{}`, found `{}`",
+                            fn_name,
+                            param_type.to_string(),
+                            arg_type.to_string()
+                        ),
                         None,
                     ));
                 }
+
+                current_type = *return_type
             }
 
             Ok(current_type)
         }
 
-        Expr::NameCollection(_) => Err(FogError::runtime(
+        ParsedExpr::DataConstructor(name, args) => {
+            let ctor: DataConstructor = DataConstructor {
+                variant: name.clone(),
+                types: args
+                    .iter()
+                    .map(|arg: &ParsedExpr| Ok(eval_type_expr(arg, env)?.into()))
+                    .collect::<Result<Vec<Type>, FogError>>()?,
+            };
+
+            Ok(Type::Sum(vec![ctor]))
+        }
+
+        ParsedExpr::Collection(_) => Err(FogError::runtime(
             "unresolved name collection".to_string(),
             None,
         )),

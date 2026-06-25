@@ -4,20 +4,16 @@ use std::rc::Rc;
 
 use crate::error::Span;
 
-// --- AST nodes ---
-
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
 pub enum Statement {
-    TypeAnnotation(String, Expr, Span),
-    Declaration(String, Expr, Span),
+    TypeAnnotation(String, ResolvedExpr, Span),
+    Declaration(String, ResolvedExpr, Span),
 }
 
-// --- expressions ---
-
-pub enum Expr {
+pub enum ResolvedExpr {
     Identifier(String),
 
     Int32Literal(i32),
@@ -25,26 +21,18 @@ pub enum Expr {
 
     Lambda {
         param_name: String,
-        param_type: Box<Expr>,
-        body: Rc<Expr>,
+        param_type: Box<ResolvedExpr>,
+        body: Rc<ResolvedExpr>,
     },
 
-    Tuple(Vec<Expr>),
+    Tuple(Vec<ResolvedExpr>),
 
-    // bunch of names, undecided if it's a
-    // function application or a data constructor
-    NameCollection(Vec<Expr>),
-
-    FuncAppl {
-        fn_name: String,
-        args: Vec<Expr>,
-    },
-
-    DataConstructor(String, Vec<Expr>),
+    FuncAppl(String, Vec<ResolvedExpr>),
+    DataConstructor(String, Vec<ResolvedExpr>),
 }
 
-impl Expr {
-    fn fmt_parenthesized(expr: &Expr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl ResolvedExpr {
+    fn fmt_parenthesized(expr: &ResolvedExpr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: String = expr.to_string();
 
         if s.contains(' ') {
@@ -55,15 +43,15 @@ impl Expr {
     }
 }
 
-impl Display for Expr {
+impl Display for ResolvedExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expr::Identifier(name) => write!(f, "{name}"),
+            ResolvedExpr::Identifier(name) => write!(f, "{name}"),
 
-            Expr::Int32Literal(value) => write!(f, "{value}"),
-            Expr::Float32Literal(value) => write!(f, "{value}"),
+            ResolvedExpr::Int32Literal(value) => write!(f, "{value}"),
+            ResolvedExpr::Float32Literal(value) => write!(f, "{value}"),
 
-            Expr::Tuple(exprs) => {
+            ResolvedExpr::Tuple(exprs) => {
                 let contents: String = exprs
                     .iter()
                     .map(ToString::to_string)
@@ -73,7 +61,7 @@ impl Display for Expr {
                 write!(f, "({contents})")
             }
 
-            Expr::Lambda {
+            ResolvedExpr::Lambda {
                 param_name: param,
                 body,
                 ..
@@ -81,21 +69,8 @@ impl Display for Expr {
                 write!(f, "{param} => {body}")
             }
 
-            Expr::NameCollection(names) => {
-                for (i, name) in names.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, " ")?;
-                    }
-                    Self::fmt_parenthesized(name, f)?;
-                }
-                Ok(())
-            }
-
-            Expr::FuncAppl {
-                fn_name: function,
-                args,
-            } => {
-                write!(f, "{function}")?;
+            ResolvedExpr::FuncAppl(fn_name, args) => {
+                write!(f, "{fn_name}")?;
 
                 for arg in args {
                     write!(f, " ")?;
@@ -105,7 +80,7 @@ impl Display for Expr {
                 Ok(())
             }
 
-            Expr::DataConstructor(name, args) => {
+            ResolvedExpr::DataConstructor(name, args) => {
                 write!(f, "{name}")?;
 
                 for arg in args {

@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::r#type::Type;
-use crate::parser::nodes::Expr;
+use crate::parser::parsed_expr::ParsedExpr;
 
 #[derive(Clone)]
 pub enum Value {
@@ -12,7 +12,7 @@ pub enum Value {
     Function {
         param: String,
         param_type: Type,
-        body: Rc<Expr>,
+        body: Rc<ParsedExpr>,
         captured_env: Box<Environment>,
     },
     NativeFunction {

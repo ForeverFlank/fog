@@ -3,9 +3,9 @@ use std::fs;
 use std::path;
 
 use crate::error::FogError;
-use crate::parser::nodes::Expr;
-use crate::parser::nodes::Statement::Declaration;
-use crate::parser::nodes::Statement::TypeAnnotation;
+use crate::parser::parsed_expr::ParsedExpr;
+use crate::parser::parsed_expr::Statement::Declaration;
+use crate::parser::parsed_expr::Statement::TypeAnnotation;
 use crate::parser::parser::*;
 use crate::parser::*;
 
@@ -19,7 +19,7 @@ mod interpreter;
 mod lexer;
 mod parser;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- arguments and paths ---
     let args: Vec<String> = env::args().collect();
     let path: &String = args.get(1).expect("usage: ./fog <path>");
@@ -28,8 +28,7 @@ fn main() {
     let arg_emit_ast: bool = args.contains(&"--emit-ast".to_string());
 
     // --- read file ---
-    let src: &str =
-        &fs::read_to_string(path).expect(&format!("failed to read source file `{}`", path));
+    let src: &str = &fs::read_to_string(path)?;
 
     // --- compilation ---
     // lexing
@@ -55,6 +54,8 @@ fn main() {
     // interpreting
 
     interpret(ast);
+
+    Ok(())
 }
 
 // --- Lexer ---
@@ -85,7 +86,7 @@ fn print_lexer_errors(errors: &Vec<FogError>) {
 
 // --- AST ---
 
-fn emit_ast_puml(program: &parser::nodes::Program, path: &str) -> String {
+fn emit_ast_puml(program: &parser::parsed_expr::Program, path: &str) -> String {
     let mut out: String = String::new();
     let mut id: i32 = 0;
     out.push_str(&format!("@startuml AST of {}\n", path));
@@ -125,7 +126,11 @@ fn edge(out: &mut String, parent_id: i32, child_id: i32) {
     out.push_str(&format!("n{} <-- n{}\n", parent_id, child_id));
 }
 
-fn emit_ast_puml_statement(out: &mut String, id: &mut i32, stmt: &parser::nodes::Statement) -> i32 {
+fn emit_ast_puml_statement(
+    out: &mut String,
+    id: &mut i32,
+    stmt: &parser::parsed_expr::Statement,
+) -> i32 {
     match stmt {
         TypeAnnotation(name, expr, _) => emit_ast_puml_type_annotation(out, id, name, expr),
         Declaration(name, expr, _) => emit_ast_puml_declaration(out, id, name, expr),
@@ -136,7 +141,7 @@ fn emit_ast_puml_type_annotation(
     out: &mut String,
     id: &mut i32,
     name: &String,
-    expr: &Expr,
+    expr: &ParsedExpr,
 ) -> i32 {
     let ta_id: i32 = new_node(out, id, ":", COLOR_STATEMENT);
     let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
@@ -148,7 +153,12 @@ fn emit_ast_puml_type_annotation(
     ta_id
 }
 
-fn emit_ast_puml_declaration(out: &mut String, id: &mut i32, name: &String, expr: &Expr) -> i32 {
+fn emit_ast_puml_declaration(
+    out: &mut String,
+    id: &mut i32,
+    name: &String,
+    expr: &ParsedExpr,
+) -> i32 {
     let decl_id: i32 = new_node(out, id, "=", COLOR_STATEMENT);
     let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
     let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
@@ -159,20 +169,24 @@ fn emit_ast_puml_declaration(out: &mut String, id: &mut i32, name: &String, expr
     decl_id
 }
 
-fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr) -> i32 {
+fn emit_ast_puml_expr(
+    out: &mut String,
+    id: &mut i32,
+    expr: &parser::parsed_expr::ParsedExpr,
+) -> i32 {
     match expr {
-        parser::nodes::Expr::Identifier(name) => {
+        parser::parsed_expr::ParsedExpr::Identifier(name) => {
             new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
         }
 
-        parser::nodes::Expr::Int32Literal(val) => {
+        parser::parsed_expr::ParsedExpr::Int32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
-        parser::nodes::Expr::Float32Literal(val) => {
+        parser::parsed_expr::ParsedExpr::Float32Literal(val) => {
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
 
-        parser::nodes::Expr::Lambda {
+        parser::parsed_expr::ParsedExpr::Lambda {
             param_name,
             param_type,
             body,
@@ -186,7 +200,7 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             lambda_id
         }
 
-        parser::nodes::Expr::FuncAppl { fn_name, args } => {
+        parser::parsed_expr::ParsedExpr::FuncAppl(fn_name, args) => {
             let appl_id: i32 = new_node(out, id, &format!("{}", fn_name), COLOR_FUNC_APPL);
             for arg in args {
                 let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
@@ -195,7 +209,7 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             appl_id
         }
 
-        parser::nodes::Expr::Tuple(exprs) => {
+        parser::parsed_expr::ParsedExpr::Tuple(exprs) => {
             let tuple_id: i32 = new_node(out, id, "tuple", COLOR_IDENTIFIER);
             for expr in exprs {
                 let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
@@ -204,7 +218,7 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             tuple_id
         }
 
-        parser::nodes::Expr::DataConstructor(name, args) => {
+        parser::parsed_expr::ParsedExpr::DataConstructor(name, args) => {
             let name_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
             for arg in args {
                 let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
@@ -213,7 +227,7 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             name_id
         }
 
-        parser::nodes::Expr::NameCollection(_) => unreachable!(),
+        parser::parsed_expr::ParsedExpr::Collection(_) => unreachable!(),
     }
 }
 
