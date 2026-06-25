@@ -20,7 +20,7 @@ pub enum Value {
         return_type: Type,
         function: Rc<dyn Fn(Value) -> FogResult<Value>>,
     },
-    EmptyTuple,
+    Tuple(Vec<Box<Value>>),
 }
 
 impl ToString for Value {
@@ -28,11 +28,22 @@ impl ToString for Value {
         match self {
             Value::Int32(value) => value.to_string(),
             Value::Float32(value) => value.to_string(),
+
             Value::Function { param, body, .. } => {
                 format!("{} => {}", param, (*body).to_string())
             }
+
             Value::NativeFunction { .. } => "[native function]".to_string(),
-            Value::EmptyTuple => "()".to_string(),
+
+            Value::Tuple(values) => {
+                let contents: String = values
+                    .iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                format!("({})", contents)
+            }
         }
     }
 }

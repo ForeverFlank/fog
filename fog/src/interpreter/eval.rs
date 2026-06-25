@@ -48,11 +48,19 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
             Ok(result)
         }
 
+        // tuple
+        Expr::Tuple(exprs) => Ok(Value::Tuple(
+            exprs
+                .iter()
+                .map(|expr| Ok(eval_expr(expr, env, span)?.into()))
+                .collect::<Result<Vec<Box<Value>>, FogError>>()?,
+        )),
+
+        // etc.
         Expr::DataConstructor { .. } => Err(FogError::runtime(
             "cannot evaluate data constructor as value".to_string(),
             Some(span.clone()),
         )),
-
         Expr::NameCollection(_) => Err(FogError::runtime(
             "unresolved name collection".to_string(),
             Some(span.clone()),
@@ -102,7 +110,10 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
             Ok(current)
         }
 
+        // etc.
         Expr::Lambda { .. } => Err(FogError::runtime("lambda is not a type".to_string(), None)),
+        Expr::Tuple(_) => Err(FogError::runtime("tuple is not a type".to_string(), None)),
+
         Expr::Int32Literal(_) => Err(FogError::runtime(
             "Int32 literal is not a type".to_string(),
             None,

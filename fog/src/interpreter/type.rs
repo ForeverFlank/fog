@@ -3,6 +3,7 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_type_expr;
+use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::nodes::Expr;
 
@@ -11,7 +12,6 @@ use crate::parser::nodes::Expr;
 #[derive(Clone, Eq, Hash)]
 pub enum Type {
     Kind,
-
     Type,
     Function(Box<Type>, Box<Type>),
 
@@ -71,6 +71,7 @@ impl ToString for Type {
             Type::Product(types) => types.iter().fold(String::new(), |acc, r#type| {
                 acc + " * " + &r#type.to_string()
             }),
+
             Type::Sum(_, ctors) => ctors.iter().fold(String::new(), |acc, r#type| {
                 acc + " + " + &r#type.to_string()
             }),
@@ -119,7 +120,12 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
             ..
         } => Ok(Type::function(param_type.clone(), return_type.clone())),
 
-        Value::EmptyTuple => Ok(Type::Unit),
+        Value::Tuple(values) => Ok(Type::Product(
+            values
+                .iter()
+                .map(|value| Ok(value_type_of(value, env, span)?.into()))
+                .collect::<Result<Vec<Type>, FogError>>()?,
+        )),
     }
 }
 
@@ -154,6 +160,13 @@ pub fn expr_type_of(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Ty
 
             Ok(curr_type)
         }
+
+        Expr::Tuple(exprs) => Ok(Product(
+            exprs
+                .iter()
+                .map(|expr| Ok(expr_type_of(expr, env, span)?.into()))
+                .collect::<Result<Vec<Type>, FogError>>()?,
+        )),
 
         Expr::DataConstructor { type_name, .. } => Ok(env.get_type(type_name)?),
 

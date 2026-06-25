@@ -29,6 +29,8 @@ pub enum Expr {
         body: Rc<Expr>,
     },
 
+    Tuple(Vec<Box<Expr>>),
+
     // bunch of names, undecided if it's a
     // function application or a data constructor
     NameCollection(Vec<Box<Expr>>),
@@ -64,6 +66,16 @@ impl Display for Expr {
 
             Expr::Int32Literal(value) => write!(f, "{value}"),
             Expr::Float32Literal(value) => write!(f, "{value}"),
+
+            Expr::Tuple(exprs) => {
+                let contents: String = exprs
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                write!(f, "({contents})")
+            }
 
             Expr::Lambda {
                 param_name: param,

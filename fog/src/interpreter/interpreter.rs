@@ -70,14 +70,6 @@ impl Interpreter {
             r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
         };
 
-        // built-in values
-
-        let var_empty_tuple: Variable = Variable {
-            name: "()".to_string(),
-            value: Some(Value::EmptyTuple),
-            r#type: Type::Unit,
-        };
-
         // insert into top level environment
 
         vec![t_type, t_int32, t_float32, t_unit, t_function]
@@ -89,7 +81,7 @@ impl Interpreter {
                     .insert(r#type.to_string(), r#type.clone());
             });
 
-        vec![var_plus_int32_int32, var_empty_tuple]
+        vec![var_plus_int32_int32]
             .iter()
             .for_each(|var: &Variable| {
                 interpreter

@@ -195,6 +195,15 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             appl_id
         }
 
+        parser::nodes::Expr::Tuple(exprs) => {
+            let tuple_id: i32 = new_node(out, id, "tuple", COLOR_IDENTIFIER);
+            for expr in exprs {
+                let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
+                edge(out, tuple_id, expr_id);
+            }
+            tuple_id
+        }
+
         parser::nodes::Expr::DataConstructor {
             ctor_name, args, ..
         } => {
