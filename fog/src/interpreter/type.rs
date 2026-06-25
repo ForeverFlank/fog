@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
@@ -18,11 +20,12 @@ pub enum Type {
     // primitive types
     Int32,
     Float32,
-    Unit,
 
     // ADTs
     Product(Vec<Type>),
-    Sum(String, Vec<DataConstructor>),
+    Sum(Vec<DataConstructor>),
+    // data constructor
+    // DataConstructor(DataConstructor),
 }
 
 impl Type {
@@ -37,14 +40,22 @@ impl PartialEq for Type {
             (Type::Kind, Type::Kind) => true,
             (Type::Type, Type::Type) => true,
 
+            (Type::Int32, Type::Int32) => true,
+            (Type::Float32, Type::Float32) => true,
+
             (
                 Type::Function(param_type_1, return_type_1),
                 Type::Function(param_type_2, return_type_2),
             ) => param_type_1 == param_type_2 && return_type_1 == return_type_2,
 
-            (Type::Int32, Type::Int32) => true,
-            (Type::Float32, Type::Float32) => true,
-            (Type::Unit, Type::Unit) => true,
+            (Type::Product(types_1), Type::Product(types_2)) => types_1 == types_2,
+
+            (Type::Sum(ctors_1), Type::Sum(ctors_2)) => {
+                let s1: HashSet<&DataConstructor> = ctors_1.iter().collect();
+                let s2: HashSet<&DataConstructor> = ctors_2.iter().collect();
+
+                s1 == s2
+            }
 
             _ => false,
         }
@@ -66,15 +77,25 @@ impl ToString for Type {
 
             Type::Int32 => "Int32".to_string(),
             Type::Float32 => "Float32".to_string(),
-            Type::Unit => "Unit".to_string(),
 
-            Type::Product(types) => types.iter().fold(String::new(), |acc, r#type| {
-                acc + " * " + &r#type.to_string()
-            }),
+            Type::Product(types) => {
+                if types.is_empty() {
+                    "Unit".to_string()
+                } else {
+                    types
+                        .iter()
+                        .fold(String::new(), |acc: String, r#type: &Type| {
+                            acc + " * " + &r#type.to_string()
+                        })
+                }
+            }
 
-            Type::Sum(_, ctors) => ctors.iter().fold(String::new(), |acc, r#type| {
-                acc + " + " + &r#type.to_string()
-            }),
+            Type::Sum(ctors) => ctors
+                .iter()
+                .fold(String::new(), |acc: String, r#type: &DataConstructor| {
+                    acc + " + " + &r#type.to_string()
+                }),
+            // Type::DataConstructor()
         }
     }
 }
@@ -123,7 +144,7 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
         Value::Tuple(values) => Ok(Type::Product(
             values
                 .iter()
-                .map(|value| Ok(value_type_of(value, env, span)?.into()))
+                .map(|value: &Value| Ok(value_type_of(value, env, span)?.into()))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
     }
@@ -164,11 +185,11 @@ pub fn expr_type_of(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Ty
         Expr::Tuple(exprs) => Ok(Product(
             exprs
                 .iter()
-                .map(|expr| Ok(expr_type_of(expr, env, span)?.into()))
+                .map(|expr: &Expr| Ok(expr_type_of(expr, env, span)?.into()))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
 
-        Expr::DataConstructor { type_name, .. } => Ok(env.get_type(type_name)?),
+        Expr::DataConstructor(name, args) => todo!(),
 
         Expr::NameCollection(_) => Err(FogError::runtime(
             "unresolved name collection".to_string(),

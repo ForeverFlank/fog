@@ -20,7 +20,7 @@ pub enum Value {
         return_type: Type,
         function: Rc<dyn Fn(Value) -> FogResult<Value>>,
     },
-    Tuple(Vec<Box<Value>>),
+    Tuple(Vec<Value>),
 }
 
 impl ToString for Value {
@@ -38,8 +38,8 @@ impl ToString for Value {
             Value::Tuple(values) => {
                 let contents: String = values
                     .iter()
-                    .map(|value| value.to_string())
-                    .collect::<Vec<_>>()
+                    .map(|value: &Value| value.to_string())
+                    .collect::<Vec<String>>()
                     .join(", ");
 
                 format!("({})", contents)

@@ -26,24 +26,20 @@ impl Interpreter {
         };
 
         // the Type itself
-
         let t_type: Type = Type::Type;
 
         // primitive types
-
         let t_int32: Type = Type::Int32;
         let t_float32: Type = Type::Float32;
-        let t_unit: Type = Type::Unit;
+        let t_unit: Type = Type::Product(Vec::new());
 
         // function type
-
         let t_function: Type = Type::Function(
             Box::new(Type::Type),
             Box::new(Type::Function(Box::new(Type::Type), Box::new(Type::Type))),
         );
 
         // builtin functions
-
         let var_plus_int32_int32: Variable = Variable {
             name: "_builtin_plus_Int32_Int32".to_string(),
             value: Some(Value::NativeFunction {
@@ -71,7 +67,6 @@ impl Interpreter {
         };
 
         // insert into top level environment
-
         vec![t_type, t_int32, t_float32, t_unit, t_function]
             .iter()
             .for_each(|r#type: &Type| {

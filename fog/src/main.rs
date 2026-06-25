@@ -204,15 +204,13 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             tuple_id
         }
 
-        parser::nodes::Expr::DataConstructor {
-            ctor_name, args, ..
-        } => {
-            let ctor_id: i32 = new_node(out, id, &format!("{}", ctor_name), COLOR_IDENTIFIER);
+        parser::nodes::Expr::DataConstructor(name, args) => {
+            let name_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
             for arg in args {
                 let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
-                edge(out, ctor_id, arg_id);
+                edge(out, name_id, arg_id);
             }
-            ctor_id
+            name_id
         }
 
         parser::nodes::Expr::NameCollection(_) => unreachable!(),

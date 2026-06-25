@@ -1,0 +1,4 @@
+-- the boolean type
+
+Bool : Type
+Bool = True + False

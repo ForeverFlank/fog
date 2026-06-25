@@ -168,14 +168,14 @@ impl ASTParser<'_> {
 
             self.next();
 
-            let rhs: Box<Expr> = Box::new(match op_assoc {
+            let rhs: Expr = match op_assoc {
                 OpAssociativity::Left => self.parse_expression(op_prec + 1),
                 OpAssociativity::Right => self.parse_expression(op_prec),
-            }?);
+            }?;
 
             lhs = Expr::FuncAppl {
                 fn_name: op_name,
-                args: vec![Box::new(lhs), rhs],
+                args: vec![lhs, rhs],
             };
         }
 
@@ -187,11 +187,11 @@ impl ASTParser<'_> {
 
         // check for function application
         if let Expr::Identifier(name) = &head {
-            let mut args: Vec<Box<Expr>> = Vec::new();
+            let mut args: Vec<Expr> = Vec::new();
 
             while self.pos < self.tokens.len() && is_primary_starter(self.peek()) {
                 let arg: Expr = self.parse_atomic()?;
-                args.push(Box::new(arg));
+                args.push(arg);
             }
 
             if !args.is_empty() {
@@ -222,7 +222,7 @@ impl ASTParser<'_> {
 
             return Ok(Expr::FuncAppl {
                 fn_name: "-".to_string(),
-                args: vec![Box::new(opnd)],
+                args: vec![opnd],
             });
         }
 
@@ -261,7 +261,7 @@ impl ASTParser<'_> {
         if let TokenKind::LeftParenthesis = token.kind {
             if let TokenKind::RightParenthesis = self.peek().kind {
                 self.next();
-                return Ok(Expr::Identifier("()".to_string()));
+                return Ok(Expr::Tuple(Vec::new()));
             };
 
             let res: FogResult<Expr> = self.parse_expression(i32::MIN);

@@ -29,22 +29,18 @@ pub enum Expr {
         body: Rc<Expr>,
     },
 
-    Tuple(Vec<Box<Expr>>),
+    Tuple(Vec<Expr>),
 
     // bunch of names, undecided if it's a
     // function application or a data constructor
-    NameCollection(Vec<Box<Expr>>),
+    NameCollection(Vec<Expr>),
 
     FuncAppl {
         fn_name: String,
-        args: Vec<Box<Expr>>,
+        args: Vec<Expr>,
     },
 
-    DataConstructor {
-        type_name: String,
-        ctor_name: String,
-        args: Vec<Box<Expr>>,
-    },
+    DataConstructor(String, Vec<Expr>),
 }
 
 impl Expr {
@@ -109,10 +105,8 @@ impl Display for Expr {
                 Ok(())
             }
 
-            Expr::DataConstructor {
-                ctor_name, args, ..
-            } => {
-                write!(f, "{ctor_name}")?;
+            Expr::DataConstructor(name, args) => {
+                write!(f, "{name}")?;
 
                 for arg in args {
                     write!(f, " ")?;

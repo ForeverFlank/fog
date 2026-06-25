@@ -53,7 +53,7 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
             exprs
                 .iter()
                 .map(|expr| Ok(eval_expr(expr, env, span)?.into()))
-                .collect::<Result<Vec<Box<Value>>, FogError>>()?,
+                .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
         // etc.
@@ -73,10 +73,18 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
         Expr::Identifier(name) => Ok(env.get_type(name)?),
 
         Expr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
-            let left: Type = eval_type_expr(args[0].as_ref(), env)?;
-            let right: Type = eval_type_expr(args[1].as_ref(), env)?;
+            let left: Type = eval_type_expr(&args[0], env)?;
+            let right: Type = eval_type_expr(&args[1], env)?;
 
             Ok(Type::Function(Box::new(left), Box::new(right)))
+        }
+
+        Expr::FuncAppl { fn_name, args } if fn_name == "+" && args.len() == 2 => {
+            let t1: Type = eval_type_expr(&args[0], env)?;
+            let t2: Type = eval_type_expr(&args[1], env)?;
+
+            todo!()
+            // Ok(Type::Sum())
         }
 
         Expr::FuncAppl {
@@ -84,50 +92,44 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
             args,
         } => {
             let fn_type: Type = eval_type_expr(&Expr::Identifier(function.clone()), env)?;
-            let mut current: Type = fn_type;
+            let mut current_type: Type = fn_type;
 
             for arg in args {
-                current = match current {
-                    Type::Function(param, ret) => {
-                        let arg_type: Type = eval_type_expr(arg.as_ref(), env)?;
-                        if arg_type != *param {
-                            return Err(FogError::runtime(
-                                format!("type mismatch applying `{}`", function),
-                                None,
-                            ));
-                        }
-                        *ret
-                    }
-                    _ => {
+                if let Type::Function(param_type, return_type) = current_type {
+                    let arg_type: Type = eval_type_expr(&arg, env)?;
+
+                    if arg_type != *param_type {
                         return Err(FogError::runtime(
-                            format!("`{}` is not a valid type constructor", function),
+                            format!(
+                                "type mismatch applying `{}`\n\
+                                 expected `{}`, found `{}`",
+                                function,
+                                param_type.to_string(),
+                                arg_type.to_string()
+                            ),
                             None,
                         ));
                     }
-                };
+
+                    current_type = *return_type
+                } else {
+                    return Err(FogError::runtime(
+                        format!("`{}` is not a valid type constructor", function),
+                        None,
+                    ));
+                }
             }
 
-            Ok(current)
+            Ok(current_type)
         }
 
-        // etc.
-        Expr::Lambda { .. } => Err(FogError::runtime("lambda is not a type".to_string(), None)),
-        Expr::Tuple(_) => Err(FogError::runtime("tuple is not a type".to_string(), None)),
-
-        Expr::Int32Literal(_) => Err(FogError::runtime(
-            "Int32 literal is not a type".to_string(),
-            None,
-        )),
-        Expr::Float32Literal(_) => Err(FogError::runtime(
-            "Float32 literal is not a type".to_string(),
-            None,
-        )),
-        Expr::DataConstructor { .. } => Err(FogError::runtime(
-            "data constructor is not a type".to_string(),
-            None,
-        )),
         Expr::NameCollection(_) => Err(FogError::runtime(
             "unresolved name collection".to_string(),
+            None,
+        )),
+
+        _ => Err(FogError::runtime(
+            format!("`{}` is not a type", expr.to_string()),
             None,
         )),
     }
