@@ -1,5 +1,0 @@
--- order of operations
--- should be -9.5
-
-a : Float32
-a = 4 + 3 / 2 + 2 * (-1 + 6 / 3 - 9) - (-1)

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::error::FogError;
@@ -26,7 +25,7 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
 
         // AST lambda -> interpreter function
         Expr::Lambda {
-            param,
+            param_name: param,
             param_type,
             body,
         } => Ok(Value::Function {
@@ -38,7 +37,7 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
 
         // function application
         Expr::FuncAppl {
-            function: function_name,
+            fn_name: function_name,
             args: arguments,
         } => {
             let mut result: Value = eval_expr(&Expr::Identifier(function_name.clone()), env, span)?;
@@ -48,61 +47,89 @@ pub fn eval_expr(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Value
             }
             Ok(result)
         }
+
+        // tuple
+        Expr::Tuple(exprs) => Ok(Value::Tuple(
+            exprs
+                .iter()
+                .map(|expr| Ok(eval_expr(expr, env, span)?.into()))
+                .collect::<Result<Vec<Value>, FogError>>()?,
+        )),
+
+        // etc.
+        Expr::DataConstructor { .. } => Err(FogError::runtime(
+            "cannot evaluate data constructor as value".to_string(),
+            Some(span.clone()),
+        )),
+        Expr::NameCollection(_) => Err(FogError::runtime(
+            "unresolved name collection".to_string(),
+            Some(span.clone()),
+        )),
     }
 }
 
 pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
-        Expr::Identifier(name) => {
-            let Some(Value::Type(r#type)) = env.get_var(name)?.value else {
-                return Err(FogError::runtime(format!("`{}` is not a type", name), None));
-            };
+        Expr::Identifier(name) => Ok(env.get_type(name)?),
 
-            Ok(r#type)
-        }
-
-        Expr::FuncAppl { function, args } if function == "->" && args.len() == 2 => {
-            let left: Type = eval_type_expr(args[0].as_ref(), env)?;
-            let right: Type = eval_type_expr(args[1].as_ref(), env)?;
+        Expr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
+            let left: Type = eval_type_expr(&args[0], env)?;
+            let right: Type = eval_type_expr(&args[1], env)?;
 
             Ok(Type::Function(Box::new(left), Box::new(right)))
         }
 
-        Expr::FuncAppl { function, args } => {
+        Expr::FuncAppl { fn_name, args } if fn_name == "+" && args.len() == 2 => {
+            let t1: Type = eval_type_expr(&args[0], env)?;
+            let t2: Type = eval_type_expr(&args[1], env)?;
+
+            todo!()
+            // Ok(Type::Sum())
+        }
+
+        Expr::FuncAppl {
+            fn_name: function,
+            args,
+        } => {
             let fn_type: Type = eval_type_expr(&Expr::Identifier(function.clone()), env)?;
-            let mut current: Type = fn_type;
+            let mut current_type: Type = fn_type;
 
             for arg in args {
-                current = match current {
-                    Type::Function(param, ret) => {
-                        let arg_type: Type = eval_type_expr(arg.as_ref(), env)?;
-                        if arg_type != *param {
-                            return Err(FogError::runtime(
-                                format!("type mismatch applying `{}`", function),
-                                None,
-                            ));
-                        }
-                        *ret
-                    }
-                    _ => {
+                if let Type::Function(param_type, return_type) = current_type {
+                    let arg_type: Type = eval_type_expr(&arg, env)?;
+
+                    if arg_type != *param_type {
                         return Err(FogError::runtime(
-                            format!("`{}` is not a valid type constructor", function),
+                            format!(
+                                "type mismatch applying `{}`\n\
+                                 expected `{}`, found `{}`",
+                                function,
+                                param_type.to_string(),
+                                arg_type.to_string()
+                            ),
                             None,
                         ));
                     }
-                };
+
+                    current_type = *return_type
+                } else {
+                    return Err(FogError::runtime(
+                        format!("`{}` is not a valid type constructor", function),
+                        None,
+                    ));
+                }
             }
 
-            Ok(current)
+            Ok(current_type)
         }
 
-        Expr::Lambda { .. } => Err(FogError::runtime("lambda is not a type".to_string(), None)),
-        Expr::Int32Literal(_) => Err(FogError::runtime(
-            "Int32 literal is not a type".to_string(),
+        Expr::NameCollection(_) => Err(FogError::runtime(
+            "unresolved name collection".to_string(),
             None,
         )),
-        Expr::Float32Literal(_) => Err(FogError::runtime(
-            "Float32 literal is not a type".to_string(),
+
+        _ => Err(FogError::runtime(
+            format!("`{}` is not a type", expr.to_string()),
             None,
         )),
     }
@@ -116,10 +143,7 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
             body,
             captured_env,
         } => {
-            let mut child_env: Environment = Environment {
-                variables: HashMap::new(),
-                parent: Some(captured_env),
-            };
+            let mut child_env: Environment = Environment::new(Some(captured_env));
 
             child_env.variables.insert(
                 param.clone(),

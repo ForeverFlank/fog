@@ -22,16 +22,17 @@ mod parser;
 fn main() {
     // --- arguments and paths ---
     let args: Vec<String> = env::args().collect();
-    let path: &String = args.get(1).expect("Usage: ./fog <path>");
+    let path: &String = args.get(1).expect("usage: ./fog <path>");
 
     let arg_print_tokens: bool = args.contains(&"--print-tokens".to_string());
     let arg_emit_ast: bool = args.contains(&"--emit-ast".to_string());
 
     // --- read file ---
-    let src: &str = &fs::read_to_string(path).expect("Failed to read source file");
+    let src: &str =
+        &fs::read_to_string(path).expect(&format!("failed to read source file `{}`", path));
 
     // --- compilation ---
-    // -- lexing
+    // lexing
     let (tokens, lexer_errors) = tokenize(src);
 
     if arg_print_tokens {
@@ -40,7 +41,7 @@ fn main() {
 
     print_lexer_errors(&lexer_errors);
 
-    // -- AST parsing
+    // AST parsing
     let (ast, parser_errors) = parse_program(&tokens);
 
     if arg_emit_ast {
@@ -51,7 +52,7 @@ fn main() {
 
     print_parser_errors(&parser_errors);
 
-    // -- interpreting
+    // interpreting
 
     interpret(ast);
 }
@@ -172,12 +173,12 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
         }
 
         parser::nodes::Expr::Lambda {
-            param,
+            param_name,
             param_type,
             body,
         } => {
             let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
-            let param_id: i32 = emit_ast_puml_type_annotation(out, id, param, param_type);
+            let param_id: i32 = emit_ast_puml_type_annotation(out, id, param_name, param_type);
             let body_id: i32 = emit_ast_puml_expr(out, id, &body);
 
             edge(out, lambda_id, param_id);
@@ -185,17 +186,34 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             lambda_id
         }
 
-        parser::nodes::Expr::FuncAppl {
-            function: function_name,
-            args: arguments,
-        } => {
-            let appl_id: i32 = new_node(out, id, &format!("{}", function_name), COLOR_FUNC_APPL);
-            for arg in arguments {
-                let arg_id = emit_ast_puml_expr(out, id, arg);
+        parser::nodes::Expr::FuncAppl { fn_name, args } => {
+            let appl_id: i32 = new_node(out, id, &format!("{}", fn_name), COLOR_FUNC_APPL);
+            for arg in args {
+                let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
                 edge(out, appl_id, arg_id);
             }
             appl_id
         }
+
+        parser::nodes::Expr::Tuple(exprs) => {
+            let tuple_id: i32 = new_node(out, id, "tuple", COLOR_IDENTIFIER);
+            for expr in exprs {
+                let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
+                edge(out, tuple_id, expr_id);
+            }
+            tuple_id
+        }
+
+        parser::nodes::Expr::DataConstructor(name, args) => {
+            let name_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
+            for arg in args {
+                let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
+                edge(out, name_id, arg_id);
+            }
+            name_id
+        }
+
+        parser::nodes::Expr::NameCollection(_) => unreachable!(),
     }
 }
 

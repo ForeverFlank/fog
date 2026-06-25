@@ -7,7 +7,6 @@ use crate::parser::nodes::Expr;
 
 #[derive(Clone)]
 pub enum Value {
-    Type(Type),
     Int32(i32),
     Float32(f32),
     Function {
@@ -21,20 +20,30 @@ pub enum Value {
         return_type: Type,
         function: Rc<dyn Fn(Value) -> FogResult<Value>>,
     },
-    EmptyTuple,
+    Tuple(Vec<Value>),
 }
 
 impl ToString for Value {
     fn to_string(&self) -> String {
         match self {
-            Value::Type(r#type) => (*r#type).to_string(),
             Value::Int32(value) => value.to_string(),
             Value::Float32(value) => value.to_string(),
+
             Value::Function { param, body, .. } => {
                 format!("{} => {}", param, (*body).to_string())
             }
+
             Value::NativeFunction { .. } => "[native function]".to_string(),
-            Value::EmptyTuple => "()".to_string(),
+
+            Value::Tuple(values) => {
+                let contents: String = values
+                    .iter()
+                    .map(|value: &Value| value.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                format!("({})", contents)
+            }
         }
     }
 }

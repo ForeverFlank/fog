@@ -1,10 +1,11 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::error::FogError;
+use crate::error::FogResult;
 use crate::error::Span;
-use crate::error::{FogError, FogResult};
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_expr;
+use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
@@ -21,73 +22,24 @@ impl Interpreter {
     fn new(program: Box<Program>) -> Interpreter {
         let mut interpreter: Interpreter = Interpreter {
             program,
-            top_env: Environment {
-                variables: HashMap::new(),
-                parent: None,
-            },
+            top_env: Environment::new(None),
         };
 
         // the Type itself
-
-        let var_type: Variable = Variable {
-            name: "Type".to_string(),
-            value: Some(Value::Type(Type::Type)),
-            r#type: Type::Kind,
-        };
+        let t_type: Type = Type::Type;
 
         // primitive types
-
-        let var_int32: Variable = Variable {
-            name: "Int32".to_string(),
-            value: Some(Value::Type(Type::Int32)),
-            r#type: Type::Kind,
-        };
-
-        let var_float32: Variable = Variable {
-            name: "Float32".to_string(),
-            value: Some(Value::Type(Type::Float32)),
-            r#type: Type::Kind,
-        };
-
-        let var_unit: Variable = Variable {
-            name: "Unit".to_string(),
-            value: Some(Value::Type(Type::Unit)),
-            r#type: Type::Kind,
-        };
+        let t_int32: Type = Type::Int32;
+        let t_float32: Type = Type::Float32;
+        let t_unit: Type = Type::Product(Vec::new());
 
         // function type
-
-        let var_function: Variable = Variable {
-            name: "->".to_string(),
-            value: Some(Value::NativeFunction {
-                param_type: Type::Type,
-                return_type: Type::function(Type::Type, Type::Type),
-                function: Rc::new(|arg: Value| match arg {
-                    Value::Type(domain) => Ok(Value::NativeFunction {
-                        param_type: Type::Type,
-                        return_type: Type::Type,
-                        function: Rc::new(move |arg: Value| match arg {
-                            Value::Type(codomain) => Ok(Value::Type(Type::Function(
-                                Box::new(domain.clone()),
-                                Box::new(codomain.clone()),
-                            ))),
-                            _ => Err(FogError::runtime(
-                                "expected a type argument".to_string(),
-                                None,
-                            )),
-                        }),
-                    }),
-                    _ => Err(FogError::runtime(
-                        "expected a type argument".to_string(),
-                        None,
-                    )),
-                }),
-            }),
-            r#type: Type::function(Type::Type, Type::function(Type::Type, Type::Type)),
-        };
+        let t_function: Type = Type::Function(
+            Box::new(Type::Type),
+            Box::new(Type::Function(Box::new(Type::Type), Box::new(Type::Type))),
+        );
 
         // builtin functions
-
         let var_plus_int32_int32: Variable = Variable {
             name: "_builtin_plus_Int32_Int32".to_string(),
             value: Some(Value::NativeFunction {
@@ -114,30 +66,24 @@ impl Interpreter {
             r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
         };
 
-        // built-in values
+        // insert into top level environment
+        vec![t_type, t_int32, t_float32, t_unit, t_function]
+            .iter()
+            .for_each(|r#type: &Type| {
+                interpreter
+                    .top_env
+                    .types
+                    .insert(r#type.to_string(), r#type.clone());
+            });
 
-        let var_empty_tuple: Variable = Variable {
-            name: "()".to_string(),
-            value: Some(Value::EmptyTuple),
-            r#type: Type::Kind,
-        };
-
-        vec![
-            var_type,
-            var_int32,
-            var_float32,
-            var_unit,
-            var_function,
-            var_plus_int32_int32,
-            var_empty_tuple,
-        ]
-        .iter()
-        .for_each(|var: &Variable| {
-            interpreter
-                .top_env
-                .variables
-                .insert(var.name.clone(), var.clone());
-        });
+        vec![var_plus_int32_int32]
+            .iter()
+            .for_each(|var: &Variable| {
+                interpreter
+                    .top_env
+                    .variables
+                    .insert(var.name.clone(), var.clone());
+            });
 
         interpreter
     }
@@ -189,21 +135,23 @@ impl Interpreter {
 }
 
 fn annotate_type(name: &str, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
-    let r#type: Rc<Type> = match eval_expr(&expr, env, span)? {
-        Value::Type(r#type) => r#type.into(),
-        _ => {
-            return Err(FogError::runtime(
-                "expression is not a type".to_string(),
-                Some(span.clone()),
-            ));
-        }
-    };
-
-    (*env).annotate_type(name, (*r#type).clone(), span)
+    let r#type: Type = eval_type_expr(&expr, env)?;
+    (*env).annotate_type(name, r#type, span)
 }
 
-fn declare(name: &str, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
-    let value: Value = eval_expr(expr, env, span)?;
+fn declare(name: &String, expr: &Expr, env: &mut Environment, span: &Span) -> FogResult<()> {
+    if env.variables.contains_key(name) {
+        (*env).declare_value(name, eval_expr(expr, env, span)?, span)?;
+        return Ok(());
+    }
 
-    (*env).declare(name, value, span)
+    if env.types.contains_key(name) {
+        (*env).declare_type(name, eval_type_expr(expr, env)?, span)?;
+        return Ok(());
+    }
+
+    Err(FogError::runtime(
+        format!("unannotated variable `{}`", name),
+        Some(span.clone()),
+    ))
 }
