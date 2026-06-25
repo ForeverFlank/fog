@@ -4,7 +4,7 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::r#type::Type;
-use crate::interpreter::r#type::get_value_type;
+use crate::interpreter::r#type::get_type_of_value;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 
@@ -62,7 +62,7 @@ impl Environment {
             var.r#type.clone()
         };
 
-        let value_type: Type = get_value_type(&value, self)?;
+        let value_type: Type = get_type_of_value(&value, self)?;
 
         if value_type != var_type {
             return Err(FogError::runtime(

@@ -24,7 +24,7 @@ pub enum Expr {
     Float32Literal(f32),
 
     Lambda {
-        param: String,
+        param_name: String,
         param_type: Box<Expr>,
         body: Rc<Expr>,
     },
@@ -34,11 +34,15 @@ pub enum Expr {
     NameCollection(Vec<Box<Expr>>),
 
     FuncAppl {
-        function: String,
+        fn_name: String,
         args: Vec<Box<Expr>>,
     },
 
-    DataConstructor(String, Vec<Box<Expr>>),
+    DataConstructor {
+        type_name: String,
+        ctor_name: String,
+        args: Vec<Box<Expr>>,
+    },
 }
 
 impl Expr {
@@ -61,7 +65,11 @@ impl Display for Expr {
             Expr::Int32Literal(value) => write!(f, "{value}"),
             Expr::Float32Literal(value) => write!(f, "{value}"),
 
-            Expr::Lambda { param, body, .. } => {
+            Expr::Lambda {
+                param_name: param,
+                body,
+                ..
+            } => {
                 write!(f, "{param} => {body}")
             }
 
@@ -75,7 +83,10 @@ impl Display for Expr {
                 Ok(())
             }
 
-            Expr::FuncAppl { function, args } => {
+            Expr::FuncAppl {
+                fn_name: function,
+                args,
+            } => {
                 write!(f, "{function}")?;
 
                 for arg in args {
@@ -86,12 +97,14 @@ impl Display for Expr {
                 Ok(())
             }
 
-            Expr::DataConstructor(name, types) => {
-                write!(f, "{name}")?;
+            Expr::DataConstructor {
+                ctor_name, args, ..
+            } => {
+                write!(f, "{ctor_name}")?;
 
-                for ty in types {
+                for arg in args {
                     write!(f, " ")?;
-                    Self::fmt_parenthesized(ty, f)?;
+                    Self::fmt_parenthesized(arg, f)?;
                 }
 
                 Ok(())

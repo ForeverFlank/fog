@@ -19,7 +19,7 @@ pub enum Type {
 
     // ADTs
     Product(Vec<Type>),
-    Sum(Vec<DataConstructor>),
+    Sum(String, Vec<DataConstructor>),
 }
 
 impl Type {
@@ -64,7 +64,7 @@ impl ToString for Type {
             Type::Product(types) => types.iter().fold(String::new(), |acc, r#type| {
                 acc + " * " + &r#type.to_string()
             }),
-            Type::Sum(ctors) => ctors.iter().fold(String::new(), |acc, r#type| {
+            Type::Sum(_, ctors) => ctors.iter().fold(String::new(), |acc, r#type| {
                 acc + " + " + &r#type.to_string()
             }),
         }
@@ -94,7 +94,7 @@ impl ToString for DataConstructor {
 
 // --- functions ---
 
-pub fn get_value_type(value: &Value, env: &Environment) -> FogResult<Type> {
+pub fn get_type_of_value(value: &Value, env: &Environment) -> FogResult<Type> {
     match value {
         Value::Type(_) => Ok(Type::Kind),
 
@@ -105,7 +105,7 @@ pub fn get_value_type(value: &Value, env: &Environment) -> FogResult<Type> {
             param_type, body, ..
         } => Ok(Type::function(
             param_type.clone(),
-            get_expr_type(&body, env)?,
+            get_type_of_expr(&body, env)?,
         )),
 
         Value::NativeFunction {
@@ -118,7 +118,7 @@ pub fn get_value_type(value: &Value, env: &Environment) -> FogResult<Type> {
     }
 }
 
-pub fn get_expr_type(expr: &Expr, env: &Environment) -> FogResult<Type> {
+pub fn get_type_of_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
         Expr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
 
@@ -129,10 +129,13 @@ pub fn get_expr_type(expr: &Expr, env: &Environment) -> FogResult<Type> {
             param_type, body, ..
         } => Ok(Type::Function(
             eval_type_expr(&param_type, env)?.into(),
-            get_expr_type(&body, env)?.into(),
+            get_type_of_expr(&body, env)?.into(),
         )),
 
-        Expr::FuncAppl { function, args } => {
+        Expr::FuncAppl {
+            fn_name: function,
+            args,
+        } => {
             let Type::Function(_, return_type) = env.get_var(&function)?.r#type else {
                 return Err(FogError::runtime(
                     format!("`{}` is not a function", function),
@@ -156,5 +159,16 @@ pub fn get_expr_type(expr: &Expr, env: &Environment) -> FogResult<Type> {
 
             Ok(curr_return_type)
         }
+
+        Expr::DataConstructor {
+            type_name,
+            ctor_name,
+            args,
+        } => Ok(Type::Sum(*type_name)),
+
+        Expr::NameCollection(_) => Err(FogError::runtime(
+            "unresolved name collection".to_string(),
+            None,
+        )),
     }
 }

@@ -173,12 +173,12 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
         }
 
         parser::nodes::Expr::Lambda {
-            param,
+            param_name,
             param_type,
             body,
         } => {
             let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
-            let param_id: i32 = emit_ast_puml_type_annotation(out, id, param, param_type);
+            let param_id: i32 = emit_ast_puml_type_annotation(out, id, param_name, param_type);
             let body_id: i32 = emit_ast_puml_expr(out, id, &body);
 
             edge(out, lambda_id, param_id);
@@ -186,17 +186,27 @@ fn emit_ast_puml_expr(out: &mut String, id: &mut i32, expr: &parser::nodes::Expr
             lambda_id
         }
 
-        parser::nodes::Expr::FuncAppl {
-            function: function_name,
-            args: arguments,
-        } => {
-            let appl_id: i32 = new_node(out, id, &format!("{}", function_name), COLOR_FUNC_APPL);
-            for arg in arguments {
-                let arg_id = emit_ast_puml_expr(out, id, arg);
+        parser::nodes::Expr::FuncAppl { fn_name, args } => {
+            let appl_id: i32 = new_node(out, id, &format!("{}", fn_name), COLOR_FUNC_APPL);
+            for arg in args {
+                let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
                 edge(out, appl_id, arg_id);
             }
             appl_id
         }
+
+        parser::nodes::Expr::DataConstructor {
+            ctor_name, args, ..
+        } => {
+            let ctor_id: i32 = new_node(out, id, &format!("{}", ctor_name), COLOR_IDENTIFIER);
+            for arg in args {
+                let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
+                edge(out, ctor_id, arg_id);
+            }
+            ctor_id
+        }
+
+        parser::nodes::Expr::NameCollection(_) => unreachable!(),
     }
 }
 

@@ -174,7 +174,7 @@ impl ASTParser<'_> {
             }?);
 
             lhs = Expr::FuncAppl {
-                function: op_name,
+                fn_name: op_name,
                 args: vec![Box::new(lhs), rhs],
             };
         }
@@ -196,7 +196,7 @@ impl ASTParser<'_> {
 
             if !args.is_empty() {
                 return Ok(Expr::FuncAppl {
-                    function: name.clone(),
+                    fn_name: name.clone(),
                     args,
                 });
             }
@@ -221,7 +221,7 @@ impl ASTParser<'_> {
             let opnd: Expr = self.parse_primary()?;
 
             return Ok(Expr::FuncAppl {
-                function: "-".to_string(),
+                fn_name: "-".to_string(),
                 args: vec![Box::new(opnd)],
             });
         }
@@ -248,7 +248,7 @@ impl ASTParser<'_> {
                 let body: Expr = self.parse_expression(i32::MIN)?;
 
                 return Ok(Expr::Lambda {
-                    param: name,
+                    param_name: name,
                     param_type: Box::new(param_type),
                     body: Rc::new(body),
                 });
