@@ -1,5 +1,6 @@
 use crate::error::FogError;
 use crate::error::FogResult;
+use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::value::Value;
@@ -35,7 +36,11 @@ impl PartialEq for Type {
         match (self, other) {
             (Type::Kind, Type::Kind) => true,
             (Type::Type, Type::Type) => true,
-            (Type::Function(d1, r1), Type::Function(d2, r2)) => d1 == d2 && r1 == r2,
+
+            (
+                Type::Function(param_type_1, return_type_1),
+                Type::Function(param_type_2, return_type_2),
+            ) => param_type_1 == param_type_2 && return_type_1 == return_type_2,
 
             (Type::Int32, Type::Int32) => true,
             (Type::Float32, Type::Float32) => true,
@@ -96,7 +101,7 @@ impl ToString for DataConstructor {
 
 // --- functions ---
 
-pub fn value_type_of(value: &Value, env: &Environment) -> FogResult<Type> {
+pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult<Type> {
     match value {
         Value::Int32(_) => Ok(Type::Int32),
         Value::Float32(_) => Ok(Type::Float32),
@@ -105,7 +110,7 @@ pub fn value_type_of(value: &Value, env: &Environment) -> FogResult<Type> {
             param_type, body, ..
         } => Ok(Type::function(
             param_type.clone(),
-            expr_type_of(&body, env)?,
+            expr_type_of(&body, env, span)?,
         )),
 
         Value::NativeFunction {
@@ -118,7 +123,7 @@ pub fn value_type_of(value: &Value, env: &Environment) -> FogResult<Type> {
     }
 }
 
-pub fn expr_type_of(expr: &Expr, env: &Environment) -> FogResult<Type> {
+pub fn expr_type_of(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
         Expr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
 
@@ -129,35 +134,25 @@ pub fn expr_type_of(expr: &Expr, env: &Environment) -> FogResult<Type> {
             param_type, body, ..
         } => Ok(Type::Function(
             eval_type_expr(&param_type, env)?.into(),
-            expr_type_of(&body, env)?.into(),
+            expr_type_of(&body, env, span)?.into(),
         )),
 
-        Expr::FuncAppl {
-            fn_name: function,
-            args,
-        } => {
-            let Type::Function(_, return_type) = env.get_var(&function)?.r#type else {
-                return Err(FogError::runtime(
-                    format!("`{}` is not a function", function),
-                    None,
-                ));
-            };
-
-            let mut curr_return_type: Type = *return_type;
+        Expr::FuncAppl { fn_name, args } => {
+            let mut curr_type: Type = env.get_var(&fn_name)?.r#type.clone();
 
             for _ in args {
-                curr_return_type = match curr_return_type {
-                    Type::Function(_, r) => *r,
+                curr_type = match curr_type {
+                    Type::Function(_, return_type) => *return_type,
                     _ => {
                         return Err(FogError::runtime(
-                            "expected function type".to_string(),
-                            None,
+                            format!("{} is not a function type", curr_type.to_string()),
+                            Some(span.clone()),
                         ));
                     }
-                }
+                };
             }
 
-            Ok(curr_return_type)
+            Ok(curr_type)
         }
 
         Expr::DataConstructor { type_name, .. } => Ok(env.get_type(type_name)?),

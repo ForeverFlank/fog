@@ -64,12 +64,13 @@ pub fn eval_type_expr(expr: &Expr, env: &Environment) -> FogResult<Type> {
     match expr {
         Expr::Identifier(name) => Ok(env.get_type(name)?),
 
-        // Expr::FuncAppl { function, args } if function == "->" && args.len() == 2 => {
-        //     let left: Type = eval_type_expr(args[0].as_ref(), env)?;
-        //     let right: Type = eval_type_expr(args[1].as_ref(), env)?;
+        Expr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
+            let left: Type = eval_type_expr(args[0].as_ref(), env)?;
+            let right: Type = eval_type_expr(args[1].as_ref(), env)?;
 
-        //     Ok(Type::Function(Box::new(left), Box::new(right)))
-        // }
+            Ok(Type::Function(Box::new(left), Box::new(right)))
+        }
+
         Expr::FuncAppl {
             fn_name: function,
             args,

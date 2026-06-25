@@ -71,7 +71,7 @@ impl Environment {
             var.r#type.clone()
         };
 
-        let value_type: Type = value_type_of(&value, self)?;
+        let value_type: Type = value_type_of(&value, self, span)?;
 
         if value_type != var_type {
             return Err(FogError::runtime(

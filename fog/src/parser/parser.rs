@@ -58,7 +58,7 @@ impl ASTParser<'_> {
                 ("/", OpAssociativity::Left, 3),
                 ("+", OpAssociativity::Left, 2),
                 ("-", OpAssociativity::Left, 2),
-                ("->", OpAssociativity::Left, 1),
+                ("->", OpAssociativity::Right, 1),
             ]
             .iter()
             .map(|(sym, assoc, prec)| {
