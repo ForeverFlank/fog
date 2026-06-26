@@ -16,7 +16,6 @@ use crate::util::format_joined;
 
 #[derive(Clone, Eq)]
 pub enum Type {
-    Kind,
     Type,
     Function(Box<Type>, Box<Type>),
 
@@ -38,7 +37,6 @@ impl Type {
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Type::Kind, Type::Kind) => true,
             (Type::Type, Type::Type) => true,
 
             (Type::Int32, Type::Int32) => true,
@@ -84,7 +82,6 @@ impl Hash for Type {
 impl ToString for Type {
     fn to_string(&self) -> String {
         match self {
-            Type::Kind => "Kind".to_string(),
             Type::Type => "Type".to_string(),
             Type::Function(param_type, return_type) => {
                 format!("{} -> {}", param_type.to_string(), return_type.to_string())
