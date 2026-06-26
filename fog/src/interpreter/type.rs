@@ -1,11 +1,12 @@
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval::eval_type_annotation_expr;
+use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;

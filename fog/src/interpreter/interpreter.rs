@@ -4,9 +4,9 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval::eval_type_annotation_expr;
-use crate::interpreter::eval::eval_type_definition_expr;
-use crate::interpreter::eval::eval_value_expr;
+use crate::interpreter::eval_type::eval_type_annotation_expr;
+use crate::interpreter::eval_type::eval_type_definition_expr;
+use crate::interpreter::eval_value::eval_value_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
@@ -95,12 +95,18 @@ impl Interpreter {
         let top_env = &mut interpreter.top_env;
 
         for stmt in &interpreter.statements {
-            let result: Result<(), FogError> = match stmt {
-                TypeAnnotation { name, expr, span } => {
-                    eval_type_annotation_expr(expr, top_env, span)
-                        .and_then(|r#type| top_env.annotate_type(name, r#type, span))
-                }
-                Declaration { name, expr, span } => Self::declare(name, expr, top_env, span),
+            let result = match stmt {
+                TypeAnnotation {
+                    name,
+                    expr: type_expr,
+                    span,
+                } => Self::annotate_type(name, type_expr, top_env, span),
+
+                Declaration {
+                    name,
+                    expr: value_expr,
+                    span,
+                } => Self::declare(name, value_expr, top_env, span),
             };
 
             if let Err(error) = result {
@@ -136,12 +142,24 @@ impl Interpreter {
         }
     }
 
+    fn annotate_type(
+        name: &String,
+        expr: &ResolvedExpr,
+        env: &mut Environment,
+        span: &Span,
+    ) -> FogResult<()> {
+        let r#type = eval_type_annotation_expr(expr, env, span)?;
+
+        env.annotate_type(name, r#type, span)
+    }
+
     fn declare(
         name: &String,
         expr: &ResolvedExpr,
         env: &mut Environment,
         span: &Span,
     ) -> FogResult<()> {
+        // declare a variable
         if env.variables.contains_key(name) {
             if let Type::Type = env.variables[name].r#type {
                 env.variables.remove(name);
@@ -151,12 +169,16 @@ impl Interpreter {
             }
 
             env.declare_value(name, eval_value_expr(expr, env, span)?, span)?;
+
             return Ok(());
         }
 
+        // declare a type
         if env.types.contains_key(name) {
             let r#type = eval_type_definition_expr(expr, env, span)?;
+
             env.declare_type(name, r#type.clone(), span)?;
+
             return Ok(());
         }
 

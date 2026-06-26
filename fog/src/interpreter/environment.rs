@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::interpreter::eval::make_data_constructor_function;
+use crate::interpreter::eval_type::make_data_constructor_function;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::r#type::value_type_of;
@@ -88,6 +88,8 @@ impl Environment {
     // --- setters ---
 
     pub fn annotate_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
+        // TODO: see if the "variable" actually belongs to the type land
+
         if self.variables.contains_key(name) {
             return Err(FogError::runtime(
                 format!(
