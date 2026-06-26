@@ -48,7 +48,11 @@ impl Parser<'_> {
             line: tokens.last().map_or(1, |t| t.line),
             column: tokens.last().map_or(1, |t| t.column + 1),
         };
-        Parser { tokens, pos: 0, eof_token }
+        Parser {
+            tokens,
+            pos: 0,
+            eof_token,
+        }
     }
 
     fn next(&mut self) {

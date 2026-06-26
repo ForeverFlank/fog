@@ -96,8 +96,10 @@ impl Interpreter {
 
         for stmt in &interpreter.statements {
             let result: Result<(), FogError> = match stmt {
-                TypeAnnotation { name, expr, span } => eval_type_annotation_expr(expr, top_env)
-                    .and_then(|r#type| top_env.annotate_type(name, r#type, span)),
+                TypeAnnotation { name, expr, span } => {
+                    eval_type_annotation_expr(expr, top_env, span)
+                        .and_then(|r#type| top_env.annotate_type(name, r#type, span))
+                }
                 Declaration { name, expr, span } => Self::declare(name, expr, top_env, span),
             };
 
@@ -143,7 +145,7 @@ impl Interpreter {
         if env.variables.contains_key(name) {
             if let Type::Type = env.variables[name].r#type {
                 env.variables.remove(name);
-                let r#type = eval_type_definition_expr(expr, env)?;
+                let r#type = eval_type_definition_expr(expr, env, span)?;
                 env.declare_type(name, r#type.clone(), span)?;
                 return Ok(());
             }
@@ -153,7 +155,7 @@ impl Interpreter {
         }
 
         if env.types.contains_key(name) {
-            let r#type = eval_type_definition_expr(expr, env)?;
+            let r#type = eval_type_definition_expr(expr, env, span)?;
             env.declare_type(name, r#type.clone(), span)?;
             return Ok(());
         }

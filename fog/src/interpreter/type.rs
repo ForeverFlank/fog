@@ -164,7 +164,7 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
 
 pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier { name } => Ok(env.get_var(name)?.r#type),
+        ResolvedExpr::Identifier { name } => Ok(env.get_var(name, span)?.r#type),
 
         ResolvedExpr::Int32Literal { .. } => Ok(Type::Int32),
         ResolvedExpr::Float32Literal { .. } => Ok(Type::Float32),
@@ -172,12 +172,12 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
         ResolvedExpr::Lambda {
             param_type, body, ..
         } => Ok(Type::Function(
-            eval_type_annotation_expr(param_type, env)?.into(),
+            eval_type_annotation_expr(param_type, env, span)?.into(),
             expr_type_of(body, env, span)?.into(),
         )),
 
         ResolvedExpr::FuncAppl { fn_name, args } => {
-            let mut curr_type = env.get_var(fn_name)?.r#type.clone();
+            let mut curr_type = env.get_var(fn_name, span)?.r#type.clone();
 
             for _ in args {
                 curr_type = match curr_type {

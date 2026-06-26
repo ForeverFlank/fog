@@ -28,48 +28,48 @@ impl Environment {
 
     // --- getters ---
 
-    pub fn get_var(&self, name: &str) -> FogResult<Variable> {
+    pub fn get_var(&self, name: &str, span: &Span) -> FogResult<Variable> {
         if let Some(var) = self.variables.get(name) {
             return Ok(var.clone());
         }
 
         if let Some(parent) = &self.parent {
-            return parent.get_var(name);
+            return parent.get_var(name, span);
         }
 
         Err(FogError::runtime(
             format!("variable `{}` not found in the current scope", name),
-            None,
+            Some(span.clone()),
         ))
     }
 
-    pub fn get_mut_var(&mut self, name: &str) -> FogResult<&mut Variable> {
+    pub fn get_mut_var(&mut self, name: &str, span: &Span) -> FogResult<&mut Variable> {
         if let Some(var) = self.variables.get_mut(name) {
             return Ok(var);
         }
 
         if let Some(parent) = &mut self.parent {
-            return parent.get_mut_var(name);
+            return parent.get_mut_var(name, span);
         }
 
         Err(FogError::runtime(
             format!("variable `{}` not found in the current scope", name),
-            None,
+            Some(span.clone()),
         ))
     }
 
-    pub fn get_type(&self, name: &str) -> FogResult<Type> {
+    pub fn get_type(&self, name: &str, span: &Span) -> FogResult<Type> {
         if let Some(var) = self.types.get(name) {
             return Ok(var.clone());
         }
 
         if let Some(parent) = &self.parent {
-            return parent.get_type(name);
+            return parent.get_type(name, span);
         }
 
         Err(FogError::runtime(
             format!("type `{}` not found in the current scope", name),
-            None,
+            Some(span.clone()),
         ))
     }
 
@@ -117,7 +117,7 @@ impl Environment {
         }
 
         let type_of_var = {
-            let var = self.get_mut_var(name)?;
+            let var = self.get_mut_var(name, span)?;
 
             if var.value.is_some() {
                 return Err(FogError::runtime(
