@@ -2,6 +2,7 @@ use std::char;
 
 #[derive(Clone)]
 pub enum TokenKind {
+    Eof,
     Newline,
 
     // statements
@@ -77,6 +78,7 @@ pub fn match_two_char_token(str: &str) -> Option<TokenKind> {
 impl ToString for TokenKind {
     fn to_string(&self) -> String {
         match self {
+            TokenKind::Eof => "Eof".to_string(),
             TokenKind::Newline => "Newline".to_string(),
 
             TokenKind::Identifier(val) => format!("Identifier ({})", val),
@@ -91,8 +93,8 @@ impl ToString for TokenKind {
             TokenKind::LeftBrace => "LeftBrace".to_string(),
             TokenKind::RightBrace => "RightBrace".to_string(),
 
-            TokenKind::Int32Literal(val) => format!("Int ({})", val),
-            TokenKind::Float32Literal(val) => format!("Float ({})", val),
+            TokenKind::Int32Literal(val) => format!("Int32 ({})", val),
+            TokenKind::Float32Literal(val) => format!("Float32 ({})", val),
             // TokenKind::StringLiteral(val) => format!("String ({})", val),
             TokenKind::Plus => "Plus".to_string(),
             TokenKind::Minus => "Minus".to_string(),

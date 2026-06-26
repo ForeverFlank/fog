@@ -1,0 +1,10 @@
+-- type definition
+
+MyType : Type
+MyType = Int32  -- simply a type alias of Int32
+
+x : MyType
+x = 42
+
+y : Int32
+y = x

@@ -5,12 +5,14 @@ pub struct Span {
     pub column: usize,
 }
 
+#[derive(Clone)]
 pub enum ErrorKind {
     Lex,
     Parse,
     Runtime,
 }
 
+#[derive(Clone)]
 pub struct FogError {
     pub kind: ErrorKind,
     pub message: String,

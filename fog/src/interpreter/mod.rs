@@ -1,13 +1,14 @@
 use crate::interpreter::interpreter::Interpreter;
-use crate::parser::nodes::Program;
+use crate::parser::resolved_expr::ResolvedStatement;
 
 pub mod environment;
-pub mod eval;
+pub mod eval_type;
+pub mod eval_value;
 pub mod interpreter;
 pub mod r#type;
 pub mod value;
 pub mod variable;
 
-pub fn interpret(program: Box<Program>) {
-    Interpreter::run(program);
+pub fn interpret(statements: Vec<ResolvedStatement>) {
+    Interpreter::run(statements);
 }

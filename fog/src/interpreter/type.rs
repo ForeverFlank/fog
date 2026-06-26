@@ -1,17 +1,20 @@
 use std::collections::HashSet;
+use std::hash::Hash;
+use std::hash::Hasher;
 
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval::eval_type_expr;
+use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
-use crate::parser::nodes::Expr;
+use crate::parser::resolved_expr::ResolvedExpr;
+use crate::util::format_joined;
 
 // --- type ---
 
-#[derive(Clone, Eq, Hash)]
+#[derive(Clone, Eq)]
 pub enum Type {
     Kind,
     Type,
@@ -24,8 +27,6 @@ pub enum Type {
     // ADTs
     Product(Vec<Type>),
     Sum(Vec<DataConstructor>),
-    // data constructor
-    // DataConstructor(DataConstructor),
 }
 
 impl Type {
@@ -51,13 +52,31 @@ impl PartialEq for Type {
             (Type::Product(types_1), Type::Product(types_2)) => types_1 == types_2,
 
             (Type::Sum(ctors_1), Type::Sum(ctors_2)) => {
-                let s1: HashSet<&DataConstructor> = ctors_1.iter().collect();
-                let s2: HashSet<&DataConstructor> = ctors_2.iter().collect();
-
+                let s1: HashSet<_> = ctors_1.iter().collect();
+                let s2: HashSet<_> = ctors_2.iter().collect();
                 s1 == s2
             }
 
             _ => false,
+        }
+    }
+}
+
+impl Hash for Type {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Type::Function(p, r) => {
+                p.hash(state);
+                r.hash(state);
+            }
+            Type::Product(types) => types.hash(state),
+            Type::Sum(ctors) => {
+                let mut sorted: Vec<_> = ctors.iter().collect();
+                sorted.sort_by(|a, b| a.tag.cmp(&b.tag));
+                sorted.hash(state);
+            }
+            _ => {}
         }
     }
 }
@@ -68,11 +87,7 @@ impl ToString for Type {
             Type::Kind => "Kind".to_string(),
             Type::Type => "Type".to_string(),
             Type::Function(param_type, return_type) => {
-                format!(
-                    "{} -> {}",
-                    (*param_type).to_string(),
-                    (*return_type).to_string()
-                )
+                format!("{} -> {}", param_type.to_string(), return_type.to_string())
             }
 
             Type::Int32 => "Int32".to_string(),
@@ -82,20 +97,11 @@ impl ToString for Type {
                 if types.is_empty() {
                     "Unit".to_string()
                 } else {
-                    types
-                        .iter()
-                        .fold(String::new(), |acc: String, r#type: &Type| {
-                            acc + " * " + &r#type.to_string()
-                        })
+                    format_joined(types, " * ")
                 }
             }
 
-            Type::Sum(ctors) => ctors
-                .iter()
-                .fold(String::new(), |acc: String, r#type: &DataConstructor| {
-                    acc + " + " + &r#type.to_string()
-                }),
-            // Type::DataConstructor()
+            Type::Sum(ctors) => format_joined(ctors, " + "),
         }
     }
 }
@@ -104,24 +110,29 @@ impl ToString for Type {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DataConstructor {
-    pub variant: String,
+    pub tag: String,
     pub types: Vec<Type>,
 }
 
-impl ToString for DataConstructor {
-    fn to_string(&self) -> String {
-        format!(
-            "{} {}",
-            self.variant,
-            self.types
-                .iter()
-                .map(|t| t.to_string())
-                .fold(String::new(), |acc, r#type| acc + " " + &r#type)
-        )
+impl std::fmt::Display for DataConstructor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.tag)?;
+
+        for r#type in &self.types {
+            write!(f, " {}", r#type.to_string())?;
+        }
+
+        Ok(())
     }
 }
 
 // --- functions ---
+
+pub fn nest_function_types(field_types: &[Type], return_type: Type) -> Type {
+    field_types.iter().rev().fold(return_type, |ret, ft| {
+        Type::Function(Box::new(ft.clone()), Box::new(ret))
+    })
+}
 
 pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult<Type> {
     match value {
@@ -144,28 +155,30 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
         Value::Tuple(values) => Ok(Type::Product(
             values
                 .iter()
-                .map(|value: &Value| Ok(value_type_of(value, env, span)?.into()))
+                .map(|value| value_type_of(value, env, span))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
+
+        Value::Constructor { r#type, .. } => Ok(r#type.clone()),
     }
 }
 
-pub fn expr_type_of(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Type> {
+pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
-        Expr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
+        ResolvedExpr::Identifier { name } => Ok(env.get_var(name, span)?.r#type),
 
-        Expr::Int32Literal(_) => Ok(Type::Int32),
-        Expr::Float32Literal(_) => Ok(Type::Float32),
+        ResolvedExpr::Int32Literal { .. } => Ok(Type::Int32),
+        ResolvedExpr::Float32Literal { .. } => Ok(Type::Float32),
 
-        Expr::Lambda {
+        ResolvedExpr::Lambda {
             param_type, body, ..
         } => Ok(Type::Function(
-            eval_type_expr(&param_type, env)?.into(),
-            expr_type_of(&body, env, span)?.into(),
+            eval_type_annotation_expr(param_type, env, span)?.into(),
+            expr_type_of(body, env, span)?.into(),
         )),
 
-        Expr::FuncAppl { fn_name, args } => {
-            let mut curr_type: Type = env.get_var(&fn_name)?.r#type.clone();
+        ResolvedExpr::FuncAppl { fn_name, args } => {
+            let mut curr_type = env.get_var(fn_name, span)?.r#type.clone();
 
             for _ in args {
                 curr_type = match curr_type {
@@ -182,18 +195,11 @@ pub fn expr_type_of(expr: &Expr, env: &Environment, span: &Span) -> FogResult<Ty
             Ok(curr_type)
         }
 
-        Expr::Tuple(exprs) => Ok(Product(
-            exprs
+        ResolvedExpr::Tuple { items } => Ok(Product(
+            items
                 .iter()
-                .map(|expr: &Expr| Ok(expr_type_of(expr, env, span)?.into()))
+                .map(|expr| expr_type_of(expr, env, span))
                 .collect::<Result<Vec<Type>, FogError>>()?,
-        )),
-
-        Expr::DataConstructor(name, args) => todo!(),
-
-        Expr::NameCollection(_) => Err(FogError::runtime(
-            "unresolved name collection".to_string(),
-            None,
         )),
     }
 }

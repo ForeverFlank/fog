@@ -1,0 +1,13 @@
+in : Int32 -> List Int32 -> Bool
+num in list =
+    match list {
+        Cons x xs =>
+            if num == x, true
+            else,        num in xs
+        Nil       => false
+    }
+
+list = [1, 2, 3, 4, 5]
+isThreeInList = 3 in list   -- True
+isSixInList   = 6 in list   -- False
+
