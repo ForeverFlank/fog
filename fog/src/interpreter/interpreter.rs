@@ -4,8 +4,8 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval::eval_expr;
 use crate::interpreter::eval::eval_type_expr;
+use crate::interpreter::eval::eval_value_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
@@ -152,7 +152,7 @@ fn declare(
     span: &Span,
 ) -> FogResult<()> {
     if env.variables.contains_key(name) {
-        (*env).declare_value(name, eval_expr(expr, env, span)?, span)?;
+        (*env).declare_value(name, eval_value_expr(expr, env, span)?, span)?;
         return Ok(());
     }
 

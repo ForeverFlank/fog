@@ -47,7 +47,7 @@ impl Environment {
         Ok(())
     }
 
-    pub fn declare_value(&mut self, name: &String, value: Value, span: &Span) -> FogResult<()> {
+    pub fn declare_value(&mut self, name: &str, value: Value, span: &Span) -> FogResult<()> {
         // discard
         if name == "_" {
             return Ok(());
@@ -95,7 +95,7 @@ impl Environment {
         Ok(())
     }
 
-    pub fn declare_type(&mut self, name: &String, r#type: Type, span: &Span) -> FogResult<()> {
+    pub fn declare_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
         if self.types.contains_key(name) {
             return Err(FogError::runtime(
                 format!("type `{}` already declared", name),
@@ -135,5 +135,17 @@ impl Environment {
             format!("type `{}` not found in the current scope", name),
             None,
         ))
+    }
+
+    pub fn contains_type(&self, name: &str) -> bool {
+        if self.types.contains_key(name) {
+            return true;
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.contains_type(name);
+        }
+
+        false
     }
 }

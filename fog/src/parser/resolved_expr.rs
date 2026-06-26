@@ -20,7 +20,6 @@ pub enum ResolvedExpr {
     Tuple(Vec<ResolvedExpr>),
 
     FuncAppl(String, Vec<ResolvedExpr>),
-    DataConstructor(String, Vec<ResolvedExpr>),
 }
 
 impl ResolvedExpr {
@@ -59,17 +58,6 @@ impl Display for ResolvedExpr {
 
             ResolvedExpr::FuncAppl(fn_name, args) => {
                 write!(f, "{fn_name}")?;
-
-                for arg in args {
-                    write!(f, " ")?;
-                    Self::fmt_parenthesized(f, arg)?;
-                }
-
-                Ok(())
-            }
-
-            ResolvedExpr::DataConstructor(name, args) => {
-                write!(f, "{name}")?;
 
                 for arg in args {
                     write!(f, " ")?;

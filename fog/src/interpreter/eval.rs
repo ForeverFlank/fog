@@ -10,7 +10,12 @@ use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 use crate::parser::resolved_expr::ResolvedExpr;
 
-pub fn eval_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
+pub enum EvalContext {
+    TypeAnnotation,
+    Declaration,
+}
+
+pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
         // variable
         ResolvedExpr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
@@ -32,37 +37,67 @@ pub fn eval_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResu
             captured_env: Box::new(env.clone()),
         }),
 
-        // function application
-        ResolvedExpr::FuncAppl(fn_name, args) => {
-            let mut result: Value =
-                eval_expr(&ResolvedExpr::Identifier(fn_name.clone()), env, span)?;
-            for arg in args {
-                let argument: Value = eval_expr(arg, env, span)?;
-                result = apply_function(result, argument, span)?;
-            }
-            Ok(result)
-        }
-
         // tuple
         ResolvedExpr::Tuple(exprs) => Ok(Value::Tuple(
             exprs
                 .iter()
-                .map(|expr| Ok(eval_expr(expr, env, span)?.into()))
+                .map(|expr| Ok(eval_value_expr(expr, env, span)?.into()))
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        // etc.
-        ResolvedExpr::DataConstructor(_, _) => Err(FogError::runtime(
-            "cannot evaluate data constructor as value".to_string(),
+        // function application
+        ResolvedExpr::FuncAppl(fn_name, args) => {
+            let mut result: Value =
+                eval_value_expr(&ResolvedExpr::Identifier(fn_name.clone()), env, span)?;
+
+            for arg in args {
+                let argument: Value = eval_value_expr(arg, env, span)?;
+                result = apply_value_function(result, argument, span)?;
+            }
+
+            Ok(result)
+        }
+    }
+}
+
+fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
+    match function {
+        Value::Function {
+            param_name,
+            param_type,
+            body,
+            captured_env,
+        } => {
+            let mut child_env: Environment = Environment::new(Some(captured_env));
+
+            child_env.variables.insert(
+                param_name.clone(),
+                Variable {
+                    name: param_name.clone(),
+                    value: Some(argument),
+                    r#type: param_type,
+                },
+            );
+
+            eval_value_expr(&body, &child_env, span)
+        }
+
+        Value::NativeFunction { function, .. } => function(argument),
+
+        _ => Err(FogError::runtime(
+            "cannot apply a non-function value".to_string(),
             Some(span.clone()),
         )),
     }
 }
 
+// --- type expressions ---
+
 pub fn eval_type_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
     match expr {
         ResolvedExpr::Identifier(name) => Ok(env.get_type(name)?),
 
+        // function type
         ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "->" && args.len() == 2 => {
             let left: Type = eval_type_expr(&args[0], env)?;
             let right: Type = eval_type_expr(&args[1], env)?;
@@ -70,6 +105,7 @@ pub fn eval_type_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type>
             Ok(Type::Function(Box::new(left), Box::new(right)))
         }
 
+        // product type, a.k.a. tuple
         ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "*" && args.len() == 2 => {
             let left: Type = eval_type_expr(&args[0], env)?;
             let right: Type = eval_type_expr(&args[1], env)?;
@@ -89,6 +125,7 @@ pub fn eval_type_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type>
             Ok(Type::Product(types))
         }
 
+        // sum type
         ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "+" && args.len() == 2 => {
             let left: Type = eval_type_expr(&args[0], env)?;
             let right: Type = eval_type_expr(&args[1], env)?;
@@ -117,52 +154,15 @@ pub fn eval_type_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type>
             Ok(Type::Sum(concatenated))
         }
 
-        ResolvedExpr::FuncAppl(fn_name, args) => {
-            let fn_type: Type = eval_type_expr(&ResolvedExpr::Identifier(fn_name.clone()), env)?;
-            let mut current_type: Type = fn_type;
-
-            for arg in args {
-                let Type::Function(param_type, return_type) = current_type else {
-                    return Err(FogError::runtime(
-                        format!(
-                            "`{}` is not a valid type constructor",
-                            current_type.to_string()
-                        ),
-                        None,
-                    ));
-                };
-
-                let arg_type: Type = eval_type_expr(&arg, env)?;
-
-                if arg_type != *param_type {
-                    return Err(FogError::runtime(
-                        format!(
-                            "type mismatch applying `{}`\n\
-                             expected `{}`, found `{}`",
-                            fn_name,
-                            param_type.to_string(),
-                            arg_type.to_string()
-                        ),
-                        None,
-                    ));
-                }
-
-                current_type = *return_type
+        // either a function application or a data constructor
+        ResolvedExpr::FuncAppl(name, args) => {
+            if env.contains_type(name) {
+                // the function name is declared, it's a type constructor
+                apply_type_constructor(name, args, env)
+            } else {
+                // otherwise, it's a data constructor
+                declare_data_constructor(name, args, env)
             }
-
-            Ok(current_type)
-        }
-
-        ResolvedExpr::DataConstructor(name, args) => {
-            let ctor: DataConstructor = DataConstructor {
-                variant: name.clone(),
-                types: args
-                    .iter()
-                    .map(|arg: &ResolvedExpr| Ok(eval_type_expr(arg, env)?.into()))
-                    .collect::<Result<Vec<Type>, FogError>>()?,
-            };
-
-            Ok(Type::Sum(vec![ctor]))
         }
 
         _ => Err(FogError::runtime(
@@ -172,33 +172,56 @@ pub fn eval_type_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type>
     }
 }
 
-fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
-    match function {
-        Value::Function {
-            param_name,
-            param_type,
-            body,
-            captured_env,
-        } => {
-            let mut child_env: Environment = Environment::new(Some(captured_env));
+fn apply_type_constructor(
+    fn_name: &str,
+    args: &Vec<ResolvedExpr>,
+    env: &Environment,
+) -> FogResult<Type> {
+    let mut current: Type = env.get_type(fn_name)?;
 
-            child_env.variables.insert(
-                param_name.clone(),
-                Variable {
-                    name: param_name.clone(),
-                    value: Some(argument),
-                    r#type: param_type,
-                },
-            );
+    for arg in args {
+        let Type::Function(param_type, return_type) = current else {
+            return Err(FogError::runtime(
+                format!("`{}` is not a valid type constructor", current.to_string()),
+                None,
+            ));
+        };
 
-            eval_expr(&body, &child_env, span)
+        let arg_type: Type = eval_type_expr(arg, env)?;
+
+        if arg_type != *param_type {
+            return Err(FogError::runtime(
+                format!(
+                    "type mismatch applying `{}`\n\
+                     expected `{}`, found `{}`",
+                    fn_name,
+                    param_type.to_string(),
+                    arg_type.to_string()
+                ),
+                None,
+            ));
         }
 
-        Value::NativeFunction { function, .. } => function(argument),
-
-        _ => Err(FogError::runtime(
-            "cannot apply a non-function value".to_string(),
-            Some(span.clone()),
-        )),
+        current = *return_type;
     }
+
+    Ok(current)
+}
+
+fn declare_data_constructor(
+    ctor_name: &str,
+    args: &Vec<ResolvedExpr>,
+    env: &Environment,
+) -> FogResult<Type> {
+    let ctor: DataConstructor = DataConstructor {
+        tag: ctor_name.to_string(),
+        types: args
+            .iter()
+            .map(|arg: &ResolvedExpr| Ok(eval_type_expr(arg, env)?.into()))
+            .collect::<Result<Vec<Type>, FogError>>()?,
+    };
+
+    env.declare_value(&ctor_name.to_string(), ..., ...)?;
+
+    Ok(Type::Sum(vec![ctor]))
 }

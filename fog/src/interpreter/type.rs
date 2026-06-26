@@ -104,7 +104,7 @@ impl ToString for Type {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DataConstructor {
-    pub variant: String,
+    pub tag: String,
     pub types: Vec<Type>,
 }
 
@@ -112,7 +112,7 @@ impl ToString for DataConstructor {
     fn to_string(&self) -> String {
         format!(
             "{} {}",
-            self.variant,
+            self.tag,
             self.types
                 .iter()
                 .map(|t| t.to_string())
@@ -186,7 +186,5 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                 .map(|expr: &ResolvedExpr| Ok(expr_type_of(expr, env, span)?.into()))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
-
-        ResolvedExpr::DataConstructor(name, args) => todo!(),
     }
 }

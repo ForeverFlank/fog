@@ -9,6 +9,7 @@ use crate::parser::resolved_expr::ResolvedExpr;
 pub enum Value {
     Int32(i32),
     Float32(f32),
+
     Function {
         param_name: String,
         param_type: Type,
@@ -20,7 +21,14 @@ pub enum Value {
         return_type: Type,
         function: Rc<dyn Fn(Value) -> FogResult<Value>>,
     },
+
     Tuple(Vec<Value>),
+
+    Constructor {
+        tag: String,
+        values: Vec<Value>,
+        r#type: Type,
+    },
 }
 
 impl ToString for Value {
@@ -46,6 +54,12 @@ impl ToString for Value {
 
                 format!("({})", contents)
             }
+
+            Value::Constructor {
+                tag,
+                values,
+                r#type,
+            } => todo!(),
         }
     }
 }

@@ -193,15 +193,6 @@ fn emit_ast_puml_expr(
             lambda_id
         }
 
-        parser::resolved_expr::ResolvedExpr::FuncAppl(fn_name, args) => {
-            let appl_id: i32 = new_node(out, id, &format!("{}", fn_name), COLOR_FUNC_APPL);
-            for arg in args {
-                let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
-                edge(out, appl_id, arg_id);
-            }
-            appl_id
-        }
-
         parser::resolved_expr::ResolvedExpr::Tuple(exprs) => {
             let tuple_id: i32 = new_node(out, id, "tuple", COLOR_IDENTIFIER);
             for expr in exprs {
@@ -211,13 +202,13 @@ fn emit_ast_puml_expr(
             tuple_id
         }
 
-        parser::resolved_expr::ResolvedExpr::DataConstructor(name, args) => {
-            let name_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
+        parser::resolved_expr::ResolvedExpr::FuncAppl(fn_name, args) => {
+            let appl_id: i32 = new_node(out, id, &format!("{}", fn_name), COLOR_FUNC_APPL);
             for arg in args {
                 let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
-                edge(out, name_id, arg_id);
+                edge(out, appl_id, arg_id);
             }
-            name_id
+            appl_id
         }
     }
 }
