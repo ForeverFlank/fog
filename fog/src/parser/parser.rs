@@ -34,7 +34,6 @@ fn is_primary_starter(token: &Token) -> bool {
 
 fn token_span(token: &Token) -> Span {
     Span {
-        pos: token.pos,
         line: token.line,
         column: token.column,
     }

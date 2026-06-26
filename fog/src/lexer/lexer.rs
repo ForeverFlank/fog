@@ -149,7 +149,6 @@ impl Lexer {
                     return Some(Err(FogError::lex(
                         "Malformed number".to_string(),
                         Some(Span {
-                            pos,
                             line: start_line,
                             column: start_column,
                         }),
@@ -165,7 +164,6 @@ impl Lexer {
                     return Some(Err(FogError::lex(
                         "Float parse error".to_string(),
                         Some(Span {
-                            pos,
                             line: start_line,
                             column: start_column,
                         }),
@@ -179,7 +177,6 @@ impl Lexer {
                     return Some(Err(FogError::lex(
                         "Integer parse error".to_string(),
                         Some(Span {
-                            pos,
                             line: start_line,
                             column: start_column,
                         }),
