@@ -116,8 +116,8 @@ impl Environment {
             return Ok(());
         }
 
-        let type_of_var: Type = {
-            let var: &mut Variable = self.get_mut_var(name)?;
+        let type_of_var = {
+            let var = self.get_mut_var(name)?;
 
             if var.value.is_some() {
                 return Err(FogError::runtime(
@@ -129,7 +129,7 @@ impl Environment {
             var.r#type.clone()
         };
 
-        let type_of_value: Type = value_type_of(&value, self, span)?;
+        let type_of_value = value_type_of(&value, self, span)?;
 
         if type_of_value != type_of_var {
             return Err(FogError::runtime(
@@ -144,7 +144,7 @@ impl Environment {
             ));
         }
 
-        let var: &mut Variable = self
+        let var = self
             .variables
             .get_mut(name)
             .unwrap_or_else(|| unreachable!());
@@ -164,7 +164,7 @@ impl Environment {
 
         self.types.insert(name.to_string(), r#type.clone());
 
-        if let Type::Sum(_) = r#type {
+        if let Type::Sum(..) = r#type {
             self.register_data_constructors(&r#type, span)?;
         }
 
@@ -187,9 +187,9 @@ impl Environment {
         };
 
         for ctor in ctors {
-            let ctor_type: Type = nest_function_types(&ctor.types, parent_sum_type.clone());
+            let ctor_type = nest_function_types(&ctor.types, parent_sum_type.clone());
 
-            let ctor_value: Value = make_data_constructor_function(
+            let ctor_value = make_data_constructor_function(
                 ctor.tag.clone(),
                 ctor.types.clone(),
                 parent_sum_type.clone(),

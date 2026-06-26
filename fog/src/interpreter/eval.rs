@@ -47,7 +47,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
 
         // function application
         ResolvedExpr::FuncAppl { fn_name, args } => {
-            let mut result: Value = eval_value_expr(
+            let mut result = eval_value_expr(
                 &ResolvedExpr::Identifier {
                     name: fn_name.clone(),
                 },
@@ -56,7 +56,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
             )?;
 
             for arg in args {
-                let argument: Value = eval_value_expr(arg, env, span)?;
+                let argument = eval_value_expr(arg, env, span)?;
                 result = apply_value_function(result, argument, span)?;
             }
 
@@ -73,7 +73,7 @@ fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogRes
             body,
             captured_env,
         } => {
-            let mut child_env: Environment = Environment::new(Some(captured_env));
+            let mut child_env = Environment::new(Some(captured_env));
 
             child_env.variables.insert(
                 param_name.clone(),
@@ -104,18 +104,18 @@ pub fn eval_type_annotation_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
 
         // function type
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
-            let left: Type = eval_type_annotation_expr(&args[0], env)?;
-            let right: Type = eval_type_annotation_expr(&args[1], env)?;
+            let left = eval_type_annotation_expr(&args[0], env)?;
+            let right = eval_type_annotation_expr(&args[1], env)?;
 
             Ok(Type::Function(Box::new(left), Box::new(right)))
         }
 
         // product type, a.k.a. tuple
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "*" && args.len() == 2 => {
-            let left: Type = eval_type_annotation_expr(&args[0], env)?;
-            let right: Type = eval_type_annotation_expr(&args[1], env)?;
+            let left = eval_type_annotation_expr(&args[0], env)?;
+            let right = eval_type_annotation_expr(&args[1], env)?;
 
-            let mut types: Vec<Type> = Vec::new();
+            let mut types = Vec::new();
 
             match left {
                 Type::Product(ts) => types.extend(ts),
@@ -176,8 +176,8 @@ pub fn eval_type_definition_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
         }
 
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "+" && args.len() == 2 => {
-            let left: Type = eval_type_definition_expr(&args[0], env)?;
-            let right: Type = eval_type_definition_expr(&args[1], env)?;
+            let left = eval_type_definition_expr(&args[0], env)?;
+            let right = eval_type_definition_expr(&args[1], env)?;
 
             let Type::Sum(ctors1) = left else {
                 return Err(FogError::runtime(
@@ -211,7 +211,7 @@ fn apply_type_level_function(
     args: &Vec<ResolvedExpr>,
     env: &Environment,
 ) -> FogResult<Type> {
-    let mut current: Type = env.get_type(fn_name)?;
+    let mut current = env.get_type(fn_name)?;
 
     for arg in args {
         let Type::Function(param_type, return_type) = current else {
@@ -221,7 +221,7 @@ fn apply_type_level_function(
             ));
         };
 
-        let arg_type: Type = eval_type_annotation_expr(arg, env)?;
+        let arg_type = eval_type_annotation_expr(arg, env)?;
 
         if arg_type != *param_type {
             return Err(FogError::runtime(
@@ -258,9 +258,9 @@ pub fn make_data_constructor_function(
         };
     };
 
-    let next_field: Type = next_field.clone();
-    let rest: Vec<Type> = rest.to_vec();
-    let parent_type: Type = parent_type.clone();
+    let next_field = next_field.clone();
+    let rest = rest.to_vec();
+    let parent_type = parent_type.clone();
 
     let return_type = nest_function_types(&rest, parent_type.clone());
 

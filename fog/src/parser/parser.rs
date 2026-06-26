@@ -53,9 +53,9 @@ impl Parser<'_> {
     }
 
     pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
-        let mut parser: Parser = Parser::new(&tokens);
-        let mut statements: Vec<ParsedStatement> = Vec::new();
-        let mut errors: Vec<FogError> = Vec::new();
+        let mut parser = Parser::new(&tokens);
+        let mut statements = Vec::new();
+        let mut errors = Vec::new();
 
         while parser.pos < parser.tokens.len() {
             if let Some(result) = parser.parse_statement() {
@@ -71,7 +71,7 @@ impl Parser<'_> {
     }
 
     fn parse_statement(&mut self) -> Option<FogResult<ParsedStatement>> {
-        let name: String = match &self.peek().kind {
+        let name = match &self.peek().kind {
             TokenKind::Identifier(name) => name.clone(),
             _ => return None,
         };
@@ -85,13 +85,13 @@ impl Parser<'_> {
                 self.next();
 
                 self.parse_expression()
-                    .map(|expr: ParsedExpr| ParsedStatement::TypeAnnotation { name, expr, span })
+                    .map(|expr| ParsedStatement::TypeAnnotation { name, expr, span })
             }
             TokenKind::Equal => {
                 self.next();
 
                 self.parse_expression()
-                    .map(|expr: ParsedExpr| ParsedStatement::Declaration { name, expr, span })
+                    .map(|expr| ParsedStatement::Declaration { name, expr, span })
             }
             _ => Err(FogError::parse(
                 "expected `:` or `=`".to_string(),
@@ -103,13 +103,13 @@ impl Parser<'_> {
     }
 
     fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
-        let mut items: Vec<ParsedExpr> = Vec::new();
+        let mut items = Vec::new();
 
         loop {
-            let atom: ParsedExpr = self.parse_atomic()?;
+            let atom = self.parse_atomic()?;
             items.push(atom);
 
-            let token: &Token = self.peek();
+            let token = self.peek();
 
             if let Some(kind) = get_op_kind(token) {
                 items.push(ParsedExpr::Op { kind });
@@ -129,7 +129,7 @@ impl Parser<'_> {
     }
 
     fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
-        let token: Token = self.peek().clone();
+        let token = self.peek().clone();
         self.next();
 
         match token.kind {
@@ -141,7 +141,7 @@ impl Parser<'_> {
                 if let TokenKind::Colon = self.peek().kind {
                     self.next();
 
-                    let param_type: ParsedExpr = self.parse_expression()?;
+                    let param_type = self.parse_expression()?;
 
                     let TokenKind::FatArrow = self.peek().kind else {
                         return Err(FogError::parse(
@@ -151,7 +151,7 @@ impl Parser<'_> {
                     };
                     self.next();
 
-                    let body: ParsedExpr = self.parse_expression()?;
+                    let body = self.parse_expression()?;
 
                     return Ok(ParsedExpr::Lambda {
                         param_name: name,
@@ -169,7 +169,7 @@ impl Parser<'_> {
                     return Ok(ParsedExpr::Tuple { exprs: Vec::new() });
                 }
 
-                let res: FogResult<ParsedExpr> = self.parse_expression();
+                let res = self.parse_expression();
 
                 match self.peek().kind {
                     TokenKind::RightParenthesis => {

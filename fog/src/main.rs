@@ -20,13 +20,13 @@ mod util;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- arguments and paths ---
     let args: Vec<String> = env::args().collect();
-    let path: &String = args.get(1).expect("usage: ./fog <path>");
+    let path = args.get(1).expect("usage: ./fog <path>");
 
-    let arg_print_tokens: bool = args.contains(&"--print-tokens".to_string());
-    let arg_emit_ast: bool = args.contains(&"--emit-ast".to_string());
+    let arg_print_tokens = args.contains(&"--print-tokens".to_string());
+    let arg_emit_ast = args.contains(&"--emit-ast".to_string());
 
     // --- read file ---
-    let src: &str = &fs::read_to_string(path)?;
+    let src = &fs::read_to_string(path)?;
 
     // --- compilation ---
     // -- lexing
@@ -42,8 +42,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (ast, parser_errors) = parse_program(&tokens);
 
     if arg_emit_ast {
-        let puml: String = emit_ast_puml(&ast, path);
-        let output_path: path::PathBuf = path::Path::new(path).with_extension("puml");
+        let puml = emit_ast_puml(&ast, path);
+        let output_path = path::Path::new(path).with_extension("puml");
         let _ = fs::write(output_path, puml);
     }
 
@@ -84,17 +84,17 @@ fn print_errors(label: &str, errors: &[FogError]) {
 // --- AST ---
 
 fn emit_ast_puml(statements: &Vec<parser::resolved_expr::ResolvedStatement>, path: &str) -> String {
-    let mut out: String = String::new();
-    let mut id: i32 = 0;
+    let mut out = String::new();
+    let mut id = 0i32;
     out.push_str(&format!("@startuml AST of {}\n", path));
     out.push_str(&format!("title AST of {}\n", path));
     out.push_str("skinparam nodesep 30\n");
     out.push_str("skinparam ranksep 20\n");
 
-    let prog_id: i32 = new_node(&mut out, &mut id, "Program", "#e5e5e5");
+    let prog_id = new_node(&mut out, &mut id, "Program", "#e5e5e5");
 
     for stmt in statements {
-        let stmt_id: i32 = emit_ast_puml_statement(&mut out, &mut id, &stmt);
+        let stmt_id = emit_ast_puml_statement(&mut out, &mut id, &stmt);
         edge(&mut out, prog_id, stmt_id);
     }
 
@@ -111,7 +111,7 @@ const COLOR_FUNC_APPL: &str = "#8ecfff";
 const COLOR_TUPLE: &str = "#ffcc88";
 
 fn new_node(out: &mut String, id: &mut i32, label: &str, color: &str) -> i32 {
-    let this_id: i32 = *id;
+    let this_id = *id;
     out.push_str(&format!(
         "rectangle \"{}\" as n{} {}\n",
         label, this_id, color
@@ -146,9 +146,9 @@ fn emit_ast_puml_named_stmt(
     name: &str,
     expr: &ResolvedExpr,
 ) -> i32 {
-    let node_id: i32 = new_node(out, id, label, COLOR_STATEMENT);
-    let ident_id: i32 = new_node(out, id, name, COLOR_IDENTIFIER);
-    let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
+    let node_id = new_node(out, id, label, COLOR_STATEMENT);
+    let ident_id = new_node(out, id, name, COLOR_IDENTIFIER);
+    let expr_id = emit_ast_puml_expr(out, id, expr);
 
     edge(out, node_id, ident_id);
     edge(out, node_id, expr_id);
@@ -178,10 +178,10 @@ fn emit_ast_puml_expr(
             param_type,
             body,
         } => {
-            let lambda_id: i32 = new_node(out, id, "Lambda", COLOR_LAMBDA);
-            let param_id: i32 =
+            let lambda_id = new_node(out, id, "Lambda", COLOR_LAMBDA);
+            let param_id =
                 emit_ast_puml_named_stmt(out, id, "TypeAnnotation", param_name, param_type);
-            let body_id: i32 = emit_ast_puml_expr(out, id, body);
+            let body_id = emit_ast_puml_expr(out, id, body);
 
             edge(out, lambda_id, param_id);
             edge(out, lambda_id, body_id);
@@ -189,19 +189,19 @@ fn emit_ast_puml_expr(
         }
 
         parser::resolved_expr::ResolvedExpr::Tuple { exprs } => {
-            let tuple_id: i32 = new_node(out, id, "Tuple", COLOR_TUPLE);
+            let tuple_id = new_node(out, id, "Tuple", COLOR_TUPLE);
             for expr in exprs {
-                let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
+                let expr_id = emit_ast_puml_expr(out, id, expr);
                 edge(out, tuple_id, expr_id);
             }
             tuple_id
         }
 
         parser::resolved_expr::ResolvedExpr::FuncAppl { fn_name, args } => {
-            let appl_id: i32 =
+            let appl_id =
                 new_node(out, id, &format!("FuncAppl ({})", fn_name), COLOR_FUNC_APPL);
             for arg in args {
-                let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
+                let arg_id = emit_ast_puml_expr(out, id, arg);
                 edge(out, appl_id, arg_id);
             }
             appl_id

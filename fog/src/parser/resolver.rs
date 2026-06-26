@@ -109,8 +109,8 @@ impl Resolver {
     pub fn resolve(
         parsed_statements: Vec<ParsedStatement>,
     ) -> (Vec<ResolvedStatement>, Vec<FogError>) {
-        let mut resolved_statements: Vec<ResolvedStatement> = Vec::new();
-        let mut errors: Vec<FogError> = Vec::new();
+        let mut resolved_statements = Vec::new();
+        let mut errors = Vec::new();
 
         for parsed_stmt in parsed_statements {
             match Self::resolve_statement(parsed_stmt) {
@@ -179,7 +179,7 @@ impl Resolver {
             ParsedExpr::Tuple { exprs } => Self::resolve_tuple(exprs),
 
             ParsedExpr::Collection { exprs } => {
-                let mut resolver: Resolver = Resolver::new();
+                let mut resolver = Resolver::new();
                 resolver.resolve_collection(&exprs, i32::MIN)
             }
         }
@@ -190,14 +190,14 @@ impl Resolver {
         exprs: &Vec<ParsedExpr>,
         min_prec: i32,
     ) -> FogResult<ResolvedExpr> {
-        let mut lhs: ResolvedExpr = self.resolve_primary(exprs)?;
+        let mut lhs = self.resolve_primary(exprs)?;
 
         loop {
             if self.index >= exprs.len() {
                 break;
             }
 
-            let op: &InfixFuncionInfo = match self.get_binary_op(&exprs[self.index]) {
+            let op = match self.get_binary_op(&exprs[self.index]) {
                 Some(op) => op,
                 None => break,
             };
@@ -206,18 +206,18 @@ impl Resolver {
                 break;
             }
 
-            let op_name: String = op.name.clone();
-            let op_prec: i32 = op.precedence;
-            let op_assoc: Associativity = op.associativity.clone();
+            let op_name = op.name.clone();
+            let op_prec = op.precedence;
+            let op_assoc = op.associativity.clone();
 
             self.index += 1;
 
-            let next_min_prec: i32 = match op_assoc {
+            let next_min_prec = match op_assoc {
                 Associativity::Left => op_prec + 1,
                 Associativity::Right => op_prec,
             };
 
-            let rhs: ResolvedExpr = self.resolve_collection(exprs, next_min_prec)?;
+            let rhs = self.resolve_collection(exprs, next_min_prec)?;
 
             lhs = ResolvedExpr::FuncAppl {
                 fn_name: op_name,
@@ -229,14 +229,14 @@ impl Resolver {
     }
 
     fn resolve_primary(&mut self, exprs: &[ParsedExpr]) -> FogResult<ResolvedExpr> {
-        let head: ResolvedExpr = self.resolve_atomic(exprs)?;
+        let head = self.resolve_atomic(exprs)?;
 
-        let name: String = match &head {
+        let name = match &head {
             ResolvedExpr::Identifier { name } => name.clone(),
             _ => return Ok(head),
         };
 
-        let mut args: Vec<ResolvedExpr> = Vec::new();
+        let mut args = Vec::new();
 
         while self.index < exprs.len() && is_primary_starter(&exprs[self.index]) {
             args.push(self.resolve_atomic(exprs)?);
@@ -253,7 +253,7 @@ impl Resolver {
     }
 
     fn resolve_atomic(&mut self, exprs: &[ParsedExpr]) -> FogResult<ResolvedExpr> {
-        let expr: ParsedExpr = exprs[self.index].clone();
+        let expr = exprs[self.index].clone();
         self.index += 1;
 
         match expr {
@@ -265,7 +265,7 @@ impl Resolver {
             ParsedExpr::Op {
                 kind: OpKind::Minus,
             } => {
-                let operand: ResolvedExpr = self.resolve_atomic(exprs)?;
+                let operand = self.resolve_atomic(exprs)?;
                 Ok(ResolvedExpr::FuncAppl {
                     fn_name: "-".to_string(),
                     args: vec![operand],
@@ -281,9 +281,9 @@ impl Resolver {
             ParsedExpr::Tuple { exprs } => Self::resolve_tuple(exprs),
 
             ParsedExpr::Collection { exprs: inner } => {
-                let saved_index: usize = self.index;
+                let saved_index = self.index;
                 self.index = 0;
-                let result: ResolvedExpr = self.resolve_collection(&inner, i32::MIN)?;
+                let result = self.resolve_collection(&inner, i32::MIN)?;
                 self.index = saved_index;
                 Ok(result)
             }

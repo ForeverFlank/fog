@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 
 use crate::error::FogError;
 use crate::error::FogResult;
@@ -12,7 +13,7 @@ use crate::util::format_joined;
 
 // --- type ---
 
-#[derive(Clone, Eq, Hash)]
+#[derive(Clone, Eq)]
 pub enum Type {
     Kind,
     Type,
@@ -25,8 +26,6 @@ pub enum Type {
     // ADTs
     Product(Vec<Type>),
     Sum(Vec<DataConstructor>),
-    // data constructor
-    // DataConstructor(DataConstructor),
 }
 
 impl Type {
@@ -52,13 +51,31 @@ impl PartialEq for Type {
             (Type::Product(types_1), Type::Product(types_2)) => types_1 == types_2,
 
             (Type::Sum(ctors_1), Type::Sum(ctors_2)) => {
-                let s1: HashSet<&DataConstructor> = ctors_1.iter().collect();
-                let s2: HashSet<&DataConstructor> = ctors_2.iter().collect();
-
+                let s1: HashSet<_> = ctors_1.iter().collect();
+                let s2: HashSet<_> = ctors_2.iter().collect();
                 s1 == s2
             }
 
             _ => false,
+        }
+    }
+}
+
+impl Hash for Type {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Type::Function(p, r) => {
+                p.hash(state);
+                r.hash(state);
+            }
+            Type::Product(types) => types.hash(state),
+            Type::Sum(ctors) => {
+                let mut sorted: Vec<_> = ctors.iter().collect();
+                sorted.sort_by(|a, b| a.tag.cmp(&b.tag));
+                sorted.hash(state);
+            }
+            _ => {}
         }
     }
 }
@@ -160,7 +177,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
         )),
 
         ResolvedExpr::FuncAppl { fn_name, args } => {
-            let mut curr_type: Type = env.get_var(fn_name)?.r#type.clone();
+            let mut curr_type = env.get_var(fn_name)?.r#type.clone();
 
             for _ in args {
                 curr_type = match curr_type {

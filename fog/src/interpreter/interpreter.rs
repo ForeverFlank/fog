@@ -22,27 +22,27 @@ pub struct Interpreter {
 
 impl Interpreter {
     fn new(statements: Vec<ResolvedStatement>) -> Interpreter {
-        let mut interpreter: Interpreter = Interpreter {
+        let mut interpreter = Interpreter {
             statements,
             top_env: Environment::new(None),
         };
 
         // the Type itself
-        let t_type: Type = Type::Type;
+        let t_type = Type::Type;
 
         // primitive types
-        let t_int32: Type = Type::Int32;
-        let t_float32: Type = Type::Float32;
-        let t_unit: Type = Type::Product(Vec::new());
+        let t_int32 = Type::Int32;
+        let t_float32 = Type::Float32;
+        let t_unit = Type::Product(Vec::new());
 
         // function type
-        let t_function: Type = Type::Function(
+        let t_function = Type::Function(
             Box::new(Type::Type),
             Box::new(Type::Function(Box::new(Type::Type), Box::new(Type::Type))),
         );
 
         // builtin functions
-        let var_plus_int32_int32: Variable = Variable {
+        let var_plus_int32_int32 = Variable {
             name: "_builtin_plus_Int32_Int32".to_string(),
             value: Some(Value::NativeFunction {
                 param_type: Type::Int32,
@@ -71,37 +71,33 @@ impl Interpreter {
         // insert into top level environment
         vec![t_type, t_int32, t_float32, t_unit, t_function]
             .iter()
-            .for_each(|r#type: &Type| {
+            .for_each(|r#type| {
                 interpreter
                     .top_env
                     .types
                     .insert(r#type.to_string(), r#type.clone());
             });
 
-        vec![var_plus_int32_int32]
-            .iter()
-            .for_each(|var: &Variable| {
-                interpreter
-                    .top_env
-                    .variables
-                    .insert(var.name.clone(), var.clone());
-            });
+        vec![var_plus_int32_int32].iter().for_each(|var| {
+            interpreter
+                .top_env
+                .variables
+                .insert(var.name.clone(), var.clone());
+        });
 
         interpreter
     }
 
     pub fn run(statements: Vec<ResolvedStatement>) {
-        let mut interpreter: Interpreter = Interpreter::new(statements);
-        let mut errors: Vec<FogError> = Vec::new();
+        let mut interpreter = Interpreter::new(statements);
+        let mut errors = Vec::new();
 
-        let top_env: &mut Environment = &mut interpreter.top_env;
+        let top_env = &mut interpreter.top_env;
 
         for stmt in &interpreter.statements {
             let result: Result<(), FogError> = match stmt {
-                TypeAnnotation { name, expr, span } => {
-                    eval_type_annotation_expr(expr, top_env)
-                        .and_then(|r#type| top_env.annotate_type(name, r#type, span))
-                }
+                TypeAnnotation { name, expr, span } => eval_type_annotation_expr(expr, top_env)
+                    .and_then(|r#type| top_env.annotate_type(name, r#type, span)),
                 Declaration { name, expr, span } => Self::declare(name, expr, top_env, span),
             };
 
@@ -111,7 +107,7 @@ impl Interpreter {
         }
 
         let mut all_vars: Vec<Variable> = interpreter.top_env.variables.values().cloned().collect();
-        all_vars.sort_by(|a: &Variable, b: &Variable| a.name.cmp(&b.name));
+        all_vars.sort_by(|a, b| a.name.cmp(&b.name));
 
         println!();
         for var in all_vars {
@@ -147,7 +143,7 @@ impl Interpreter {
         if env.variables.contains_key(name) {
             if let Type::Type = env.variables[name].r#type {
                 env.variables.remove(name);
-                let r#type: Type = eval_type_definition_expr(expr, env)?;
+                let r#type = eval_type_definition_expr(expr, env)?;
                 env.declare_type(name, r#type.clone(), span)?;
                 return Ok(());
             }
@@ -157,7 +153,7 @@ impl Interpreter {
         }
 
         if env.types.contains_key(name) {
-            let r#type: Type = eval_type_definition_expr(expr, env)?;
+            let r#type = eval_type_definition_expr(expr, env)?;
             env.declare_type(name, r#type.clone(), span)?;
             return Ok(());
         }
