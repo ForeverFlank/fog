@@ -34,9 +34,10 @@ pub struct InfixFuncionInfo {
 
 fn is_primary_starter(parsed_expr: &ParsedExpr) -> bool {
     match parsed_expr {
-        ParsedExpr::Identifier(_) | ParsedExpr::Int32Literal(_) | ParsedExpr::Float32Literal(_) => {
-            true
-        }
+        ParsedExpr::Identifier(_)
+        | ParsedExpr::Int32Literal(_)
+        | ParsedExpr::Float32Literal(_)
+        | ParsedExpr::Tuple(_) => true,
 
         ParsedExpr::Op(kind) => match kind {
             OpKind::Minus => true,

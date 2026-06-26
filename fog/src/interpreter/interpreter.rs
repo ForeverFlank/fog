@@ -9,20 +9,20 @@ use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
-use crate::parser::program::Program;
-use crate::parser::program::Statement::Declaration;
-use crate::parser::program::Statement::TypeAnnotation;
 use crate::parser::resolved_expr::ResolvedExpr;
+use crate::parser::resolved_expr::ResolvedStatement;
+use crate::parser::resolved_expr::ResolvedStatement::Declaration;
+use crate::parser::resolved_expr::ResolvedStatement::TypeAnnotation;
 
 pub struct Interpreter {
-    pub program: Box<Program>,
+    pub statements: Vec<ResolvedStatement>,
     pub top_env: Environment,
 }
 
 impl Interpreter {
-    fn new(program: Box<Program>) -> Interpreter {
+    fn new(statements: Vec<ResolvedStatement>) -> Interpreter {
         let mut interpreter: Interpreter = Interpreter {
-            program,
+            statements,
             top_env: Environment::new(None),
         };
 
@@ -89,13 +89,13 @@ impl Interpreter {
         interpreter
     }
 
-    pub fn run(program: Box<Program>) {
-        let mut interpreter: Interpreter = Interpreter::new(program);
+    pub fn run(statements: Vec<ResolvedStatement>) {
+        let mut interpreter: Interpreter = Interpreter::new(statements);
         let mut errors: Vec<FogError> = Vec::new();
 
         let top_env: &mut Environment = &mut interpreter.top_env;
 
-        for stmt in &interpreter.program.statements {
+        for stmt in &interpreter.statements {
             let result: Result<(), FogError> = match stmt {
                 TypeAnnotation(name, expr, span) => annotate_type(name, expr, top_env, span),
                 Declaration(name, expr, span) => declare(name, expr, top_env, span),

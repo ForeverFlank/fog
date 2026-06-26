@@ -7,7 +7,7 @@ use crate::interpreter::environment::Environment;
 use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
-use crate::parser::parsed_expr::ParsedExpr;
+use crate::parser::resolved_expr::ResolvedExpr;
 
 // --- type ---
 
@@ -150,21 +150,19 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
     }
 }
 
-pub fn expr_type_of(expr: &ParsedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
+pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
-        ParsedExpr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
+        ResolvedExpr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
 
-        ParsedExpr::Int32Literal(_) => Ok(Type::Int32),
-        ParsedExpr::Float32Literal(_) => Ok(Type::Float32),
+        ResolvedExpr::Int32Literal(_) => Ok(Type::Int32),
+        ResolvedExpr::Float32Literal(_) => Ok(Type::Float32),
 
-        ParsedExpr::Lambda {
-            param_type, body, ..
-        } => Ok(Type::Function(
+        ResolvedExpr::Lambda(_, param_type, body) => Ok(Type::Function(
             eval_type_expr(&param_type, env)?.into(),
             expr_type_of(&body, env, span)?.into(),
         )),
 
-        ParsedExpr::FuncAppl(fn_name, args) => {
+        ResolvedExpr::FuncAppl(fn_name, args) => {
             let mut curr_type: Type = env.get_var(&fn_name)?.r#type.clone();
 
             for _ in args {
@@ -182,18 +180,13 @@ pub fn expr_type_of(expr: &ParsedExpr, env: &Environment, span: &Span) -> FogRes
             Ok(curr_type)
         }
 
-        ParsedExpr::Tuple(exprs) => Ok(Product(
+        ResolvedExpr::Tuple(exprs) => Ok(Product(
             exprs
                 .iter()
-                .map(|expr: &ParsedExpr| Ok(expr_type_of(expr, env, span)?.into()))
+                .map(|expr: &ResolvedExpr| Ok(expr_type_of(expr, env, span)?.into()))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
 
-        ParsedExpr::DataConstructor(name, args) => todo!(),
-
-        ParsedExpr::Collection(_) => Err(FogError::runtime(
-            "unresolved name collection".to_string(),
-            None,
-        )),
+        ResolvedExpr::DataConstructor(name, args) => todo!(),
     }
 }

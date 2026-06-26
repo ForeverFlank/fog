@@ -7,6 +7,7 @@ use crate::interpreter::*;
 use crate::lexer::token::*;
 use crate::lexer::*;
 use crate::parser::parser::*;
+use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement::*;
 use crate::parser::*;
 
@@ -82,7 +83,7 @@ fn print_lexer_errors(errors: &Vec<FogError>) {
 
 // --- AST ---
 
-fn emit_ast_puml(program: &parser::resolved_expr::Program, path: &str) -> String {
+fn emit_ast_puml(statements: &Vec<parser::resolved_expr::ResolvedStatement>, path: &str) -> String {
     let mut out: String = String::new();
     let mut id: i32 = 0;
     out.push_str(&format!("@startuml AST of {}\n", path));
@@ -92,8 +93,8 @@ fn emit_ast_puml(program: &parser::resolved_expr::Program, path: &str) -> String
 
     let prog_id: i32 = new_node(&mut out, &mut id, "Program", "#e5e5e5");
 
-    for stmt in &program.statements {
-        let stmt_id: i32 = emit_ast_puml_statement(&mut out, &mut id, stmt);
+    for stmt in statements {
+        let stmt_id: i32 = emit_ast_puml_statement(&mut out, &mut id, &stmt);
         edge(&mut out, prog_id, stmt_id);
     }
 
@@ -182,11 +183,7 @@ fn emit_ast_puml_expr(
             new_node(out, id, &format!("{}", val), COLOR_LITERAL)
         }
 
-        parser::resolved_expr::ResolvedExpr::Lambda {
-            param_name,
-            param_type,
-            body,
-        } => {
+        parser::resolved_expr::ResolvedExpr::Lambda(param_name, param_type, body) => {
             let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
             let param_id: i32 = emit_ast_puml_type_annotation(out, id, param_name, param_type);
             let body_id: i32 = emit_ast_puml_expr(out, id, &body);
@@ -222,8 +219,6 @@ fn emit_ast_puml_expr(
             }
             name_id
         }
-
-        parser::resolved_expr::ResolvedExpr::Collection(_) => unreachable!(),
     }
 }
 

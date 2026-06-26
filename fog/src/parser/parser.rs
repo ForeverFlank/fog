@@ -9,18 +9,6 @@ pub struct Parser<'a> {
     pos: usize,
 }
 
-#[derive(Clone)]
-pub enum OpAssociativity {
-    Left,
-    Right,
-}
-
-pub struct InfixOp {
-    pub name: String,
-    pub associativity: OpAssociativity,
-    pub precedence: i32,
-}
-
 fn get_op_kind(token: &Token) -> Option<OpKind> {
     match &token.kind {
         TokenKind::Plus => Some(OpKind::Plus),
@@ -54,12 +42,6 @@ impl Parser<'_> {
 
     fn peek(&self) -> &Token {
         self.tokens.get(self.pos).expect("unexpected EOF")
-    }
-
-    fn peek_offset(&self, offset: i32) -> &Token {
-        self.tokens
-            .get((self.pos as i32 + offset) as usize)
-            .expect("unexpected EOF")
     }
 
     pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
@@ -127,7 +109,7 @@ impl Parser<'_> {
             let atom: ParsedExpr = self.parse_atomic()?;
             items.push(atom);
 
-            let token: &Token = self.peek_offset(1);
+            let token: &Token = self.peek();
 
             if let Some(kind) = get_op_kind(token) {
                 items.push(ParsedExpr::Op(kind));
