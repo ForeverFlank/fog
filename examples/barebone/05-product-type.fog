@@ -1,0 +1,11 @@
+-- product types
+-- a.k.a. tuples
+
+point1 : Int32 * Int32
+point1 = (2, 3)
+
+Point : Type
+Point = Int32 * Int32 * Int32
+
+point2 : Point
+point2 = (4, 6, 8)

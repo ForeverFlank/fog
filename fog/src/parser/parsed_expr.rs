@@ -1,0 +1,116 @@
+use std::fmt;
+use std::fmt::Display;
+
+use crate::error::Span;
+use crate::util::format_joined;
+
+// --- statement ---
+
+pub enum ParsedStatement {
+    TypeAnnotation {
+        name: String,
+        expr: ParsedExpr,
+        span: Span,
+    },
+    Declaration {
+        name: String,
+        expr: ParsedExpr,
+        span: Span,
+    },
+}
+
+// --- operator kind ---
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum OpKind {
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Arrow,
+}
+
+impl Display for OpKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OpKind::Plus => write!(f, "+"),
+            OpKind::Minus => write!(f, "-"),
+            OpKind::Star => write!(f, "*"),
+            OpKind::Slash => write!(f, "/"),
+            OpKind::Arrow => write!(f, "->"),
+        }
+    }
+}
+
+// --- parsed expression ---
+
+#[derive(Clone)]
+pub enum ParsedExpr {
+    Identifier {
+        name: String,
+    },
+    Op {
+        kind: OpKind,
+    },
+
+    Int32Literal {
+        value: i32,
+    },
+    Float32Literal {
+        value: f32,
+    },
+
+    Lambda {
+        param_name: String,
+        param_type: Box<ParsedExpr>,
+        body: Box<ParsedExpr>,
+    },
+
+    Tuple {
+        items: Vec<ParsedExpr>,
+    },
+
+    Collection {
+        items: Vec<ParsedExpr>,
+    },
+}
+
+fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ParsedExpr) -> fmt::Result {
+    let s = expr.to_string();
+    if s.contains(' ') {
+        write!(f, "({s})")
+    } else {
+        write!(f, "{s}")
+    }
+}
+
+impl Display for ParsedExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParsedExpr::Identifier { name } => write!(f, "{name}"),
+            ParsedExpr::Op { kind } => write!(f, "{kind}"),
+
+            ParsedExpr::Int32Literal { value } => write!(f, "{value}"),
+            ParsedExpr::Float32Literal { value } => write!(f, "{value}"),
+
+            ParsedExpr::Tuple { items } => write!(f, "({})", format_joined(items, ", ")),
+
+            ParsedExpr::Lambda {
+                param_name, body, ..
+            } => {
+                write!(f, "{param_name} => {body}")
+            }
+
+            ParsedExpr::Collection { items } => {
+                for (i, expr) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " ")?;
+                    }
+                    fmt_parenthesized(f, expr)?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+}
