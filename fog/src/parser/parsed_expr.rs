@@ -6,8 +6,16 @@ use crate::error::Span;
 // --- statement ---
 
 pub enum ParsedStatement {
-    TypeAnnotation(String, ParsedExpr, Span),
-    Declaration(String, ParsedExpr, Span),
+    TypeAnnotation {
+        name: String,
+        expr: ParsedExpr,
+        span: Span,
+    },
+    Declaration {
+        name: String,
+        expr: ParsedExpr,
+        span: Span,
+    },
 }
 
 // --- operator kind ---
@@ -37,17 +45,33 @@ impl Display for OpKind {
 
 #[derive(Clone)]
 pub enum ParsedExpr {
-    Identifier(String),
-    Op(OpKind),
+    Identifier {
+        name: String,
+    },
+    Op {
+        kind: OpKind,
+    },
 
-    Int32Literal(i32),
-    Float32Literal(f32),
+    Int32Literal {
+        value: i32,
+    },
+    Float32Literal {
+        value: f32,
+    },
 
-    Lambda(String, Box<ParsedExpr>, Box<ParsedExpr>),
+    Lambda {
+        param_name: String,
+        param_type: Box<ParsedExpr>,
+        body: Box<ParsedExpr>,
+    },
 
-    Tuple(Vec<ParsedExpr>),
+    Tuple {
+        exprs: Vec<ParsedExpr>,
+    },
 
-    Collection(Vec<ParsedExpr>),
+    Collection {
+        exprs: Vec<ParsedExpr>,
+    },
 }
 
 impl ParsedExpr {
@@ -65,13 +89,13 @@ impl ParsedExpr {
 impl Display for ParsedExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParsedExpr::Identifier(name) => write!(f, "{name}"),
-            ParsedExpr::Op(kind) => write!(f, "{kind}"),
+            ParsedExpr::Identifier { name } => write!(f, "{name}"),
+            ParsedExpr::Op { kind } => write!(f, "{kind}"),
 
-            ParsedExpr::Int32Literal(value) => write!(f, "{value}"),
-            ParsedExpr::Float32Literal(value) => write!(f, "{value}"),
+            ParsedExpr::Int32Literal { value } => write!(f, "{value}"),
+            ParsedExpr::Float32Literal { value } => write!(f, "{value}"),
 
-            ParsedExpr::Tuple(exprs) => {
+            ParsedExpr::Tuple { exprs } => {
                 let contents: String = exprs
                     .iter()
                     .map(ToString::to_string)
@@ -81,16 +105,18 @@ impl Display for ParsedExpr {
                 write!(f, "({contents})")
             }
 
-            ParsedExpr::Lambda(param_name, _, body) => {
+            ParsedExpr::Lambda {
+                param_name, body, ..
+            } => {
                 write!(f, "{param_name} => {body}")
             }
 
-            ParsedExpr::Collection(names) => {
-                for (i, name) in names.iter().enumerate() {
+            ParsedExpr::Collection { exprs } => {
+                for (i, expr) in exprs.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;
                     }
-                    Self::fmt_parenthesized(f, name)?;
+                    Self::fmt_parenthesized(f, expr)?;
                 }
 
                 Ok(())

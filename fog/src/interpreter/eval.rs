@@ -13,7 +13,7 @@ use crate::parser::resolved_expr::ResolvedExpr;
 pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
         // variable
-        ResolvedExpr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
+        ResolvedExpr::Identifier { name } => env.get_var(name)?.value.ok_or_else(|| {
             FogError::runtime(
                 format!("undeclared variable `{}`", name),
                 Some(span.clone()),
@@ -21,11 +21,15 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
         }),
 
         // literals
-        ResolvedExpr::Int32Literal(value) => Ok(Value::Int32(*value)),
-        ResolvedExpr::Float32Literal(value) => Ok(Value::Float32(*value)),
+        ResolvedExpr::Int32Literal { value } => Ok(Value::Int32(*value)),
+        ResolvedExpr::Float32Literal { value } => Ok(Value::Float32(*value)),
 
         // AST lambda -> interpreter function
-        ResolvedExpr::Lambda(param_name, param_type, body) => Ok(Value::Function {
+        ResolvedExpr::Lambda {
+            param_name,
+            param_type,
+            body,
+        } => Ok(Value::Function {
             param_name: param_name.clone(),
             param_type: eval_type_annotation_expr(param_type, env)?,
             body: Rc::clone(body),
@@ -33,7 +37,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
         }),
 
         // tuple
-        ResolvedExpr::Tuple(exprs) => Ok(Value::Tuple(
+        ResolvedExpr::Tuple { exprs } => Ok(Value::Tuple(
             exprs
                 .iter()
                 .map(|expr| Ok(eval_value_expr(expr, env, span)?.into()))
@@ -41,9 +45,14 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
         )),
 
         // function application
-        ResolvedExpr::FuncAppl(fn_name, args) => {
-            let mut result: Value =
-                eval_value_expr(&ResolvedExpr::Identifier(fn_name.clone()), env, span)?;
+        ResolvedExpr::FuncAppl { fn_name, args } => {
+            let mut result: Value = eval_value_expr(
+                &ResolvedExpr::Identifier {
+                    name: fn_name.clone(),
+                },
+                env,
+                span,
+            )?;
 
             for arg in args {
                 let argument: Value = eval_value_expr(arg, env, span)?;
@@ -90,10 +99,10 @@ fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogRes
 
 pub fn eval_type_annotation_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier(name) => Ok(env.get_type(name)?),
+        ResolvedExpr::Identifier { name } => Ok(env.get_type(name)?),
 
         // function type
-        ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "->" && args.len() == 2 => {
+        ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
             let left: Type = eval_type_annotation_expr(&args[0], env)?;
             let right: Type = eval_type_annotation_expr(&args[1], env)?;
 
@@ -101,7 +110,7 @@ pub fn eval_type_annotation_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
         }
 
         // product type, a.k.a. tuple
-        ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "*" && args.len() == 2 => {
+        ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "*" && args.len() == 2 => {
             let left: Type = eval_type_annotation_expr(&args[0], env)?;
             let right: Type = eval_type_annotation_expr(&args[1], env)?;
 
@@ -121,20 +130,18 @@ pub fn eval_type_annotation_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
         }
 
         // sum type
-        ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "+" && args.len() == 2 => {
-            Err(FogError::runtime(
-                "cannot type annotate a value with sum types".to_string(),
-                None,
-            ))
-        }
+        ResolvedExpr::FuncAppl { fn_name, .. } if fn_name == "+" => Err(FogError::runtime(
+            "cannot type annotate a value with sum types".to_string(),
+            None,
+        )),
 
         // either is a function application or a data constructor
-        ResolvedExpr::FuncAppl(name, args) => {
-            if env.contains_type(name) {
+        ResolvedExpr::FuncAppl { fn_name, args } => {
+            if env.contains_type(fn_name) {
                 // the function name is declared,
                 // it's a type constructor or a
                 // type-level function
-                apply_type_level_function(name, args, env)
+                apply_type_level_function(fn_name, args, env)
             } else {
                 // otherwise, it's a data constructor,
                 // which is invalid here
@@ -154,7 +161,7 @@ pub fn eval_type_annotation_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
 
 pub fn eval_type_definition_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier(name) => {
+        ResolvedExpr::Identifier { name } => {
             if env.contains_type(name) {
                 // declared type
                 env.get_type(name)
@@ -167,7 +174,7 @@ pub fn eval_type_definition_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
             }
         }
 
-        ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "+" && args.len() == 2 => {
+        ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "+" && args.len() == 2 => {
             let left: Type = eval_type_definition_expr(&args[0], env)?;
             let right: Type = eval_type_definition_expr(&args[1], env)?;
 

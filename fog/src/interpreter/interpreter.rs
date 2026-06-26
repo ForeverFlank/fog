@@ -98,8 +98,10 @@ impl Interpreter {
 
         for stmt in &interpreter.statements {
             let result: Result<(), FogError> = match stmt {
-                TypeAnnotation(name, expr, span) => Self::annotate_type(name, expr, top_env, span),
-                Declaration(name, expr, span) => Self::declare(name, expr, top_env, span),
+                TypeAnnotation { name, expr, span } => {
+                    Self::annotate_type(name, expr, top_env, span)
+                }
+                Declaration { name, expr, span } => Self::declare(name, expr, top_env, span),
             };
 
             if let Err(error) = result {

@@ -81,13 +81,13 @@ impl Parser<'_> {
                 self.next();
 
                 self.parse_expression()
-                    .map(|expr: ParsedExpr| ParsedStatement::TypeAnnotation(name, expr, span))
+                    .map(|expr: ParsedExpr| ParsedStatement::TypeAnnotation { name, expr, span })
             }
             TokenKind::Equal => {
                 self.next();
 
                 self.parse_expression()
-                    .map(|expr: ParsedExpr| ParsedStatement::Declaration(name, expr, span))
+                    .map(|expr: ParsedExpr| ParsedStatement::Declaration { name, expr, span })
             }
             _ => Err(FogError::parse(
                 "expected `:` or `=`".to_string(),
@@ -112,7 +112,7 @@ impl Parser<'_> {
             let token: &Token = self.peek();
 
             if let Some(kind) = get_op_kind(token) {
-                items.push(ParsedExpr::Op(kind));
+                items.push(ParsedExpr::Op { kind });
                 self.next();
             } else if is_primary_starter(token) {
                 continue;
@@ -124,7 +124,7 @@ impl Parser<'_> {
         if items.len() == 1 {
             Ok(items[0].clone())
         } else {
-            Ok(ParsedExpr::Collection(items))
+            Ok(ParsedExpr::Collection { exprs: items })
         }
     }
 
@@ -133,15 +133,17 @@ impl Parser<'_> {
         self.next();
 
         if let TokenKind::Int32Literal(value) = token.kind {
-            return Ok(ParsedExpr::Int32Literal(value));
+            return Ok(ParsedExpr::Int32Literal { value });
         }
 
         if let TokenKind::Float32Literal(value) = token.kind {
-            return Ok(ParsedExpr::Float32Literal(value));
+            return Ok(ParsedExpr::Float32Literal { value });
         }
 
         if let TokenKind::Minus = token.kind {
-            return Ok(ParsedExpr::Op(OpKind::Minus));
+            return Ok(ParsedExpr::Op {
+                kind: OpKind::Minus,
+            });
         }
 
         if let TokenKind::Identifier(name) = token.kind {
@@ -165,21 +167,21 @@ impl Parser<'_> {
 
                 let body: ParsedExpr = self.parse_expression()?;
 
-                return Ok(ParsedExpr::Lambda(
-                    name,
-                    Box::new(param_type),
-                    Box::new(body),
-                ));
+                return Ok(ParsedExpr::Lambda {
+                    param_name: name,
+                    param_type: Box::new(param_type),
+                    body: Box::new(body),
+                });
             }
 
             // if it's not, it's an identifier
-            return Ok(ParsedExpr::Identifier(name));
+            return Ok(ParsedExpr::Identifier { name });
         }
 
         if let TokenKind::LeftParenthesis = token.kind {
             if let TokenKind::RightParenthesis = self.peek().kind {
                 self.next();
-                return Ok(ParsedExpr::Tuple(Vec::new()));
+                return Ok(ParsedExpr::Tuple { exprs: Vec::new() });
             };
 
             let res: FogResult<ParsedExpr> = self.parse_expression();

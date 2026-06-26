@@ -103,11 +103,12 @@ fn emit_ast_puml(statements: &Vec<parser::resolved_expr::ResolvedStatement>, pat
     out
 }
 
-const COLOR_STATEMENT: &str = "#c2fff2";
-const COLOR_IDENTIFIER: &str = "#fffdd0";
-const COLOR_LITERAL: &str = "#ffcece";
-const COLOR_LAMBDA: &str = "#ffc9fc";
-const COLOR_FUNC_APPL: &str = "#cbe9ff";
+const COLOR_STATEMENT: &str = "#a0f5e5";
+const COLOR_IDENTIFIER: &str = "#fff07a";
+const COLOR_LITERAL: &str = "#ffaaaa";
+const COLOR_LAMBDA: &str = "#e0a8ff";
+const COLOR_FUNC_APPL: &str = "#8ecfff";
+const COLOR_TUPLE: &str = "#ffcc88";
 
 fn new_node(out: &mut String, id: &mut i32, label: &str, color: &str) -> i32 {
     let this_id: i32 = *id;
@@ -129,8 +130,8 @@ fn emit_ast_puml_statement(
     stmt: &parser::resolved_expr::ResolvedStatement,
 ) -> i32 {
     match stmt {
-        TypeAnnotation(name, expr, _) => emit_ast_puml_type_annotation(out, id, name, expr),
-        Declaration(name, expr, _) => emit_ast_puml_declaration(out, id, name, expr),
+        TypeAnnotation { name, expr, .. } => emit_ast_puml_type_annotation(out, id, name, expr),
+        Declaration { name, expr, .. } => emit_ast_puml_declaration(out, id, name, expr),
     }
 }
 
@@ -172,29 +173,33 @@ fn emit_ast_puml_expr(
     expr: &parser::resolved_expr::ResolvedExpr,
 ) -> i32 {
     match expr {
-        parser::resolved_expr::ResolvedExpr::Identifier(name) => {
+        parser::resolved_expr::ResolvedExpr::Identifier { name } => {
             new_node(out, id, &format!("Identifier ({})", name), COLOR_IDENTIFIER)
         }
 
-        parser::resolved_expr::ResolvedExpr::Int32Literal(val) => {
-            new_node(out, id, &format!("Int32 {}", val), COLOR_LITERAL)
+        parser::resolved_expr::ResolvedExpr::Int32Literal { value } => {
+            new_node(out, id, &format!("Int32 {}", value), COLOR_LITERAL)
         }
-        parser::resolved_expr::ResolvedExpr::Float32Literal(val) => {
-            new_node(out, id, &format!("Float32 ({})", val), COLOR_LITERAL)
+        parser::resolved_expr::ResolvedExpr::Float32Literal { value } => {
+            new_node(out, id, &format!("Float32 ({})", value), COLOR_LITERAL)
         }
 
-        parser::resolved_expr::ResolvedExpr::Lambda(param_name, param_type, body) => {
+        parser::resolved_expr::ResolvedExpr::Lambda {
+            param_name,
+            param_type,
+            body,
+        } => {
             let lambda_id: i32 = new_node(out, id, "Lambda", COLOR_LAMBDA);
             let param_id: i32 = emit_ast_puml_type_annotation(out, id, param_name, param_type);
-            let body_id: i32 = emit_ast_puml_expr(out, id, &body);
+            let body_id: i32 = emit_ast_puml_expr(out, id, body);
 
             edge(out, lambda_id, param_id);
             edge(out, lambda_id, body_id);
             lambda_id
         }
 
-        parser::resolved_expr::ResolvedExpr::Tuple(exprs) => {
-            let tuple_id: i32 = new_node(out, id, "Tuple", COLOR_IDENTIFIER);
+        parser::resolved_expr::ResolvedExpr::Tuple { exprs } => {
+            let tuple_id: i32 = new_node(out, id, "Tuple", COLOR_TUPLE);
             for expr in exprs {
                 let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
                 edge(out, tuple_id, expr_id);
@@ -202,7 +207,7 @@ fn emit_ast_puml_expr(
             tuple_id
         }
 
-        parser::resolved_expr::ResolvedExpr::FuncAppl(fn_name, args) => {
+        parser::resolved_expr::ResolvedExpr::FuncAppl { fn_name, args } => {
             let appl_id: i32 =
                 new_node(out, id, &format!("FuncAppl ({})", fn_name), COLOR_FUNC_APPL);
             for arg in args {

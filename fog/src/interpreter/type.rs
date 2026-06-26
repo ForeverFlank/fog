@@ -84,18 +84,17 @@ impl ToString for Type {
                 } else {
                     types
                         .iter()
-                        .fold(String::new(), |acc: String, r#type: &Type| {
-                            acc + " * " + &r#type.to_string()
-                        })
+                        .map(|t: &Type| t.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" * ")
                 }
             }
 
             Type::Sum(ctors) => ctors
                 .iter()
-                .fold(String::new(), |acc: String, ctor: &DataConstructor| {
-                    acc + " + " + &ctor.to_string()
-                }),
-            // Type::DataConstructor()
+                .map(|ctor: &DataConstructor| ctor.to_string())
+                .collect::<Vec<String>>()
+                .join(" + "),
         }
     }
 }
@@ -108,16 +107,15 @@ pub struct DataConstructor {
     pub types: Vec<Type>,
 }
 
-impl ToString for DataConstructor {
-    fn to_string(&self) -> String {
-        format!(
-            "{} {}",
-            self.tag,
-            self.types
-                .iter()
-                .map(|t| t.to_string())
-                .fold(String::new(), |acc, r#type| acc + " " + &r#type)
-        )
+impl std::fmt::Display for DataConstructor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.tag)?;
+
+        for r#type in &self.types {
+            write!(f, " {}", r#type.to_string())?;
+        }
+
+        Ok(())
     }
 }
 
@@ -154,18 +152,20 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
 
 pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier(name) => Ok(env.get_var(&name)?.r#type),
+        ResolvedExpr::Identifier { name } => Ok(env.get_var(name)?.r#type),
 
-        ResolvedExpr::Int32Literal(_) => Ok(Type::Int32),
-        ResolvedExpr::Float32Literal(_) => Ok(Type::Float32),
+        ResolvedExpr::Int32Literal { .. } => Ok(Type::Int32),
+        ResolvedExpr::Float32Literal { .. } => Ok(Type::Float32),
 
-        ResolvedExpr::Lambda(_, param_type, body) => Ok(Type::Function(
-            eval_type_annotation_expr(&param_type, env)?.into(),
-            expr_type_of(&body, env, span)?.into(),
+        ResolvedExpr::Lambda {
+            param_type, body, ..
+        } => Ok(Type::Function(
+            eval_type_annotation_expr(param_type, env)?.into(),
+            expr_type_of(body, env, span)?.into(),
         )),
 
-        ResolvedExpr::FuncAppl(fn_name, args) => {
-            let mut curr_type: Type = env.get_var(&fn_name)?.r#type.clone();
+        ResolvedExpr::FuncAppl { fn_name, args } => {
+            let mut curr_type: Type = env.get_var(fn_name)?.r#type.clone();
 
             for _ in args {
                 curr_type = match curr_type {
@@ -182,7 +182,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
             Ok(curr_type)
         }
 
-        ResolvedExpr::Tuple(exprs) => Ok(Product(
+        ResolvedExpr::Tuple { exprs } => Ok(Product(
             exprs
                 .iter()
                 .map(|expr: &ResolvedExpr| Ok(expr_type_of(expr, env, span)?.into()))
