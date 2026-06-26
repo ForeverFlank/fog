@@ -194,8 +194,8 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
             Ok(curr_type)
         }
 
-        ResolvedExpr::Tuple { exprs } => Ok(Product(
-            exprs
+        ResolvedExpr::Tuple { items } => Ok(Product(
+            items
                 .iter()
                 .map(|expr| expr_type_of(expr, env, span))
                 .collect::<Result<Vec<Type>, FogError>>()?,

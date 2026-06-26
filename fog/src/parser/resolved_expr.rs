@@ -37,7 +37,7 @@ pub enum ResolvedExpr {
     },
 
     Tuple {
-        exprs: Vec<ResolvedExpr>,
+        items: Vec<ResolvedExpr>,
     },
 
     FuncAppl {
@@ -63,7 +63,7 @@ impl Display for ResolvedExpr {
             ResolvedExpr::Int32Literal { value } => write!(f, "{value}"),
             ResolvedExpr::Float32Literal { value } => write!(f, "{value}"),
 
-            ResolvedExpr::Tuple { exprs } => write!(f, "({})", format_joined(exprs, ", ")),
+            ResolvedExpr::Tuple { items } => write!(f, "({})", format_joined(items, ", ")),
 
             ResolvedExpr::Lambda {
                 param_name, body, ..

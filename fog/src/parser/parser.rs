@@ -7,6 +7,7 @@ use crate::parser::parsed_expr::*;
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     pos: usize,
+    eof_token: Token,
 }
 
 fn get_op_kind(token: &Token) -> Option<OpKind> {
@@ -41,7 +42,13 @@ fn token_span(token: &Token) -> Span {
 
 impl Parser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
-        Parser { tokens, pos: 0 }
+        let eof_token = Token {
+            kind: TokenKind::Eof,
+            pos: tokens.last().map_or(0, |t| t.pos + 1),
+            line: tokens.last().map_or(1, |t| t.line),
+            column: tokens.last().map_or(1, |t| t.column + 1),
+        };
+        Parser { tokens, pos: 0, eof_token }
     }
 
     fn next(&mut self) {
@@ -49,7 +56,7 @@ impl Parser<'_> {
     }
 
     fn peek(&self) -> &Token {
-        self.tokens.get(self.pos).expect("unexpected EOF")
+        self.tokens.get(self.pos).unwrap_or(&self.eof_token)
     }
 
     pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
@@ -124,7 +131,7 @@ impl Parser<'_> {
         if items.len() == 1 {
             Ok(items[0].clone())
         } else {
-            Ok(ParsedExpr::Collection { exprs: items })
+            Ok(ParsedExpr::Collection { items })
         }
     }
 
@@ -135,7 +142,9 @@ impl Parser<'_> {
         match token.kind {
             TokenKind::Int32Literal(value) => Ok(ParsedExpr::Int32Literal { value }),
             TokenKind::Float32Literal(value) => Ok(ParsedExpr::Float32Literal { value }),
-            TokenKind::Minus => Ok(ParsedExpr::Op { kind: OpKind::Minus }),
+            TokenKind::Minus => Ok(ParsedExpr::Op {
+                kind: OpKind::Minus,
+            }),
 
             TokenKind::Identifier(name) => {
                 if let TokenKind::Colon = self.peek().kind {
@@ -166,20 +175,40 @@ impl Parser<'_> {
             TokenKind::LeftParenthesis => {
                 if let TokenKind::RightParenthesis = self.peek().kind {
                     self.next();
-                    return Ok(ParsedExpr::Tuple { exprs: Vec::new() });
+
+                    return Ok(ParsedExpr::Tuple { items: Vec::new() });
                 }
 
-                let res = self.parse_expression();
+                let mut items: Vec<ParsedExpr> = Vec::new();
 
-                match self.peek().kind {
-                    TokenKind::RightParenthesis => {
-                        self.next();
-                        res
+                loop {
+                    let expr = self.parse_expression()?;
+                    items.push(expr);
+
+                    match self.peek().kind {
+                        TokenKind::RightParenthesis => {
+                            self.next();
+
+                            if items.len() == 1 {
+                                return Ok(items[0].clone());
+                            } else {
+                                return Ok(ParsedExpr::Tuple { items });
+                            }
+                        }
+
+                        TokenKind::Comma => {
+                            self.next();
+
+                            continue;
+                        }
+
+                        _ => {
+                            return Err(FogError::parse(
+                                "expected `)`".to_string(),
+                                Some(token_span(&token)),
+                            ));
+                        }
                     }
-                    _ => Err(FogError::parse(
-                        "expected `)`".to_string(),
-                        Some(token_span(&token)),
-                    )),
                 }
             }
 

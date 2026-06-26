@@ -153,9 +153,9 @@ impl Resolver {
         })
     }
 
-    fn resolve_tuple(exprs: Vec<ParsedExpr>) -> FogResult<ResolvedExpr> {
+    fn resolve_tuple(items: Vec<ParsedExpr>) -> FogResult<ResolvedExpr> {
         Ok(ResolvedExpr::Tuple {
-            exprs: exprs
+            items: items
                 .into_iter()
                 .map(Self::resolve_expr)
                 .collect::<Result<Vec<_>, _>>()?,
@@ -176,28 +176,28 @@ impl Resolver {
                 body,
             } => Self::resolve_lambda(param_name, param_type, body),
 
-            ParsedExpr::Tuple { exprs } => Self::resolve_tuple(exprs),
+            ParsedExpr::Tuple { items } => Self::resolve_tuple(items),
 
-            ParsedExpr::Collection { exprs } => {
+            ParsedExpr::Collection { items } => {
                 let mut resolver = Resolver::new();
-                resolver.resolve_collection(&exprs, i32::MIN)
+                resolver.resolve_collection(&items, i32::MIN)
             }
         }
     }
 
     fn resolve_collection(
         &mut self,
-        exprs: &Vec<ParsedExpr>,
+        items: &Vec<ParsedExpr>,
         min_prec: i32,
     ) -> FogResult<ResolvedExpr> {
-        let mut lhs = self.resolve_primary(exprs)?;
+        let mut lhs = self.resolve_primary(items)?;
 
         loop {
-            if self.index >= exprs.len() {
+            if self.index >= items.len() {
                 break;
             }
 
-            let op = match self.get_binary_op(&exprs[self.index]) {
+            let op = match self.get_binary_op(&items[self.index]) {
                 Some(op) => op,
                 None => break,
             };
@@ -217,7 +217,7 @@ impl Resolver {
                 Associativity::Right => op_prec,
             };
 
-            let rhs = self.resolve_collection(exprs, next_min_prec)?;
+            let rhs = self.resolve_collection(items, next_min_prec)?;
 
             lhs = ResolvedExpr::FuncAppl {
                 fn_name: op_name,
@@ -278,12 +278,12 @@ impl Resolver {
                 body,
             } => Self::resolve_lambda(param_name, param_type, body),
 
-            ParsedExpr::Tuple { exprs } => Self::resolve_tuple(exprs),
+            ParsedExpr::Tuple { items } => Self::resolve_tuple(items),
 
-            ParsedExpr::Collection { exprs: inner } => {
+            ParsedExpr::Collection { items } => {
                 let saved_index = self.index;
                 self.index = 0;
-                let result = self.resolve_collection(&inner, i32::MIN)?;
+                let result = self.resolve_collection(&items, i32::MIN)?;
                 self.index = saved_index;
                 Ok(result)
             }

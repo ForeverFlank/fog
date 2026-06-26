@@ -1,0 +1,14 @@
+-- sum types
+-- a.k.a. tagged unions, Rust enums
+
+-- native sum types are rather uncommon
+-- in mainstream programming languages
+
+OptionInt32 : Type
+OptionInt32 = Some Int32 + None
+
+someInt : OptionInt32
+someInt = Some 100
+
+none : OptionInt32
+none = None

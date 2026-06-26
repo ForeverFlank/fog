@@ -38,8 +38,8 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
         }),
 
         // tuple
-        ResolvedExpr::Tuple { exprs } => Ok(Value::Tuple(
-            exprs
+        ResolvedExpr::Tuple { items } => Ok(Value::Tuple(
+            items
                 .iter()
                 .map(|expr| eval_value_expr(expr, env, span))
                 .collect::<Result<Vec<Value>, FogError>>()?,

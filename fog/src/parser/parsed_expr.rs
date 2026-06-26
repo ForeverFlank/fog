@@ -67,11 +67,11 @@ pub enum ParsedExpr {
     },
 
     Tuple {
-        exprs: Vec<ParsedExpr>,
+        items: Vec<ParsedExpr>,
     },
 
     Collection {
-        exprs: Vec<ParsedExpr>,
+        items: Vec<ParsedExpr>,
     },
 }
 
@@ -93,7 +93,7 @@ impl Display for ParsedExpr {
             ParsedExpr::Int32Literal { value } => write!(f, "{value}"),
             ParsedExpr::Float32Literal { value } => write!(f, "{value}"),
 
-            ParsedExpr::Tuple { exprs } => write!(f, "({})", format_joined(exprs, ", ")),
+            ParsedExpr::Tuple { items } => write!(f, "({})", format_joined(items, ", ")),
 
             ParsedExpr::Lambda {
                 param_name, body, ..
@@ -101,8 +101,8 @@ impl Display for ParsedExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            ParsedExpr::Collection { exprs } => {
-                for (i, expr) in exprs.iter().enumerate() {
+            ParsedExpr::Collection { items } => {
+                for (i, expr) in items.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;
                     }

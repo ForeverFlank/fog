@@ -188,18 +188,17 @@ fn emit_ast_puml_expr(
             lambda_id
         }
 
-        parser::resolved_expr::ResolvedExpr::Tuple { exprs } => {
+        parser::resolved_expr::ResolvedExpr::Tuple { items } => {
             let tuple_id = new_node(out, id, "Tuple", COLOR_TUPLE);
-            for expr in exprs {
-                let expr_id = emit_ast_puml_expr(out, id, expr);
+            for item in items {
+                let expr_id = emit_ast_puml_expr(out, id, item);
                 edge(out, tuple_id, expr_id);
             }
             tuple_id
         }
 
         parser::resolved_expr::ResolvedExpr::FuncAppl { fn_name, args } => {
-            let appl_id =
-                new_node(out, id, &format!("FuncAppl ({})", fn_name), COLOR_FUNC_APPL);
+            let appl_id = new_node(out, id, &format!("FuncAppl ({})", fn_name), COLOR_FUNC_APPL);
             for arg in args {
                 let arg_id = emit_ast_puml_expr(out, id, arg);
                 edge(out, appl_id, arg_id);
