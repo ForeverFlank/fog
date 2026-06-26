@@ -4,7 +4,7 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval::eval_type_expr;
+use crate::interpreter::eval::eval_type_annotation_expr;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
@@ -92,8 +92,8 @@ impl ToString for Type {
 
             Type::Sum(ctors) => ctors
                 .iter()
-                .fold(String::new(), |acc: String, r#type: &DataConstructor| {
-                    acc + " + " + &r#type.to_string()
+                .fold(String::new(), |acc: String, ctor: &DataConstructor| {
+                    acc + " + " + &ctor.to_string()
                 }),
             // Type::DataConstructor()
         }
@@ -147,6 +147,8 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
                 .map(|value: &Value| Ok(value_type_of(value, env, span)?.into()))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
+
+        Value::Constructor { r#type, .. } => Ok(r#type.clone()),
     }
 }
 
@@ -158,7 +160,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
         ResolvedExpr::Float32Literal(_) => Ok(Type::Float32),
 
         ResolvedExpr::Lambda(_, param_type, body) => Ok(Type::Function(
-            eval_type_expr(&param_type, env)?.into(),
+            eval_type_annotation_expr(&param_type, env)?.into(),
             expr_type_of(&body, env, span)?.into(),
         )),
 

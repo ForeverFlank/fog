@@ -22,6 +22,7 @@ pub enum ResolvedExpr {
     FuncAppl(String, Vec<ResolvedExpr>),
 }
 
+
 impl ResolvedExpr {
     fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ResolvedExpr) -> fmt::Result {
         let s: String = expr.to_string();

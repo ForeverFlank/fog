@@ -140,7 +140,7 @@ fn emit_ast_puml_type_annotation(
     name: &String,
     expr: &ResolvedExpr,
 ) -> i32 {
-    let ta_id: i32 = new_node(out, id, ":", COLOR_STATEMENT);
+    let ta_id: i32 = new_node(out, id, "TypeAnnotation", COLOR_STATEMENT);
     let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
     let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
 
@@ -156,7 +156,7 @@ fn emit_ast_puml_declaration(
     name: &String,
     expr: &ResolvedExpr,
 ) -> i32 {
-    let decl_id: i32 = new_node(out, id, "=", COLOR_STATEMENT);
+    let decl_id: i32 = new_node(out, id, "Declaration", COLOR_STATEMENT);
     let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
     let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
 
@@ -173,18 +173,18 @@ fn emit_ast_puml_expr(
 ) -> i32 {
     match expr {
         parser::resolved_expr::ResolvedExpr::Identifier(name) => {
-            new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER)
+            new_node(out, id, &format!("Identifier ({})", name), COLOR_IDENTIFIER)
         }
 
         parser::resolved_expr::ResolvedExpr::Int32Literal(val) => {
-            new_node(out, id, &format!("{}", val), COLOR_LITERAL)
+            new_node(out, id, &format!("Int32 {}", val), COLOR_LITERAL)
         }
         parser::resolved_expr::ResolvedExpr::Float32Literal(val) => {
-            new_node(out, id, &format!("{}", val), COLOR_LITERAL)
+            new_node(out, id, &format!("Float32 ({})", val), COLOR_LITERAL)
         }
 
         parser::resolved_expr::ResolvedExpr::Lambda(param_name, param_type, body) => {
-            let lambda_id: i32 = new_node(out, id, "λ", COLOR_LAMBDA);
+            let lambda_id: i32 = new_node(out, id, "Lambda", COLOR_LAMBDA);
             let param_id: i32 = emit_ast_puml_type_annotation(out, id, param_name, param_type);
             let body_id: i32 = emit_ast_puml_expr(out, id, &body);
 
@@ -194,7 +194,7 @@ fn emit_ast_puml_expr(
         }
 
         parser::resolved_expr::ResolvedExpr::Tuple(exprs) => {
-            let tuple_id: i32 = new_node(out, id, "tuple", COLOR_IDENTIFIER);
+            let tuple_id: i32 = new_node(out, id, "Tuple", COLOR_IDENTIFIER);
             for expr in exprs {
                 let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
                 edge(out, tuple_id, expr_id);
@@ -203,7 +203,8 @@ fn emit_ast_puml_expr(
         }
 
         parser::resolved_expr::ResolvedExpr::FuncAppl(fn_name, args) => {
-            let appl_id: i32 = new_node(out, id, &format!("{}", fn_name), COLOR_FUNC_APPL);
+            let appl_id: i32 =
+                new_node(out, id, &format!("FuncAppl ({})", fn_name), COLOR_FUNC_APPL);
             for arg in args {
                 let arg_id: i32 = emit_ast_puml_expr(out, id, arg);
                 edge(out, appl_id, arg_id);

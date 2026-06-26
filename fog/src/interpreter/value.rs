@@ -55,11 +55,18 @@ impl ToString for Value {
                 format!("({})", contents)
             }
 
-            Value::Constructor {
-                tag,
-                values,
-                r#type,
-            } => todo!(),
+            Value::Constructor { tag, values, .. } => {
+                if values.is_empty() {
+                    tag.clone()
+                } else {
+                    let args = values
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    format!("{} {}", tag, args)
+                }
+            }
         }
     }
 }

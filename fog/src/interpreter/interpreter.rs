@@ -4,7 +4,8 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval::eval_type_expr;
+use crate::interpreter::eval::eval_type_annotation_expr;
+use crate::interpreter::eval::eval_type_definition_expr;
 use crate::interpreter::eval::eval_value_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
@@ -97,8 +98,8 @@ impl Interpreter {
 
         for stmt in &interpreter.statements {
             let result: Result<(), FogError> = match stmt {
-                TypeAnnotation(name, expr, span) => annotate_type(name, expr, top_env, span),
-                Declaration(name, expr, span) => declare(name, expr, top_env, span),
+                TypeAnnotation(name, expr, span) => Self::annotate_type(name, expr, top_env, span),
+                Declaration(name, expr, span) => Self::declare(name, expr, top_env, span),
             };
 
             if let Err(error) = result {
@@ -133,36 +134,44 @@ impl Interpreter {
             }
         }
     }
-}
 
-fn annotate_type(
-    name: &str,
-    expr: &ResolvedExpr,
-    env: &mut Environment,
-    span: &Span,
-) -> FogResult<()> {
-    let r#type: Type = eval_type_expr(&expr, env)?;
-    (*env).annotate_type(name, r#type, span)
-}
-
-fn declare(
-    name: &String,
-    expr: &ResolvedExpr,
-    env: &mut Environment,
-    span: &Span,
-) -> FogResult<()> {
-    if env.variables.contains_key(name) {
-        (*env).declare_value(name, eval_value_expr(expr, env, span)?, span)?;
-        return Ok(());
+    fn annotate_type(
+        name: &str,
+        expr: &ResolvedExpr,
+        env: &mut Environment,
+        span: &Span,
+    ) -> FogResult<()> {
+        let r#type: Type = eval_type_annotation_expr(&expr, env)?;
+        (*env).annotate_type(name, r#type, span)
     }
 
-    if env.types.contains_key(name) {
-        (*env).declare_type(name, eval_type_expr(expr, env)?, span)?;
-        return Ok(());
-    }
+    fn declare(
+        name: &String,
+        expr: &ResolvedExpr,
+        env: &mut Environment,
+        span: &Span,
+    ) -> FogResult<()> {
+        if env.variables.contains_key(name) {
+            if let Type::Type = env.variables[name].r#type {
+                env.variables.remove(name);
+                let r#type: Type = eval_type_definition_expr(expr, env)?;
+                (*env).declare_type(name, r#type.clone(), span)?;
+                return Ok(());
+            }
 
-    Err(FogError::runtime(
-        format!("unannotated variable `{}`", name),
-        Some(span.clone()),
-    ))
+            (*env).declare_value(name, eval_value_expr(expr, env, span)?, span)?;
+            return Ok(());
+        }
+
+        if env.types.contains_key(name) {
+            let r#type: Type = eval_type_definition_expr(expr, env)?;
+            (*env).declare_type(name, r#type.clone(), span)?;
+            return Ok(());
+        }
+
+        Err(FogError::runtime(
+            format!("unannotated variable `{}`", name),
+            Some(span.clone()),
+        ))
+    }
 }
