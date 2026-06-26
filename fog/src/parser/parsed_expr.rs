@@ -12,7 +12,7 @@ pub enum ParsedStatement {
 
 // --- operator kind ---
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum OpKind {
     Plus,
     Minus,
@@ -48,7 +48,6 @@ pub enum ParsedExpr {
     Tuple(Vec<ParsedExpr>),
 
     Collection(Vec<ParsedExpr>),
-    FuncAppl(String, Vec<ParsedExpr>),
 }
 
 impl ParsedExpr {
@@ -92,17 +91,6 @@ impl Display for ParsedExpr {
                         write!(f, " ")?;
                     }
                     Self::fmt_parenthesized(f, name)?;
-                }
-
-                Ok(())
-            }
-
-            ParsedExpr::FuncAppl(fn_name, args) => {
-                write!(f, "{fn_name}")?;
-
-                for arg in args {
-                    write!(f, " ")?;
-                    Self::fmt_parenthesized(f, arg)?;
                 }
 
                 Ok(())

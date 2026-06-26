@@ -10,32 +10,27 @@ use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 
 pub struct Resolver {
-    infix_ops: HashMap<String, InfixOp>,
+    infix_functions: HashMap<InfixFunctionKey, InfixFuncionInfo>,
+    index: usize,
 }
 
 #[derive(Clone)]
-pub enum OpAssociativity {
+pub enum Associativity {
     Left,
     Right,
 }
 
-pub struct InfixOp {
-    pub name: String,
-    pub associativity: OpAssociativity,
-    pub precedence: i32,
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum InfixFunctionKey {
+    Op(OpKind),
+    Identifier(String),
 }
 
-// fn token_op_key(token: &Token) -> Option<&str> {
-//     match &token.kind {
-//         TokenKind::Plus => Some("+"),
-//         TokenKind::Minus => Some("-"),
-//         TokenKind::Star => Some("*"),
-//         TokenKind::Slash => Some("/"),
-//         TokenKind::Arrow => Some("->"),
-//         TokenKind::Identifier(name) => Some(name.as_str()),
-//         _ => None,
-//     }
-// }
+pub struct InfixFuncionInfo {
+    pub name: String,
+    pub associativity: Associativity,
+    pub precedence: i32,
+}
 
 fn is_primary_starter(parsed_expr: &ParsedExpr) -> bool {
     match parsed_expr {
@@ -55,30 +50,59 @@ fn is_primary_starter(parsed_expr: &ParsedExpr) -> bool {
 impl Resolver {
     fn new() -> Self {
         Self {
-            infix_ops: [
-                ("*", OpAssociativity::Left, 3),
-                ("/", OpAssociativity::Left, 3),
-                ("+", OpAssociativity::Left, 2),
-                ("-", OpAssociativity::Left, 2),
-                ("->", OpAssociativity::Right, 1),
-            ]
-            .iter()
-            .map(|(sym, assoc, prec)| {
+            infix_functions: HashMap::from([
                 (
-                    sym.to_string(),
-                    InfixOp {
-                        name: sym.to_string(),
-                        associativity: assoc.clone(),
-                        precedence: *prec,
+                    InfixFunctionKey::Op(OpKind::Star),
+                    InfixFuncionInfo {
+                        name: "*".into(),
+                        associativity: Associativity::Left,
+                        precedence: 3,
                     },
-                )
-            })
-            .collect(),
+                ),
+                (
+                    InfixFunctionKey::Op(OpKind::Slash),
+                    InfixFuncionInfo {
+                        name: "/".into(),
+                        associativity: Associativity::Left,
+                        precedence: 3,
+                    },
+                ),
+                (
+                    InfixFunctionKey::Op(OpKind::Plus),
+                    InfixFuncionInfo {
+                        name: "+".into(),
+                        associativity: Associativity::Left,
+                        precedence: 2,
+                    },
+                ),
+                (
+                    InfixFunctionKey::Op(OpKind::Minus),
+                    InfixFuncionInfo {
+                        name: "-".into(),
+                        associativity: Associativity::Left,
+                        precedence: 2,
+                    },
+                ),
+                (
+                    InfixFunctionKey::Op(OpKind::Arrow),
+                    InfixFuncionInfo {
+                        name: "->".into(),
+                        associativity: Associativity::Right,
+                        precedence: 1,
+                    },
+                ),
+            ]),
+            index: 0,
         }
     }
 
-    fn get_binary_op(&self, parsed_expr: &ParsedExpr) -> Option<&InfixOp> {
-        token_op_key(token).and_then(|key: &str| self.infix_ops.get(key))
+    fn get_binary_op(&self, parsed_expr: &ParsedExpr) -> Option<&InfixFuncionInfo> {
+        let key = match parsed_expr {
+            ParsedExpr::Op(kind) => InfixFunctionKey::Op(kind.clone()),
+            ParsedExpr::Identifier(name) => InfixFunctionKey::Identifier(name.clone()),
+            _ => return None,
+        };
+        self.infix_functions.get(&key)
     }
 
     pub fn resolve(
@@ -129,18 +153,26 @@ impl Resolver {
                     .collect::<Result<Vec<ResolvedExpr>, FogError>>()?,
             )),
 
-            ParsedExpr::Collection(exprs) => Self::resolve_collection(exprs, i32::MIN),
+            ParsedExpr::Collection(exprs) => {
+                let mut resolver: Resolver = Resolver::new();
+                resolver.resolve_collection(&exprs, i32::MIN)
+            }
         }
     }
 
-    fn resolve_collection(parsed_exprs: Vec<ParsedExpr>, min_prec: i32) -> FogResult<ResolvedExpr> {
-        let mut index: usize = 0;
-        let mut lhs: ResolvedExpr = Self::resolve_prefix(parsed_exprs, &mut index)?;
+    fn resolve_collection(
+        &mut self,
+        exprs: &Vec<ParsedExpr>,
+        min_prec: i32,
+    ) -> FogResult<ResolvedExpr> {
+        let mut lhs: ResolvedExpr = self.resolve_primary(exprs)?;
 
         loop {
-            let curr: ParsedExpr = parsed_exprs[index];
+            if self.index >= exprs.len() {
+                break;
+            }
 
-            let op: &InfixOp = match self.get_binary_op(curr) {
+            let op: &InfixFuncionInfo = match self.get_binary_op(&exprs[self.index]) {
                 Some(op) => op,
                 None => break,
             };
@@ -151,14 +183,16 @@ impl Resolver {
 
             let op_name: String = op.name.clone();
             let op_prec: i32 = op.precedence;
-            let op_assoc: OpAssociativity = op.associativity.clone();
+            let op_assoc: Associativity = op.associativity.clone();
 
-            index += 1;
+            self.index += 1;
 
-            let rhs: ResolvedExpr = match op_assoc {
-                OpAssociativity::Left => Self::resolve_collection(parsed_exprs[index], op_prec + 1),
-                OpAssociativity::Right => Self::resolve_collection(parsed_exprs[index], op_prec),
-            }?;
+            let next_min_prec: i32 = match op_assoc {
+                Associativity::Left => op_prec + 1,
+                Associativity::Right => op_prec,
+            };
+
+            let rhs: ResolvedExpr = self.resolve_collection(exprs, next_min_prec)?;
 
             lhs = ResolvedExpr::FuncAppl(op_name, vec![lhs, rhs]);
         }
@@ -166,110 +200,67 @@ impl Resolver {
         Ok(lhs)
     }
 
-    fn resolve_prefix(parsed_exprs: Vec<ParsedExpr>, index: &mut usize) -> FogResult<ResolvedExpr> {
+    fn resolve_primary(&mut self, exprs: &[ParsedExpr]) -> FogResult<ResolvedExpr> {
+        let head: ResolvedExpr = self.resolve_atomic(exprs)?;
+
+        let name: String = match &head {
+            ResolvedExpr::Identifier(name) => name.clone(),
+            _ => return Ok(head),
+        };
+
+        let mut args: Vec<ResolvedExpr> = Vec::new();
+
+        while self.index < exprs.len() && is_primary_starter(&exprs[self.index]) {
+            args.push(self.resolve_atomic(exprs)?);
+        }
+
+        if args.is_empty() {
+            Ok(head)
+        } else {
+            Ok(ResolvedExpr::FuncAppl(name, args))
+        }
     }
 
-    fn resolve_primary(&mut self) -> FogResult<ResolvedExpr> {
-        let head: ResolvedExpr = self.resolve_atomic()?;
+    fn resolve_atomic(&mut self, exprs: &[ParsedExpr]) -> FogResult<ResolvedExpr> {
+        let expr: ParsedExpr = exprs[self.index].clone();
+        self.index += 1;
 
-        // check for function application
-        if let ResolvedExpr::Identifier(name) = &head {
-            let mut args: Vec<ResolvedExpr> = Vec::new();
+        match expr {
+            ParsedExpr::Identifier(name) => Ok(ResolvedExpr::Identifier(name)),
 
-            while self.pos < self.tokens.len() && is_primary_starter(self.peek()) {
-                let arg: ResolvedExpr = self.resolve_atomic()?;
-                args.push(arg);
+            ParsedExpr::Int32Literal(value) => Ok(ResolvedExpr::Int32Literal(value)),
+            ParsedExpr::Float32Literal(value) => Ok(ResolvedExpr::Float32Literal(value)),
+
+            ParsedExpr::Op(OpKind::Minus) => {
+                let operand: ResolvedExpr = self.resolve_atomic(exprs)?;
+                Ok(ResolvedExpr::FuncAppl("-".to_string(), vec![operand]))
             }
 
-            if !args.is_empty() {
-                return Ok(ResolvedExpr::FuncAppl(name.clone(), args));
-            }
-        }
+            ParsedExpr::Lambda(param_name, param_type, body) => Ok(ResolvedExpr::Lambda(
+                param_name,
+                Box::new(Self::resolve_expr(*param_type)?),
+                Rc::new(Self::resolve_expr(*body)?),
+            )),
 
-        Ok(head)
-    }
+            ParsedExpr::Tuple(items) => Ok(ResolvedExpr::Tuple(
+                items
+                    .into_iter()
+                    .map(Self::resolve_expr)
+                    .collect::<Result<Vec<ResolvedExpr>, FogError>>()?,
+            )),
 
-    fn resolve_atomic(&mut self) -> FogResult<ResolvedExpr> {
-        let token: Token = self.peek().clone();
-        self.next();
-
-        if let TokenKind::Int32Literal(value) = token.kind {
-            return Ok(ResolvedExpr::Int32Literal(value));
-        }
-
-        if let TokenKind::Float32Literal(value) = token.kind {
-            return Ok(ResolvedExpr::Float32Literal(value));
-        }
-
-        if let TokenKind::Minus = token.kind {
-            let opnd: ResolvedExpr = self.parse_primary()?;
-
-            return Ok(ResolvedExpr::FuncAppl("-".to_string(), vec![opnd]));
-        }
-
-        if let TokenKind::Identifier(name) = token.kind {
-            // check if it's a lambda
-            if let TokenKind::Colon = self.peek().kind {
-                self.next();
-
-                let param_type: ResolvedExpr = self.parse_expression(i32::MIN)?;
-
-                let TokenKind::FatArrow = self.peek().kind else {
-                    return Err(FogError::parse(
-                        "expected `=>`".to_string(),
-                        Some(Span {
-                            pos: self.peek().pos,
-                            line: self.peek().line,
-                            column: self.peek().column,
-                        }),
-                    ));
-                };
-                self.next();
-
-                let body: ResolvedExpr = self.parse_expression(i32::MIN)?;
-
-                return Ok(ResolvedExpr::Lambda(
-                    name,
-                    Box::new(param_type),
-                    Box::new(body),
-                ));
+            ParsedExpr::Collection(inner) => {
+                let saved_index: usize = self.index;
+                self.index = 0;
+                let result: ResolvedExpr = self.resolve_collection(&inner, i32::MIN)?;
+                self.index = saved_index;
+                Ok(result)
             }
 
-            // otherwise, it's an identifier
-            return Ok(ResolvedExpr::Identifier(name));
+            ParsedExpr::Op(_) => Err(FogError::parse(
+                "unexpected infix operator".to_string(),
+                None,
+            )),
         }
-
-        if let TokenKind::LeftParenthesis = token.kind {
-            if let TokenKind::RightParenthesis = self.peek().kind {
-                self.next();
-                return Ok(ResolvedExpr::Tuple(Vec::new()));
-            };
-
-            let res: FogResult<ResolvedExpr> = self.parse_expression(i32::MIN);
-
-            return match self.peek().kind {
-                TokenKind::RightParenthesis => {
-                    self.next();
-                    res
-                }
-                _ => Err(FogError::parse(
-                    "expected `)`".to_string(),
-                    Some(Span {
-                        pos: token.pos,
-                        line: token.line,
-                        column: token.column,
-                    }),
-                )),
-            };
-        }
-
-        Err(FogError::parse(
-            "atomic expression parsing error".to_string(),
-            Some(Span {
-                pos: token.pos,
-                line: token.line,
-                column: token.column,
-            }),
-        ))
     }
 }

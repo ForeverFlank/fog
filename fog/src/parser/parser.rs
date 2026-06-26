@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
