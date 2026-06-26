@@ -8,12 +8,12 @@ use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
-use crate::parser::parsed_expr::ParsedExpr;
+use crate::parser::resolved_expr::ResolvedExpr;
 
-pub fn eval_expr(expr: &ParsedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
+pub fn eval_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
         // variable
-        ParsedExpr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
+        ResolvedExpr::Identifier(name) => env.get_var(&name)?.value.ok_or_else(|| {
             FogError::runtime(
                 format!("undeclared variable `{}`", name),
                 Some(span.clone()),
@@ -21,24 +21,21 @@ pub fn eval_expr(expr: &ParsedExpr, env: &Environment, span: &Span) -> FogResult
         }),
 
         // literals
-        ParsedExpr::Int32Literal(value) => Ok(Value::Int32(*value)),
-        ParsedExpr::Float32Literal(value) => Ok(Value::Float32(*value)),
+        ResolvedExpr::Int32Literal(value) => Ok(Value::Int32(*value)),
+        ResolvedExpr::Float32Literal(value) => Ok(Value::Float32(*value)),
 
         // AST lambda -> interpreter function
-        ParsedExpr::Lambda {
-            param_name: param,
-            param_type,
-            body,
-        } => Ok(Value::Function {
-            param: param.clone(),
+        ResolvedExpr::Lambda(param_name, param_type, body) => Ok(Value::Function {
+            param_name: param_name.clone(),
             param_type: eval_type_expr(param_type, env)?,
             body: Rc::clone(body),
             captured_env: Box::new(env.clone()),
         }),
 
         // function application
-        ParsedExpr::FuncAppl(fn_name, args) => {
-            let mut result: Value = eval_expr(&ParsedExpr::Identifier(fn_name.clone()), env, span)?;
+        ResolvedExpr::FuncAppl(fn_name, args) => {
+            let mut result: Value =
+                eval_expr(&ResolvedExpr::Identifier(fn_name.clone()), env, span)?;
             for arg in args {
                 let argument: Value = eval_expr(arg, env, span)?;
                 result = apply_function(result, argument, span)?;
@@ -47,7 +44,7 @@ pub fn eval_expr(expr: &ParsedExpr, env: &Environment, span: &Span) -> FogResult
         }
 
         // tuple
-        ParsedExpr::Tuple(exprs) => Ok(Value::Tuple(
+        ResolvedExpr::Tuple(exprs) => Ok(Value::Tuple(
             exprs
                 .iter()
                 .map(|expr| Ok(eval_expr(expr, env, span)?.into()))
@@ -55,29 +52,25 @@ pub fn eval_expr(expr: &ParsedExpr, env: &Environment, span: &Span) -> FogResult
         )),
 
         // etc.
-        ParsedExpr::DataConstructor { .. } => Err(FogError::runtime(
+        ResolvedExpr::DataConstructor(_, _) => Err(FogError::runtime(
             "cannot evaluate data constructor as value".to_string(),
-            Some(span.clone()),
-        )),
-        ParsedExpr::Collection(_) => Err(FogError::runtime(
-            "unresolved name collection".to_string(),
             Some(span.clone()),
         )),
     }
 }
 
-pub fn eval_type_expr(expr: &ParsedExpr, env: &Environment) -> FogResult<Type> {
+pub fn eval_type_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
     match expr {
-        ParsedExpr::Identifier(name) => Ok(env.get_type(name)?),
+        ResolvedExpr::Identifier(name) => Ok(env.get_type(name)?),
 
-        ParsedExpr::FuncAppl(fn_name, args) if fn_name == "->" && args.len() == 2 => {
+        ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "->" && args.len() == 2 => {
             let left: Type = eval_type_expr(&args[0], env)?;
             let right: Type = eval_type_expr(&args[1], env)?;
 
             Ok(Type::Function(Box::new(left), Box::new(right)))
         }
 
-        ParsedExpr::FuncAppl(fn_name, args) if fn_name == "*" && args.len() == 2 => {
+        ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "*" && args.len() == 2 => {
             let left: Type = eval_type_expr(&args[0], env)?;
             let right: Type = eval_type_expr(&args[1], env)?;
 
@@ -96,7 +89,7 @@ pub fn eval_type_expr(expr: &ParsedExpr, env: &Environment) -> FogResult<Type> {
             Ok(Type::Product(types))
         }
 
-        ParsedExpr::FuncAppl(fn_name, args) if fn_name == "+" && args.len() == 2 => {
+        ResolvedExpr::FuncAppl(fn_name, args) if fn_name == "+" && args.len() == 2 => {
             let left: Type = eval_type_expr(&args[0], env)?;
             let right: Type = eval_type_expr(&args[1], env)?;
 
@@ -124,8 +117,8 @@ pub fn eval_type_expr(expr: &ParsedExpr, env: &Environment) -> FogResult<Type> {
             Ok(Type::Sum(concatenated))
         }
 
-        ParsedExpr::FuncAppl(fn_name, args) => {
-            let fn_type: Type = eval_type_expr(&ParsedExpr::Identifier(fn_name.clone()), env)?;
+        ResolvedExpr::FuncAppl(fn_name, args) => {
+            let fn_type: Type = eval_type_expr(&ResolvedExpr::Identifier(fn_name.clone()), env)?;
             let mut current_type: Type = fn_type;
 
             for arg in args {
@@ -160,22 +153,17 @@ pub fn eval_type_expr(expr: &ParsedExpr, env: &Environment) -> FogResult<Type> {
             Ok(current_type)
         }
 
-        ParsedExpr::DataConstructor(name, args) => {
+        ResolvedExpr::DataConstructor(name, args) => {
             let ctor: DataConstructor = DataConstructor {
                 variant: name.clone(),
                 types: args
                     .iter()
-                    .map(|arg: &ParsedExpr| Ok(eval_type_expr(arg, env)?.into()))
+                    .map(|arg: &ResolvedExpr| Ok(eval_type_expr(arg, env)?.into()))
                     .collect::<Result<Vec<Type>, FogError>>()?,
             };
 
             Ok(Type::Sum(vec![ctor]))
         }
-
-        ParsedExpr::Collection(_) => Err(FogError::runtime(
-            "unresolved name collection".to_string(),
-            None,
-        )),
 
         _ => Err(FogError::runtime(
             format!("`{}` is not a type", expr.to_string()),
@@ -187,7 +175,7 @@ pub fn eval_type_expr(expr: &ParsedExpr, env: &Environment) -> FogResult<Type> {
 fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
     match function {
         Value::Function {
-            param,
+            param_name,
             param_type,
             body,
             captured_env,
@@ -195,9 +183,9 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
             let mut child_env: Environment = Environment::new(Some(captured_env));
 
             child_env.variables.insert(
-                param.clone(),
+                param_name.clone(),
                 Variable {
-                    name: param.clone(),
+                    name: param_name.clone(),
                     value: Some(argument),
                     r#type: param_type,
                 },

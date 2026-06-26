@@ -7,10 +7,10 @@ use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parser::parsed_expr::*;
 
-pub struct ASTParser<'a> {
+pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     pos: usize,
-    binary_ops: HashMap<String, BinaryOp>,
+    infix_ops: HashMap<String, InfixOp>,
 }
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ pub enum OpAssociativity {
     Right,
 }
 
-pub struct BinaryOp {
+pub struct InfixOp {
     pub name: String,
     pub associativity: OpAssociativity,
     pub precedence: i32,
@@ -48,12 +48,12 @@ fn is_primary_starter(token: &Token) -> bool {
     }
 }
 
-impl ASTParser<'_> {
-    fn new(tokens: &'_ Vec<Token>) -> ASTParser<'_> {
-        ASTParser {
+impl Parser<'_> {
+    fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
+        Parser {
             tokens,
             pos: 0,
-            binary_ops: [
+            infix_ops: [
                 ("*", OpAssociativity::Left, 3),
                 ("/", OpAssociativity::Left, 3),
                 ("+", OpAssociativity::Left, 2),
@@ -64,7 +64,7 @@ impl ASTParser<'_> {
             .map(|(sym, assoc, prec)| {
                 (
                     sym.to_string(),
-                    BinaryOp {
+                    InfixOp {
                         name: sym.to_string(),
                         associativity: assoc.clone(),
                         precedence: *prec,
@@ -83,31 +83,29 @@ impl ASTParser<'_> {
         self.tokens.get(self.pos).expect("unexpected EOF")
     }
 
-    fn get_binary_op(&self, token: &Token) -> Option<&BinaryOp> {
-        token_op_key(token).and_then(|key| self.binary_ops.get(key))
+    fn get_binary_op(&self, token: &Token) -> Option<&InfixOp> {
+        token_op_key(token).and_then(|key| self.infix_ops.get(key))
     }
 
-    pub fn parse_program(tokens: &Vec<Token>) -> (Box<Program>, Vec<FogError>) {
-        let mut parser: ASTParser = ASTParser::new(&tokens);
-        let mut statements: Vec<Statement> = Vec::new();
+    pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
+        let mut parser: Parser = Parser::new(&tokens);
+        let mut statements: Vec<ParsedStatement> = Vec::new();
         let mut errors: Vec<FogError> = Vec::new();
 
         while parser.pos < parser.tokens.len() {
             if let Some(result) = parser.parse_statement() {
                 match result {
-                    Ok(statement) => statements.push(statement),
+                    Ok(stmt) => statements.push(stmt),
                     Err(error) => errors.push(error),
                 }
             }
             parser.next();
         }
 
-        let program: Box<Program> = Box::new(Program { statements });
-
-        (program, errors)
+        (statements, errors)
     }
 
-    fn parse_statement(&mut self) -> Option<FogResult<Statement>> {
+    fn parse_statement(&mut self) -> Option<FogResult<ParsedStatement>> {
         let name: String = match &self.peek().kind {
             TokenKind::Identifier(name) => name.clone(),
             _ => return None,
@@ -121,18 +119,18 @@ impl ASTParser<'_> {
 
         self.next();
 
-        let result: FogResult<Statement> = match self.peek().kind {
+        let result: FogResult<ParsedStatement> = match self.peek().kind {
             TokenKind::Colon => {
                 self.next();
 
                 self.parse_expression(i32::MIN)
-                    .map(|expr| Statement::TypeAnnotation(name, expr, span))
+                    .map(|expr| ParsedStatement::TypeAnnotation(name, expr, span))
             }
             TokenKind::Equal => {
                 self.next();
 
                 self.parse_expression(i32::MIN)
-                    .map(|expr| Statement::Declaration(name, expr, span))
+                    .map(|expr| ParsedStatement::Declaration(name, expr, span))
             }
             _ => Err(FogError::parse(
                 "expected `:` or `=`".to_string(),
@@ -153,7 +151,7 @@ impl ASTParser<'_> {
         while self.pos < self.tokens.len() {
             let token: &Token = self.peek();
 
-            let op: &BinaryOp = match self.get_binary_op(token) {
+            let op: &InfixOp = match self.get_binary_op(token) {
                 Some(op) => op,
                 None => break,
             };
@@ -238,11 +236,11 @@ impl ASTParser<'_> {
 
                 let body: ParsedExpr = self.parse_expression(i32::MIN)?;
 
-                return Ok(ParsedExpr::Lambda {
-                    param_name: name,
-                    param_type: Box::new(param_type),
-                    body: Rc::new(body),
-                });
+                return Ok(ParsedExpr::Lambda(
+                    name,
+                    Box::new(param_type),
+                    Rc::new(body),
+                ));
             }
 
             // otherwise, it's an identifier

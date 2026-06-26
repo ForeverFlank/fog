@@ -4,11 +4,7 @@ use std::rc::Rc;
 
 use crate::error::Span;
 
-pub struct Program {
-    pub statements: Vec<Statement>,
-}
-
-pub enum Statement {
+pub enum ResolvedStatement {
     TypeAnnotation(String, ResolvedExpr, Span),
     Declaration(String, ResolvedExpr, Span),
 }
@@ -19,11 +15,7 @@ pub enum ResolvedExpr {
     Int32Literal(i32),
     Float32Literal(f32),
 
-    Lambda {
-        param_name: String,
-        param_type: Box<ResolvedExpr>,
-        body: Rc<ResolvedExpr>,
-    },
+    Lambda(String, Box<ResolvedExpr>, Rc<ResolvedExpr>),
 
     Tuple(Vec<ResolvedExpr>),
 
@@ -55,18 +47,14 @@ impl Display for ResolvedExpr {
                 let contents: String = exprs
                     .iter()
                     .map(ToString::to_string)
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<String>>()
                     .join(", ");
 
                 write!(f, "({contents})")
             }
 
-            ResolvedExpr::Lambda {
-                param_name: param,
-                body,
-                ..
-            } => {
-                write!(f, "{param} => {body}")
+            ResolvedExpr::Lambda(param_name, _, body) => {
+                write!(f, "{param_name} => {body}")
             }
 
             ResolvedExpr::FuncAppl(fn_name, args) => {

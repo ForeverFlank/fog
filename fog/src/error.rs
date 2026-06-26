@@ -11,6 +11,7 @@ pub enum ErrorKind {
     Runtime,
 }
 
+#[derive(Clone)]
 pub struct FogError {
     pub kind: ErrorKind,
     pub message: String,

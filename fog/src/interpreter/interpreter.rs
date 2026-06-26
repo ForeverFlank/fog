@@ -9,9 +9,10 @@ use crate::interpreter::eval::eval_type_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
-use crate::parser::parsed_expr::ParsedExpr;
-use crate::parser::parsed_expr::Program;
-use crate::parser::parsed_expr::Statement::*;
+use crate::parser::program::Program;
+use crate::parser::program::Statement::Declaration;
+use crate::parser::program::Statement::TypeAnnotation;
+use crate::parser::resolved_expr::ResolvedExpr;
 
 pub struct Interpreter {
     pub program: Box<Program>,
@@ -134,12 +135,22 @@ impl Interpreter {
     }
 }
 
-fn annotate_type(name: &str, expr: &ParsedExpr, env: &mut Environment, span: &Span) -> FogResult<()> {
+fn annotate_type(
+    name: &str,
+    expr: &ResolvedExpr,
+    env: &mut Environment,
+    span: &Span,
+) -> FogResult<()> {
     let r#type: Type = eval_type_expr(&expr, env)?;
     (*env).annotate_type(name, r#type, span)
 }
 
-fn declare(name: &String, expr: &ParsedExpr, env: &mut Environment, span: &Span) -> FogResult<()> {
+fn declare(
+    name: &String,
+    expr: &ResolvedExpr,
+    env: &mut Environment,
+    span: &Span,
+) -> FogResult<()> {
     if env.variables.contains_key(name) {
         (*env).declare_value(name, eval_expr(expr, env, span)?, span)?;
         return Ok(());
