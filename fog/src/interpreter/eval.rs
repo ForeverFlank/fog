@@ -6,6 +6,7 @@ use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
+use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 use crate::parser::resolved_expr::ResolvedExpr;
@@ -40,7 +41,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
         ResolvedExpr::Tuple { exprs } => Ok(Value::Tuple(
             exprs
                 .iter()
-                .map(|expr| Ok(eval_value_expr(expr, env, span)?.into()))
+                .map(|expr| eval_value_expr(expr, env, span))
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
@@ -261,12 +262,7 @@ pub fn make_data_constructor_function(
     let rest: Vec<Type> = rest.to_vec();
     let parent_type: Type = parent_type.clone();
 
-    let return_type: Type = rest
-        .iter()
-        .rev()
-        .fold(parent_type.clone(), |ret, field_type| {
-            Type::Function(Box::new(field_type.clone()), Box::new(ret))
-        });
+    let return_type = nest_function_types(&rest, parent_type.clone());
 
     Value::NativeFunction {
         param_type: next_field,

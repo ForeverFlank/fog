@@ -15,6 +15,7 @@ mod error;
 mod interpreter;
 mod lexer;
 mod parser;
+mod util;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- arguments and paths ---
@@ -35,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         print_tokens(&tokens);
     }
 
-    print_lexer_errors(&lexer_errors);
+    print_errors("lexer", &lexer_errors);
 
     // -- AST parsing
     let (ast, parser_errors) = parse_program(&tokens);
@@ -46,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = fs::write(output_path, puml);
     }
 
-    print_parser_errors(&parser_errors);
+    print_errors("parser", &parser_errors);
 
     // interpreting
 
@@ -68,15 +69,14 @@ fn print_tokens(tokens: &Vec<Token>) {
     }
 }
 
-fn print_lexer_errors(errors: &Vec<FogError>) {
+fn print_errors(label: &str, errors: &[FogError]) {
     for error in errors {
-        let span = error.span.as_ref();
-        match span {
+        match error.span.as_ref() {
             Some(span) => println!(
-                "lexer error ({}:{}): {}",
+                "{label} error ({}:{}): {}",
                 span.line, span.column, error.message
             ),
-            None => println!("lexer error: {}", error.message),
+            None => println!("{label} error: {}", error.message),
         }
     }
 }
@@ -130,41 +130,30 @@ fn emit_ast_puml_statement(
     stmt: &parser::resolved_expr::ResolvedStatement,
 ) -> i32 {
     match stmt {
-        TypeAnnotation { name, expr, .. } => emit_ast_puml_type_annotation(out, id, name, expr),
-        Declaration { name, expr, .. } => emit_ast_puml_declaration(out, id, name, expr),
+        TypeAnnotation { name, expr, .. } => {
+            emit_ast_puml_named_stmt(out, id, "TypeAnnotation", name, expr)
+        }
+        Declaration { name, expr, .. } => {
+            emit_ast_puml_named_stmt(out, id, "Declaration", name, expr)
+        }
     }
 }
 
-fn emit_ast_puml_type_annotation(
+fn emit_ast_puml_named_stmt(
     out: &mut String,
     id: &mut i32,
-    name: &String,
+    label: &str,
+    name: &str,
     expr: &ResolvedExpr,
 ) -> i32 {
-    let ta_id: i32 = new_node(out, id, "TypeAnnotation", COLOR_STATEMENT);
-    let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
+    let node_id: i32 = new_node(out, id, label, COLOR_STATEMENT);
+    let ident_id: i32 = new_node(out, id, name, COLOR_IDENTIFIER);
     let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
 
-    edge(out, ta_id, ident_id);
-    edge(out, ta_id, expr_id);
+    edge(out, node_id, ident_id);
+    edge(out, node_id, expr_id);
 
-    ta_id
-}
-
-fn emit_ast_puml_declaration(
-    out: &mut String,
-    id: &mut i32,
-    name: &String,
-    expr: &ResolvedExpr,
-) -> i32 {
-    let decl_id: i32 = new_node(out, id, "Declaration", COLOR_STATEMENT);
-    let ident_id: i32 = new_node(out, id, &format!("{}", name), COLOR_IDENTIFIER);
-    let expr_id: i32 = emit_ast_puml_expr(out, id, expr);
-
-    edge(out, decl_id, ident_id);
-    edge(out, decl_id, expr_id);
-
-    decl_id
+    node_id
 }
 
 fn emit_ast_puml_expr(
@@ -190,7 +179,8 @@ fn emit_ast_puml_expr(
             body,
         } => {
             let lambda_id: i32 = new_node(out, id, "Lambda", COLOR_LAMBDA);
-            let param_id: i32 = emit_ast_puml_type_annotation(out, id, param_name, param_type);
+            let param_id: i32 =
+                emit_ast_puml_named_stmt(out, id, "TypeAnnotation", param_name, param_type);
             let body_id: i32 = emit_ast_puml_expr(out, id, body);
 
             edge(out, lambda_id, param_id);
@@ -215,21 +205,6 @@ fn emit_ast_puml_expr(
                 edge(out, appl_id, arg_id);
             }
             appl_id
-        }
-    }
-}
-
-fn print_parser_errors(errors: &Vec<FogError>) {
-    for error in errors {
-        let span = error.span.as_ref();
-        match span {
-            Some(span) => {
-                println!(
-                    "parser error ({}:{}): {}",
-                    span.line, span.column, error.message,
-                )
-            }
-            None => println!("parser error: {}", error.message),
         }
     }
 }

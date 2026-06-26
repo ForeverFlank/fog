@@ -3,6 +3,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 
 use crate::error::Span;
+use crate::util::format_joined;
 
 pub enum ResolvedStatement {
     TypeAnnotation {
@@ -45,15 +46,12 @@ pub enum ResolvedExpr {
     },
 }
 
-impl ResolvedExpr {
-    fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ResolvedExpr) -> fmt::Result {
-        let s: String = expr.to_string();
-
-        if s.contains(' ') {
-            write!(f, "({s})")
-        } else {
-            write!(f, "{s}")
-        }
+fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ResolvedExpr) -> fmt::Result {
+    let s = expr.to_string();
+    if s.contains(' ') {
+        write!(f, "({s})")
+    } else {
+        write!(f, "{s}")
     }
 }
 
@@ -65,15 +63,7 @@ impl Display for ResolvedExpr {
             ResolvedExpr::Int32Literal { value } => write!(f, "{value}"),
             ResolvedExpr::Float32Literal { value } => write!(f, "{value}"),
 
-            ResolvedExpr::Tuple { exprs } => {
-                let contents: String = exprs
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ");
-
-                write!(f, "({contents})")
-            }
+            ResolvedExpr::Tuple { exprs } => write!(f, "({})", format_joined(exprs, ", ")),
 
             ResolvedExpr::Lambda {
                 param_name, body, ..
@@ -86,7 +76,7 @@ impl Display for ResolvedExpr {
 
                 for arg in args {
                     write!(f, " ")?;
-                    Self::fmt_parenthesized(f, arg)?;
+                    fmt_parenthesized(f, arg)?;
                 }
 
                 Ok(())

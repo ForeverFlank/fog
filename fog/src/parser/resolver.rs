@@ -141,6 +141,27 @@ impl Resolver {
         }
     }
 
+    fn resolve_lambda(
+        param_name: String,
+        param_type: Box<ParsedExpr>,
+        body: Box<ParsedExpr>,
+    ) -> FogResult<ResolvedExpr> {
+        Ok(ResolvedExpr::Lambda {
+            param_name,
+            param_type: Box::new(Self::resolve_expr(*param_type)?),
+            body: Rc::new(Self::resolve_expr(*body)?),
+        })
+    }
+
+    fn resolve_tuple(exprs: Vec<ParsedExpr>) -> FogResult<ResolvedExpr> {
+        Ok(ResolvedExpr::Tuple {
+            exprs: exprs
+                .into_iter()
+                .map(Self::resolve_expr)
+                .collect::<Result<Vec<_>, _>>()?,
+        })
+    }
+
     fn resolve_expr(parsed_expr: ParsedExpr) -> FogResult<ResolvedExpr> {
         match parsed_expr {
             ParsedExpr::Identifier { name } => Ok(ResolvedExpr::Identifier { name }),
@@ -153,18 +174,9 @@ impl Resolver {
                 param_name,
                 param_type,
                 body,
-            } => Ok(ResolvedExpr::Lambda {
-                param_name,
-                param_type: Box::new(Self::resolve_expr(*param_type)?),
-                body: Rc::new(Self::resolve_expr(*body)?),
-            }),
+            } => Self::resolve_lambda(param_name, param_type, body),
 
-            ParsedExpr::Tuple { exprs } => Ok(ResolvedExpr::Tuple {
-                exprs: exprs
-                    .iter()
-                    .map(|expr: &ParsedExpr| Ok(Self::resolve_expr(expr.clone())?.into()))
-                    .collect::<Result<Vec<ResolvedExpr>, FogError>>()?,
-            }),
+            ParsedExpr::Tuple { exprs } => Self::resolve_tuple(exprs),
 
             ParsedExpr::Collection { exprs } => {
                 let mut resolver: Resolver = Resolver::new();
@@ -264,18 +276,9 @@ impl Resolver {
                 param_name,
                 param_type,
                 body,
-            } => Ok(ResolvedExpr::Lambda {
-                param_name,
-                param_type: Box::new(Self::resolve_expr(*param_type)?),
-                body: Rc::new(Self::resolve_expr(*body)?),
-            }),
+            } => Self::resolve_lambda(param_name, param_type, body),
 
-            ParsedExpr::Tuple { exprs } => Ok(ResolvedExpr::Tuple {
-                exprs: exprs
-                    .into_iter()
-                    .map(Self::resolve_expr)
-                    .collect::<Result<Vec<ResolvedExpr>, FogError>>()?,
-            }),
+            ParsedExpr::Tuple { exprs } => Self::resolve_tuple(exprs),
 
             ParsedExpr::Collection { exprs: inner } => {
                 let saved_index: usize = self.index;

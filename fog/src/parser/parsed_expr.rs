@@ -2,6 +2,7 @@ use std::fmt;
 use std::fmt::Display;
 
 use crate::error::Span;
+use crate::util::format_joined;
 
 // --- statement ---
 
@@ -74,15 +75,12 @@ pub enum ParsedExpr {
     },
 }
 
-impl ParsedExpr {
-    fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ParsedExpr) -> fmt::Result {
-        let s: String = expr.to_string();
-
-        if s.contains(' ') {
-            write!(f, "({s})")
-        } else {
-            write!(f, "{s}")
-        }
+fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ParsedExpr) -> fmt::Result {
+    let s = expr.to_string();
+    if s.contains(' ') {
+        write!(f, "({s})")
+    } else {
+        write!(f, "{s}")
     }
 }
 
@@ -95,15 +93,7 @@ impl Display for ParsedExpr {
             ParsedExpr::Int32Literal { value } => write!(f, "{value}"),
             ParsedExpr::Float32Literal { value } => write!(f, "{value}"),
 
-            ParsedExpr::Tuple { exprs } => {
-                let contents: String = exprs
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ");
-
-                write!(f, "({contents})")
-            }
+            ParsedExpr::Tuple { exprs } => write!(f, "({})", format_joined(exprs, ", ")),
 
             ParsedExpr::Lambda {
                 param_name, body, ..
@@ -116,7 +106,7 @@ impl Display for ParsedExpr {
                     if i > 0 {
                         write!(f, " ")?;
                     }
-                    Self::fmt_parenthesized(f, expr)?;
+                    fmt_parenthesized(f, expr)?;
                 }
 
                 Ok(())

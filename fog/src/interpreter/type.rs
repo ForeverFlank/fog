@@ -8,6 +8,7 @@ use crate::interpreter::eval::eval_type_annotation_expr;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
+use crate::util::format_joined;
 
 // --- type ---
 
@@ -68,11 +69,7 @@ impl ToString for Type {
             Type::Kind => "Kind".to_string(),
             Type::Type => "Type".to_string(),
             Type::Function(param_type, return_type) => {
-                format!(
-                    "{} -> {}",
-                    (*param_type).to_string(),
-                    (*return_type).to_string()
-                )
+                format!("{} -> {}", param_type.to_string(), return_type.to_string())
             }
 
             Type::Int32 => "Int32".to_string(),
@@ -82,19 +79,11 @@ impl ToString for Type {
                 if types.is_empty() {
                     "Unit".to_string()
                 } else {
-                    types
-                        .iter()
-                        .map(|t: &Type| t.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" * ")
+                    format_joined(types, " * ")
                 }
             }
 
-            Type::Sum(ctors) => ctors
-                .iter()
-                .map(|ctor: &DataConstructor| ctor.to_string())
-                .collect::<Vec<String>>()
-                .join(" + "),
+            Type::Sum(ctors) => format_joined(ctors, " + "),
         }
     }
 }
@@ -121,6 +110,12 @@ impl std::fmt::Display for DataConstructor {
 
 // --- functions ---
 
+pub fn nest_function_types(field_types: &[Type], return_type: Type) -> Type {
+    field_types.iter().rev().fold(return_type, |ret, ft| {
+        Type::Function(Box::new(ft.clone()), Box::new(ret))
+    })
+}
+
 pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult<Type> {
     match value {
         Value::Int32(_) => Ok(Type::Int32),
@@ -142,7 +137,7 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
         Value::Tuple(values) => Ok(Type::Product(
             values
                 .iter()
-                .map(|value: &Value| Ok(value_type_of(value, env, span)?.into()))
+                .map(|value| value_type_of(value, env, span))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
 
@@ -185,7 +180,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
         ResolvedExpr::Tuple { exprs } => Ok(Product(
             exprs
                 .iter()
-                .map(|expr: &ResolvedExpr| Ok(expr_type_of(expr, env, span)?.into()))
+                .map(|expr| expr_type_of(expr, env, span))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
     }

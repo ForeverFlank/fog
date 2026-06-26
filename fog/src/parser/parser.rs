@@ -31,6 +31,14 @@ fn is_primary_starter(token: &Token) -> bool {
     }
 }
 
+fn token_span(token: &Token) -> Span {
+    Span {
+        pos: token.pos,
+        line: token.line,
+        column: token.column,
+    }
+}
+
 impl Parser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
         Parser { tokens, pos: 0 }
@@ -68,11 +76,7 @@ impl Parser<'_> {
             _ => return None,
         };
 
-        let span: Span = Span {
-            pos: self.peek().pos,
-            line: self.peek().line,
-            column: self.peek().column,
-        };
+        let span = token_span(self.peek());
 
         self.next();
 
@@ -91,11 +95,7 @@ impl Parser<'_> {
             }
             _ => Err(FogError::parse(
                 "expected `:` or `=`".to_string(),
-                Some(Span {
-                    pos: self.peek().pos,
-                    line: self.peek().line,
-                    column: self.peek().column,
-                }),
+                Some(token_span(self.peek())),
             )),
         };
 
@@ -132,83 +132,61 @@ impl Parser<'_> {
         let token: Token = self.peek().clone();
         self.next();
 
-        if let TokenKind::Int32Literal(value) = token.kind {
-            return Ok(ParsedExpr::Int32Literal { value });
-        }
+        match token.kind {
+            TokenKind::Int32Literal(value) => Ok(ParsedExpr::Int32Literal { value }),
+            TokenKind::Float32Literal(value) => Ok(ParsedExpr::Float32Literal { value }),
+            TokenKind::Minus => Ok(ParsedExpr::Op { kind: OpKind::Minus }),
 
-        if let TokenKind::Float32Literal(value) = token.kind {
-            return Ok(ParsedExpr::Float32Literal { value });
-        }
+            TokenKind::Identifier(name) => {
+                if let TokenKind::Colon = self.peek().kind {
+                    self.next();
 
-        if let TokenKind::Minus = token.kind {
-            return Ok(ParsedExpr::Op {
-                kind: OpKind::Minus,
-            });
-        }
+                    let param_type: ParsedExpr = self.parse_expression()?;
 
-        if let TokenKind::Identifier(name) = token.kind {
-            // check if it's a lambda
-            if let TokenKind::Colon = self.peek().kind {
-                self.next();
+                    let TokenKind::FatArrow = self.peek().kind else {
+                        return Err(FogError::parse(
+                            "expected `=>`".to_string(),
+                            Some(token_span(self.peek())),
+                        ));
+                    };
+                    self.next();
 
-                let param_type: ParsedExpr = self.parse_expression()?;
+                    let body: ParsedExpr = self.parse_expression()?;
 
-                let TokenKind::FatArrow = self.peek().kind else {
-                    return Err(FogError::parse(
-                        "expected `=>`".to_string(),
-                        Some(Span {
-                            pos: self.peek().pos,
-                            line: self.peek().line,
-                            column: self.peek().column,
-                        }),
-                    ));
-                };
-                self.next();
+                    return Ok(ParsedExpr::Lambda {
+                        param_name: name,
+                        param_type: Box::new(param_type),
+                        body: Box::new(body),
+                    });
+                }
 
-                let body: ParsedExpr = self.parse_expression()?;
-
-                return Ok(ParsedExpr::Lambda {
-                    param_name: name,
-                    param_type: Box::new(param_type),
-                    body: Box::new(body),
-                });
+                Ok(ParsedExpr::Identifier { name })
             }
 
-            // if it's not, it's an identifier
-            return Ok(ParsedExpr::Identifier { name });
-        }
-
-        if let TokenKind::LeftParenthesis = token.kind {
-            if let TokenKind::RightParenthesis = self.peek().kind {
-                self.next();
-                return Ok(ParsedExpr::Tuple { exprs: Vec::new() });
-            };
-
-            let res: FogResult<ParsedExpr> = self.parse_expression();
-
-            return match self.peek().kind {
-                TokenKind::RightParenthesis => {
+            TokenKind::LeftParenthesis => {
+                if let TokenKind::RightParenthesis = self.peek().kind {
                     self.next();
-                    res
+                    return Ok(ParsedExpr::Tuple { exprs: Vec::new() });
                 }
-                _ => Err(FogError::parse(
-                    "expected `)`".to_string(),
-                    Some(Span {
-                        pos: token.pos,
-                        line: token.line,
-                        column: token.column,
-                    }),
-                )),
-            };
-        }
 
-        Err(FogError::parse(
-            "atomic expression parsing error".to_string(),
-            Some(Span {
-                pos: token.pos,
-                line: token.line,
-                column: token.column,
-            }),
-        ))
+                let res: FogResult<ParsedExpr> = self.parse_expression();
+
+                match self.peek().kind {
+                    TokenKind::RightParenthesis => {
+                        self.next();
+                        res
+                    }
+                    _ => Err(FogError::parse(
+                        "expected `)`".to_string(),
+                        Some(token_span(&token)),
+                    )),
+                }
+            }
+
+            _ => Err(FogError::parse(
+                "atomic expression parsing error".to_string(),
+                Some(token_span(&token)),
+            )),
+        }
     }
 }

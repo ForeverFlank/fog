@@ -5,6 +5,7 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::eval::make_data_constructor_function;
 use crate::interpreter::r#type::Type;
+use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::r#type::value_type_of;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
@@ -186,12 +187,7 @@ impl Environment {
         };
 
         for ctor in ctors {
-            let ctor_type: Type = ctor.types.iter().rev().fold(
-                parent_sum_type.clone(),
-                |ret: Type, field_type: &Type| {
-                    Type::Function(Box::new(field_type.clone()), Box::new(ret))
-                },
-            );
+            let ctor_type: Type = nest_function_types(&ctor.types, parent_sum_type.clone());
 
             let ctor_value: Value = make_data_constructor_function(
                 ctor.tag.clone(),

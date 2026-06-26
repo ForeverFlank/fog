@@ -99,7 +99,8 @@ impl Interpreter {
         for stmt in &interpreter.statements {
             let result: Result<(), FogError> = match stmt {
                 TypeAnnotation { name, expr, span } => {
-                    Self::annotate_type(name, expr, top_env, span)
+                    eval_type_annotation_expr(expr, top_env)
+                        .and_then(|r#type| top_env.annotate_type(name, r#type, span))
                 }
                 Declaration { name, expr, span } => Self::declare(name, expr, top_env, span),
             };
@@ -137,16 +138,6 @@ impl Interpreter {
         }
     }
 
-    fn annotate_type(
-        name: &str,
-        expr: &ResolvedExpr,
-        env: &mut Environment,
-        span: &Span,
-    ) -> FogResult<()> {
-        let r#type: Type = eval_type_annotation_expr(&expr, env)?;
-        (*env).annotate_type(name, r#type, span)
-    }
-
     fn declare(
         name: &String,
         expr: &ResolvedExpr,
@@ -157,17 +148,17 @@ impl Interpreter {
             if let Type::Type = env.variables[name].r#type {
                 env.variables.remove(name);
                 let r#type: Type = eval_type_definition_expr(expr, env)?;
-                (*env).declare_type(name, r#type.clone(), span)?;
+                env.declare_type(name, r#type.clone(), span)?;
                 return Ok(());
             }
 
-            (*env).declare_value(name, eval_value_expr(expr, env, span)?, span)?;
+            env.declare_value(name, eval_value_expr(expr, env, span)?, span)?;
             return Ok(());
         }
 
         if env.types.contains_key(name) {
             let r#type: Type = eval_type_definition_expr(expr, env)?;
-            (*env).declare_type(name, r#type.clone(), span)?;
+            env.declare_type(name, r#type.clone(), span)?;
             return Ok(());
         }
 

@@ -4,6 +4,7 @@ use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::r#type::Type;
 use crate::parser::resolved_expr::ResolvedExpr;
+use crate::util::format_joined;
 
 #[derive(Clone)]
 pub enum Value {
@@ -45,26 +46,13 @@ impl ToString for Value {
 
             Value::NativeFunction { .. } => "[native function]".to_string(),
 
-            Value::Tuple(values) => {
-                let contents: String = values
-                    .iter()
-                    .map(|value: &Value| value.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ");
-
-                format!("({})", contents)
-            }
+            Value::Tuple(values) => format!("({})", format_joined(values, ", ")),
 
             Value::Constructor { tag, values, .. } => {
                 if values.is_empty() {
                     tag.clone()
                 } else {
-                    let args = values
-                        .iter()
-                        .map(|v| v.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    format!("{} {}", tag, args)
+                    format!("{} {}", tag, format_joined(values, " "))
                 }
             }
         }
