@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::error::FogError;
 use crate::error::FogResult;
@@ -10,7 +9,6 @@ use crate::parser::parsed_expr::*;
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     pos: usize,
-    infix_ops: HashMap<String, InfixOp>,
 }
 
 #[derive(Clone)]
@@ -25,14 +23,13 @@ pub struct InfixOp {
     pub precedence: i32,
 }
 
-fn token_op_key(token: &Token) -> Option<&str> {
+fn get_op_kind(token: &Token) -> Option<OpKind> {
     match &token.kind {
-        TokenKind::Plus => Some("+"),
-        TokenKind::Minus => Some("-"),
-        TokenKind::Star => Some("*"),
-        TokenKind::Slash => Some("/"),
-        TokenKind::Arrow => Some("->"),
-        TokenKind::Identifier(name) => Some(name.as_str()),
+        TokenKind::Plus => Some(OpKind::Plus),
+        TokenKind::Minus => Some(OpKind::Minus),
+        TokenKind::Star => Some(OpKind::Star),
+        TokenKind::Slash => Some(OpKind::Slash),
+        TokenKind::Arrow => Some(OpKind::Arrow),
         _ => None,
     }
 }
@@ -50,29 +47,7 @@ fn is_primary_starter(token: &Token) -> bool {
 
 impl Parser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
-        Parser {
-            tokens,
-            pos: 0,
-            infix_ops: [
-                ("*", OpAssociativity::Left, 3),
-                ("/", OpAssociativity::Left, 3),
-                ("+", OpAssociativity::Left, 2),
-                ("-", OpAssociativity::Left, 2),
-                ("->", OpAssociativity::Right, 1),
-            ]
-            .iter()
-            .map(|(sym, assoc, prec)| {
-                (
-                    sym.to_string(),
-                    InfixOp {
-                        name: sym.to_string(),
-                        associativity: assoc.clone(),
-                        precedence: *prec,
-                    },
-                )
-            })
-            .collect(),
-        }
+        Parser { tokens, pos: 0 }
     }
 
     fn next(&mut self) {
@@ -83,8 +58,10 @@ impl Parser<'_> {
         self.tokens.get(self.pos).expect("unexpected EOF")
     }
 
-    fn get_binary_op(&self, token: &Token) -> Option<&InfixOp> {
-        token_op_key(token).and_then(|key| self.infix_ops.get(key))
+    fn peek_offset(&self, offset: i32) -> &Token {
+        self.tokens
+            .get((self.pos as i32 + offset) as usize)
+            .expect("unexpected EOF")
     }
 
     pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
@@ -123,14 +100,14 @@ impl Parser<'_> {
             TokenKind::Colon => {
                 self.next();
 
-                self.parse_expression(i32::MIN)
-                    .map(|expr| ParsedStatement::TypeAnnotation(name, expr, span))
+                self.parse_expression()
+                    .map(|expr: ParsedExpr| ParsedStatement::TypeAnnotation(name, expr, span))
             }
             TokenKind::Equal => {
                 self.next();
 
-                self.parse_expression(i32::MIN)
-                    .map(|expr| ParsedStatement::Declaration(name, expr, span))
+                self.parse_expression()
+                    .map(|expr: ParsedExpr| ParsedStatement::Declaration(name, expr, span))
             }
             _ => Err(FogError::parse(
                 "expected `:` or `=`".to_string(),
@@ -145,56 +122,30 @@ impl Parser<'_> {
         Some(result)
     }
 
-    fn parse_expression(&mut self, min_prec: i32) -> FogResult<ParsedExpr> {
-        let mut lhs: ParsedExpr = self.parse_primary()?;
+    fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
+        let mut items: Vec<ParsedExpr> = Vec::new();
 
-        while self.pos < self.tokens.len() {
-            let token: &Token = self.peek();
+        loop {
+            let atom: ParsedExpr = self.parse_atomic()?;
+            items.push(atom);
 
-            let op: &InfixOp = match self.get_binary_op(token) {
-                Some(op) => op,
-                None => break,
-            };
+            let token: &Token = self.peek_offset(1);
 
-            if op.precedence < min_prec {
+            if let Some(kind) = get_op_kind(token) {
+                items.push(ParsedExpr::Op(kind));
+                self.next();
+            } else if is_primary_starter(token) {
+                continue;
+            } else {
                 break;
             }
-
-            let op_name: String = op.name.clone();
-            let op_prec: i32 = op.precedence;
-            let op_assoc: OpAssociativity = op.associativity.clone();
-
-            self.next();
-
-            let rhs: ParsedExpr = match op_assoc {
-                OpAssociativity::Left => self.parse_expression(op_prec + 1),
-                OpAssociativity::Right => self.parse_expression(op_prec),
-            }?;
-
-            lhs = ParsedExpr::FuncAppl(op_name, vec![lhs, rhs]);
         }
 
-        Ok(lhs)
-    }
-
-    fn parse_primary(&mut self) -> FogResult<ParsedExpr> {
-        let head: ParsedExpr = self.parse_atomic()?;
-
-        // check for function application
-        if let ParsedExpr::Identifier(name) = &head {
-            let mut args: Vec<ParsedExpr> = Vec::new();
-
-            while self.pos < self.tokens.len() && is_primary_starter(self.peek()) {
-                let arg: ParsedExpr = self.parse_atomic()?;
-                args.push(arg);
-            }
-
-            if !args.is_empty() {
-                return Ok(ParsedExpr::FuncAppl(name.clone(), args));
-            }
+        if items.len() == 1 {
+            Ok(items[0].clone())
+        } else {
+            Ok(ParsedExpr::Collection(items))
         }
-
-        Ok(head)
     }
 
     fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
@@ -210,9 +161,7 @@ impl Parser<'_> {
         }
 
         if let TokenKind::Minus = token.kind {
-            let opnd: ParsedExpr = self.parse_primary()?;
-
-            return Ok(ParsedExpr::FuncAppl("-".to_string(), vec![opnd]));
+            return Ok(ParsedExpr::Op(OpKind::Minus));
         }
 
         if let TokenKind::Identifier(name) = token.kind {
@@ -220,7 +169,7 @@ impl Parser<'_> {
             if let TokenKind::Colon = self.peek().kind {
                 self.next();
 
-                let param_type: ParsedExpr = self.parse_expression(i32::MIN)?;
+                let param_type: ParsedExpr = self.parse_expression()?;
 
                 let TokenKind::FatArrow = self.peek().kind else {
                     return Err(FogError::parse(
@@ -234,16 +183,16 @@ impl Parser<'_> {
                 };
                 self.next();
 
-                let body: ParsedExpr = self.parse_expression(i32::MIN)?;
+                let body: ParsedExpr = self.parse_expression()?;
 
                 return Ok(ParsedExpr::Lambda(
                     name,
                     Box::new(param_type),
-                    Rc::new(body),
+                    Box::new(body),
                 ));
             }
 
-            // otherwise, it's an identifier
+            // if it's not, it's an identifier
             return Ok(ParsedExpr::Identifier(name));
         }
 
@@ -253,7 +202,7 @@ impl Parser<'_> {
                 return Ok(ParsedExpr::Tuple(Vec::new()));
             };
 
-            let res: FogResult<ParsedExpr> = self.parse_expression(i32::MIN);
+            let res: FogResult<ParsedExpr> = self.parse_expression();
 
             return match self.peek().kind {
                 TokenKind::RightParenthesis => {

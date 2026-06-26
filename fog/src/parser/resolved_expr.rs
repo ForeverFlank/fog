@@ -24,7 +24,7 @@ pub enum ResolvedExpr {
 }
 
 impl ResolvedExpr {
-    fn fmt_parenthesized(expr: &ResolvedExpr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ResolvedExpr) -> fmt::Result {
         let s: String = expr.to_string();
 
         if s.contains(' ') {
@@ -62,7 +62,7 @@ impl Display for ResolvedExpr {
 
                 for arg in args {
                     write!(f, " ")?;
-                    Self::fmt_parenthesized(arg, f)?;
+                    Self::fmt_parenthesized(f, arg)?;
                 }
 
                 Ok(())
@@ -73,7 +73,7 @@ impl Display for ResolvedExpr {
 
                 for arg in args {
                     write!(f, " ")?;
-                    Self::fmt_parenthesized(arg, f)?;
+                    Self::fmt_parenthesized(f, arg)?;
                 }
 
                 Ok(())

@@ -1,6 +1,5 @@
 use std::fmt;
 use std::fmt::Display;
-use std::rc::Rc;
 
 use crate::error::Span;
 
@@ -13,6 +12,7 @@ pub enum ParsedStatement {
 
 // --- operator kind ---
 
+#[derive(Clone)]
 pub enum OpKind {
     Plus,
     Minus,
@@ -35,6 +35,7 @@ impl Display for OpKind {
 
 // --- parsed expression ---
 
+#[derive(Clone)]
 pub enum ParsedExpr {
     Identifier(String),
     Op(OpKind),
@@ -42,7 +43,7 @@ pub enum ParsedExpr {
     Int32Literal(i32),
     Float32Literal(f32),
 
-    Lambda(String, Box<ParsedExpr>, Rc<ParsedExpr>),
+    Lambda(String, Box<ParsedExpr>, Box<ParsedExpr>),
 
     Tuple(Vec<ParsedExpr>),
 

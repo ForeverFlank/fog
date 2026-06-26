@@ -13,7 +13,7 @@ pub fn parse_program(tokens: &Vec<Token>) -> (Vec<ResolvedStatement>, Vec<FogErr
     let (parsed_stmts, parser_errors) = Parser::parse(&tokens);
     let (resolved_stmts, resolver_errors) = Resolver::resolve(parsed_stmts);
 
-    let all_errors = [&parser_errors[..], &resolver_errors[..]].concat();
+    let all_errors: Vec<FogError> = [&parser_errors[..], &resolver_errors[..]].concat();
 
     (resolved_stmts, all_errors)
 }
