@@ -1,4 +1,4 @@
-use crate::interpreter::interpreter::Interpreter;
+use crate::error::FogResult;
 use crate::parser::resolved_expr::ResolvedStatement;
 
 pub mod environment;
@@ -9,6 +9,6 @@ pub mod r#type;
 pub mod value;
 pub mod variable;
 
-pub fn interpret(statements: Vec<ResolvedStatement>) {
-    Interpreter::run(statements);
+pub fn interpret(statements: &Vec<ResolvedStatement>) -> FogResult<()> {
+    interpreter::interpret(statements)
 }

@@ -7,9 +7,12 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
+use crate::interpreter::eval_value::annotate_type;
+use crate::interpreter::eval_value::declare;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
+use crate::parser::resolved_expr::ResolvedStatement;
 use crate::util::format_joined;
 
 // --- type ---
@@ -163,7 +166,26 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
 pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
         ResolvedExpr::Block { statements } => {
-            todo!()
+            let mut block_env = Environment::new(Some(env));
+
+            for stmt in statements {
+                match stmt {
+                    ResolvedStatement::TypeAnnotation { name, expr, span } => {
+                        annotate_type(name, expr, &mut block_env, span)?;
+                    }
+                    ResolvedStatement::Declaration { name, expr, span } => {
+                        declare(name, expr, &mut block_env, span)?;
+                    }
+                    ResolvedStatement::Expression { span, expr } => {
+                        return expr_type_of(expr, &block_env, span);
+                    }
+                }
+            }
+
+            Err(FogError::runtime(
+                "final operand not found in block statement".to_string(),
+                Some(span.clone()),
+            ))
         }
 
         ResolvedExpr::Identifier { name } => Ok(env.get_var(name, span)?.r#type),

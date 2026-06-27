@@ -2,192 +2,107 @@ use std::rc::Rc;
 
 use crate::error::FogError;
 use crate::error::FogResult;
-use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval_type::eval_type_annotation_expr;
-use crate::interpreter::eval_type::eval_type_definition_expr;
-use crate::interpreter::eval_value::eval_value_expr;
+use crate::interpreter::eval_value::annotate_type;
+use crate::interpreter::eval_value::declare;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
-use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 
-pub struct Interpreter {
-    pub statements: Vec<ResolvedStatement>,
-    pub top_env: Environment,
-}
+fn create_top_env() -> Environment<'static> {
+    let mut env = Environment::new(None);
 
-impl Interpreter {
-    fn new(statements: Vec<ResolvedStatement>) -> Interpreter {
-        let mut interpreter = Interpreter {
-            statements,
-            top_env: Environment::new(None),
-        };
+    // the Type itself
+    let t_type = Type::Type;
 
-        // the Type itself
-        let t_type = Type::Type;
+    // primitive types
+    let t_int32 = Type::Int32;
+    let t_float32 = Type::Float32;
+    let t_unit = Type::Product(Vec::new());
 
-        // primitive types
-        let t_int32 = Type::Int32;
-        let t_float32 = Type::Float32;
-        let t_unit = Type::Product(Vec::new());
+    // function type
+    let t_function = Type::Function(
+        Box::new(Type::Type),
+        Box::new(Type::Function(Box::new(Type::Type), Box::new(Type::Type))),
+    );
 
-        // function type
-        let t_function = Type::Function(
-            Box::new(Type::Type),
-            Box::new(Type::Function(Box::new(Type::Type), Box::new(Type::Type))),
-        );
-
-        // builtin functions
-        let var_plus_int32_int32 = Variable {
-            name: "_plus_Int32_Int32".to_string(),
-            value: Some(Value::NativeFunction {
-                param_type: Type::Int32,
-                return_type: Type::Function(Box::new(Type::Int32), Box::new(Type::Int32)),
-                function: Rc::new(|a: Value| match a {
-                    Value::Int32(lhs) => Ok(Value::NativeFunction {
-                        param_type: Type::Int32,
-                        return_type: Type::Int32,
-                        function: Rc::new(move |b: Value| match b {
-                            Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
-                            _ => Err(FogError::runtime(
-                                "right operand is not an Int32".to_string(),
-                                None,
-                            )),
-                        }),
+    // builtin functions
+    let var_plus_int32_int32 = Variable {
+        name: "_plus_Int32_Int32".to_string(),
+        value: Some(Value::NativeFunction {
+            param_type: Type::Int32,
+            return_type: Type::Function(Box::new(Type::Int32), Box::new(Type::Int32)),
+            function: Rc::new(|a: Value| match a {
+                Value::Int32(lhs) => Ok(Value::NativeFunction {
+                    param_type: Type::Int32,
+                    return_type: Type::Int32,
+                    function: Rc::new(move |b: Value| match b {
+                        Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
+                        _ => Err(FogError::runtime(
+                            "right operand is not an Int32".to_string(),
+                            None,
+                        )),
                     }),
-                    _ => Err(FogError::runtime(
-                        "left operand is not an Int32".to_string(),
-                        None,
-                    )),
                 }),
+                _ => Err(FogError::runtime(
+                    "left operand is not an Int32".to_string(),
+                    None,
+                )),
             }),
-            r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
-        };
+        }),
+        r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
+    };
 
-        // insert into top level environment
-        vec![t_type, t_int32, t_float32, t_unit, t_function]
-            .iter()
-            .for_each(|r#type| {
-                interpreter
-                    .top_env
-                    .types
-                    .insert(r#type.to_string(), r#type.clone());
-            });
-
-        vec![var_plus_int32_int32].iter().for_each(|var| {
-            interpreter
-                .top_env
-                .variables
-                .insert(var.name.clone(), var.clone());
+    vec![t_type, t_int32, t_float32, t_unit, t_function]
+        .iter()
+        .for_each(|r#type| {
+            env.types.insert(r#type.to_string(), r#type.clone());
         });
 
-        interpreter
-    }
+    vec![var_plus_int32_int32].iter().for_each(|var| {
+        env.variables.insert(var.name.clone(), var.clone());
+    });
 
-    pub fn run(statements: Vec<ResolvedStatement>) {
-        let mut interpreter = Interpreter::new(statements);
-        let mut errors = Vec::new();
+    env
+}
 
-        let top_env = &mut interpreter.top_env;
+pub fn interpret(statements: &Vec<ResolvedStatement>) -> FogResult<()> {
+    let mut top_env = create_top_env();
 
-        for stmt in &interpreter.statements {
-            let result = match stmt {
-                ResolvedStatement::TypeAnnotation {
-                    name,
-                    expr: type_expr,
-                    span,
-                } => Self::annotate_type(name, type_expr, top_env, span),
-
-                ResolvedStatement::Declaration {
-                    name,
-                    expr: value_expr,
-                    span,
-                } => Self::declare(name, value_expr, top_env, span),
-
-                ResolvedStatement::Expression { span, .. } => Err(FogError::runtime(
-                    "cannot have an expression as a top-level statement".to_string(),
+    for stmt in statements {
+        match stmt {
+            ResolvedStatement::TypeAnnotation { name, expr, span } => {
+                annotate_type(name, expr, &mut top_env, span)?;
+            }
+            ResolvedStatement::Declaration { name, expr, span } => {
+                declare(name, expr, &mut top_env, span)?;
+            }
+            ResolvedStatement::Expression { span, .. } => {
+                return Err(FogError::runtime(
+                    "cannot have final operand as a top-level statement".to_string(),
                     Some(span.clone()),
-                )),
-            };
-
-            if let Err(error) = result {
-                errors.push(error);
-            }
-        }
-
-        let mut all_vars: Vec<Variable> = interpreter.top_env.variables.values().cloned().collect();
-        all_vars.sort_by(|a, b| a.name.cmp(&b.name));
-
-        println!();
-        for var in all_vars {
-            println!(
-                "{} : {} = {}",
-                var.name,
-                var.r#type.to_string(),
-                match var.value {
-                    Some(value) => value.to_string(),
-                    None => "?".to_string(),
-                }
-            );
-        }
-        println!();
-
-        for error in errors {
-            match error.span {
-                Some(span) => println!(
-                    "runtime error ({}:{}): {}",
-                    span.line, span.column, error.message
-                ),
-                None => println!("runtime error: {}", error.message),
+                ));
             }
         }
     }
 
-    fn annotate_type(
-        name: &String,
-        expr: &ResolvedExpr,
-        env: &mut Environment,
-        span: &Span,
-    ) -> FogResult<()> {
-        let r#type = eval_type_annotation_expr(expr, env, span)?;
+    let mut all_vars: Vec<Variable> = top_env.variables.values().cloned().collect();
+    all_vars.sort_by(|a, b| a.name.cmp(&b.name));
 
-        env.annotate_type(name, r#type, span)
-    }
-
-    fn declare(
-        name: &String,
-        expr: &ResolvedExpr,
-        env: &mut Environment,
-        span: &Span,
-    ) -> FogResult<()> {
-        // declare a variable
-        if env.variables.contains_key(name) {
-            if let Type::Type = env.variables[name].r#type {
-                env.variables.remove(name);
-                let r#type = eval_type_definition_expr(expr, env, span)?;
-                env.declare_type(name, r#type.clone(), span)?;
-                return Ok(());
+    println!();
+    for var in all_vars {
+        println!(
+            "{} : {} = {}",
+            var.name,
+            var.r#type.to_string(),
+            match var.value {
+                Some(value) => value.to_string(),
+                None => "?".to_string(),
             }
-
-            env.declare_value(name, eval_value_expr(expr, env, span)?, span)?;
-
-            return Ok(());
-        }
-
-        // declare a type
-        if env.types.contains_key(name) {
-            let r#type = eval_type_definition_expr(expr, env, span)?;
-
-            env.declare_type(name, r#type.clone(), span)?;
-
-            return Ok(());
-        }
-
-        Err(FogError::runtime(
-            format!("unannotated variable `{}`", name),
-            Some(span.clone()),
-        ))
+        );
     }
+    println!();
+
+    Ok(())
 }

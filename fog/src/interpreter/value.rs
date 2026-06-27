@@ -15,7 +15,7 @@ pub enum Value {
         param_name: String,
         param_type: Type,
         body: Rc<ResolvedExpr>,
-        captured_env: Box<Environment>,
+        captured_env: Box<Environment<'static>>,
     },
     NativeFunction {
         param_type: Type,

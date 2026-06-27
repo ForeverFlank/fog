@@ -11,14 +11,14 @@ use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 
 #[derive(Clone)]
-pub struct Environment {
+pub struct Environment<'a> {
     pub variables: HashMap<String, Variable>,
     pub types: HashMap<String, Type>,
-    pub parent: Option<Box<Environment>>,
+    pub parent: Option<&'a Environment<'a>>,
 }
 
-impl Environment {
-    pub fn new(parent: Option<Box<Environment>>) -> Self {
+impl<'a> Environment<'a> {
+    pub fn new(parent: Option<&'a Environment<'a>>) -> Self {
         Environment {
             variables: HashMap::new(),
             types: HashMap::new(),
@@ -43,19 +43,24 @@ impl Environment {
         ))
     }
 
-    pub fn get_mut_var(&mut self, name: &str, span: &Span) -> FogResult<&mut Variable> {
-        if let Some(var) = self.variables.get_mut(name) {
-            return Ok(var);
+    pub fn flatten(&self) -> Environment<'static> {
+        let mut variables = HashMap::new();
+        let mut types = HashMap::new();
+
+        if let Some(parent) = self.parent {
+            let flat = parent.flatten();
+            variables.extend(flat.variables);
+            types.extend(flat.types);
         }
 
-        if let Some(parent) = &mut self.parent {
-            return parent.get_mut_var(name, span);
-        }
+        variables.extend(self.variables.clone());
+        types.extend(self.types.clone());
 
-        Err(FogError::runtime(
-            format!("variable `{}` not found in the current scope", name),
-            Some(span.clone()),
-        ))
+        Environment {
+            variables,
+            types,
+            parent: None,
+        }
     }
 
     pub fn get_type(&self, name: &str, span: &Span) -> FogResult<Type> {
@@ -119,7 +124,7 @@ impl Environment {
         }
 
         let type_of_var = {
-            let var = self.get_mut_var(name, span)?;
+            let var = self.get_var(name, span)?;
 
             if var.value.is_some() {
                 return Err(FogError::runtime(

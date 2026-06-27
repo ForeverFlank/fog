@@ -110,7 +110,10 @@ impl Parser<'_> {
                     .map(|expr| ParsedStatement::Expression { expr, span })
             }
             _ => Err(FogError::parse(
-                "expected `:` or `=`".to_string(),
+                format!(
+                    "expected `:` or `=`, found `{}`",
+                    self.peek().kind.to_string()
+                ),
                 Some(token_span(self.peek())),
             )),
         };
@@ -147,16 +150,27 @@ impl Parser<'_> {
     fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
         let token = self.peek().clone();
 
-        self.next();
-
         match token.kind {
-            TokenKind::Int32Literal(value) => Ok(ParsedExpr::Int32Literal { value }),
-            TokenKind::Float32Literal(value) => Ok(ParsedExpr::Float32Literal { value }),
-            TokenKind::Minus => Ok(ParsedExpr::Op {
-                kind: OpKind::Minus,
-            }),
+            TokenKind::Int32Literal(value) => {
+                self.next();
+                Ok(ParsedExpr::Int32Literal { value })
+            }
+
+            TokenKind::Float32Literal(value) => {
+                self.next();
+                Ok(ParsedExpr::Float32Literal { value })
+            }
+
+            TokenKind::Minus => {
+                self.next();
+                Ok(ParsedExpr::Op {
+                    kind: OpKind::Minus,
+                })
+            }
 
             TokenKind::Identifier(name) => {
+                self.next();
+
                 if let TokenKind::Colon = self.peek().kind {
                     self.next();
 
@@ -183,6 +197,8 @@ impl Parser<'_> {
             }
 
             TokenKind::LeftParenthesis => {
+                self.next();
+
                 if let TokenKind::RightParenthesis = self.peek().kind {
                     self.next();
 
@@ -223,16 +239,22 @@ impl Parser<'_> {
             }
 
             TokenKind::LeftBrace => {
+                self.next();
+
                 let mut statements: Vec<ParsedStatement> = Vec::new();
 
                 loop {
                     if let TokenKind::RightBrace = self.peek().kind {
+                        self.next();
                         break;
                     }
 
+                    // TODO this won't match expressions, giving error
                     if let Some(stmt) = self.parse_statement() {
                         statements.push(stmt?);
                     }
+
+                    self.next();
                 }
 
                 Ok(ParsedExpr::Block { statements })
