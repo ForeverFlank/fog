@@ -1,0 +1,23 @@
+-- matching tuples
+
+Bool : Type
+Bool = True + False
+
+and : Bool -> Bool -> Bool
+and =
+    b1 : Bool =>
+    b2 : Bool =>
+    match (b1, b2) {
+        (True, True) => True
+        _            => False
+    }
+
+
+b1 : Bool
+b1 = and False False    -- false
+
+b2 : Bool
+b2 = and False True     -- false
+
+b3 : Bool
+b3 = and True True      -- true

@@ -1,7 +1,7 @@
 -- currying
 
 add : Int32 -> Int32 -> Int32
-add = lhs : Int32 => rhs : Int32 => _builtin_plus_Int32_Int32 lhs rhs
+add = lhs : Int32 => rhs : Int32 => _plus_Int32_Int32 lhs rhs
 
 
 addFive : Int32 -> Int32

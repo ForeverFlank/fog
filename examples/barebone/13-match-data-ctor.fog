@@ -1,0 +1,17 @@
+-- matching data constructors
+
+-- shape type, described by side lengths
+Shape : Type
+Shape = Tri Int32 Int32 Int32 + Quad Int32 Int32 Int32 Int32
+
+perimeter : Shape -> Int32
+perimeter = shape : Shape => match {
+    Tri s1 s2 s3    => _plus_Int32_Int32 (_plus_Int32_Int32 s1 s2) s3
+    Quads1 s2 s3 s4 => _plus_Int32_Int32 (_plus_Int32_Int32 (_plus_Int32_Int32 s1 s2) s3) s4
+}
+
+num1 : Int32
+num1 = perimeter (Tri 3 4 5)
+
+num2 : Int32
+num2 = perimeter (Quad 6 7 8 9)

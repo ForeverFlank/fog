@@ -43,7 +43,7 @@ impl Interpreter {
 
         // builtin functions
         let var_plus_int32_int32 = Variable {
-            name: "_builtin_plus_Int32_Int32".to_string(),
+            name: "_plus_Int32_Int32".to_string(),
             value: Some(Value::NativeFunction {
                 param_type: Type::Int32,
                 return_type: Type::Function(Box::new(Type::Int32), Box::new(Type::Int32)),

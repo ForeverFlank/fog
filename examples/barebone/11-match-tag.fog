@@ -1,0 +1,26 @@
+-- matching sum types
+
+Bool : Type
+Bool = True + False
+
+and : Bool -> Bool -> Bool
+and =
+    b1 : Bool =>
+    b2 : Bool =>
+    match b1 {
+        False => False
+        True  => match b2 {
+            False => False
+            True  => True
+        }
+    }
+
+
+b1 : Bool
+b1 = and False False    -- false
+
+b2 : Bool
+b2 = and False True     -- false
+
+b3 : Bool
+b3 = and True True      -- true
