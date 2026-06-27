@@ -60,7 +60,7 @@ pub fn eval_type_definition_expr(
 
         ResolvedExpr::Identifier { name } => Ok(Type::Sum(vec![DataConstructor {
             tag: name.clone(),
-            types: vec![],
+            types: Vec::new(),
         }])),
 
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {

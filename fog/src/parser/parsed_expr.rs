@@ -118,7 +118,7 @@ impl Display for ParsedExpr {
                 write!(f, "{{\n")?;
 
                 for stmt in statements {
-                    write!(f, "{}\n", stmt)?;
+                    write!(f, "    {}\n", stmt)?;
                 }
 
                 write!(f, "}}")

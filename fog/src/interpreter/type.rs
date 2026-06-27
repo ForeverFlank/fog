@@ -174,7 +174,8 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                         annotate_type(name, expr, &mut block_env, span)?;
                     }
                     ResolvedStatement::Declaration { name, expr, span } => {
-                        declare(name, expr, &mut block_env, span)?;
+                        // TODO type declaration
+                        // declare(name, expr, &mut block_env, span)?;
                     }
                     ResolvedStatement::Expression { span, expr } => {
                         return expr_type_of(expr, &block_env, span);
