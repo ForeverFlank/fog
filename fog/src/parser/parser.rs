@@ -62,63 +62,35 @@ impl Parser<'_> {
         self.tokens.get(self.pos).unwrap_or(&self.eof_token)
     }
 
+    fn peek_offset(&self, offset: i32) -> &Token {
+        self.tokens
+            .get((self.pos as i32 + offset) as usize)
+            .unwrap_or(&self.eof_token)
+    }
+
     pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
         let mut parser = Parser::new(&tokens);
         let mut statements = Vec::new();
         let mut errors = Vec::new();
 
-        while parser.pos < parser.tokens.len() {
-            if let Some(result) = parser.parse_statement() {
-                match result {
-                    Ok(stmt) => statements.push(stmt),
-                    Err(error) => errors.push(error),
-                }
-            }
+        while let TokenKind::Newline = parser.peek().kind {
             parser.next();
         }
 
+        loop {
+            if let TokenKind::Eof = parser.peek().kind {
+                break;
+            }
+            match parser.parse_block_statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(e) => errors.push(e),
+            }
+            while let TokenKind::Newline = parser.peek().kind {
+                parser.next();
+            }
+        }
+
         (statements, errors)
-    }
-
-    fn parse_statement(&mut self) -> Option<FogResult<ParsedStatement>> {
-        let span = token_span(self.peek());
-
-        let name = match &self.peek().kind {
-            TokenKind::Identifier(name) => name.clone(),
-            _ => return None,
-        };
-
-        self.next();
-
-        let result: FogResult<ParsedStatement> = match self.peek().kind {
-            TokenKind::Colon => {
-                self.next();
-
-                self.parse_expression()
-                    .map(|expr| ParsedStatement::TypeAnnotation { name, expr, span })
-            }
-            TokenKind::Equal => {
-                self.next();
-
-                self.parse_expression()
-                    .map(|expr| ParsedStatement::Declaration { name, expr, span })
-            }
-            TokenKind::Newline => {
-                self.next();
-
-                self.parse_expression()
-                    .map(|expr| ParsedStatement::Expression { expr, span })
-            }
-            _ => Err(FogError::parse(
-                format!(
-                    "expected `:` or `=`, found `{}`",
-                    self.peek().kind.to_string()
-                ),
-                Some(token_span(self.peek())),
-            )),
-        };
-
-        Some(result)
     }
 
     fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
@@ -153,16 +125,19 @@ impl Parser<'_> {
         match token.kind {
             TokenKind::Int32Literal(value) => {
                 self.next();
+
                 Ok(ParsedExpr::Int32Literal { value })
             }
 
             TokenKind::Float32Literal(value) => {
                 self.next();
+
                 Ok(ParsedExpr::Float32Literal { value })
             }
 
             TokenKind::Minus => {
                 self.next();
+
                 Ok(ParsedExpr::Op {
                     kind: OpKind::Minus,
                 })
@@ -241,22 +216,7 @@ impl Parser<'_> {
             TokenKind::LeftBrace => {
                 self.next();
 
-                let mut statements: Vec<ParsedStatement> = Vec::new();
-
-                loop {
-                    if let TokenKind::RightBrace = self.peek().kind {
-                        self.next();
-                        break;
-                    }
-
-                    // TODO this won't match expressions, giving error
-                    if let Some(stmt) = self.parse_statement() {
-                        statements.push(stmt?);
-                    }
-
-                    self.next();
-                }
-
+                let statements = self.parse_block()?;
                 Ok(ParsedExpr::Block { statements })
             }
 
@@ -264,6 +224,69 @@ impl Parser<'_> {
                 "atomic expression parsing error".to_string(),
                 Some(token_span(&token)),
             )),
+        }
+    }
+
+    fn parse_block(&mut self) -> FogResult<Vec<ParsedStatement>> {
+        let mut statements = Vec::new();
+
+        while let TokenKind::Newline = self.peek().kind {
+            self.next();
+        }
+
+        loop {
+            if let TokenKind::RightBrace = self.peek().kind {
+                self.next();
+                break;
+            }
+            if let TokenKind::Eof = self.peek().kind {
+                return Err(FogError::parse("unclosed block".to_string(), None));
+            }
+
+            let stmt = self.parse_block_statement()?;
+            statements.push(stmt);
+
+            while let TokenKind::Newline = self.peek().kind {
+                self.next();
+            }
+        }
+
+        Ok(statements)
+    }
+
+    fn parse_block_statement(&mut self) -> FogResult<ParsedStatement> {
+        let span = token_span(self.peek());
+
+        let ahead = self.peek_offset(1).clone();
+
+        match (&self.peek().kind, ahead.kind) {
+            (TokenKind::Identifier(name), TokenKind::Colon) => {
+                let name = name.clone();
+
+                self.next(); // name
+                self.next(); // :
+
+                let expr = self.parse_expression()?;
+
+                Ok(ParsedStatement::TypeAnnotation { name, expr, span })
+            }
+
+            (TokenKind::Identifier(name), TokenKind::Equal) => {
+                let name = name.clone();
+
+                self.next(); // name
+                self.next(); // =
+
+                let expr = self.parse_expression()?;
+
+                Ok(ParsedStatement::Declaration { name, expr, span })
+            }
+
+            _ => {
+                let expr = self.parse_expression()?;
+
+                Ok(ParsedStatement::Expression { expr, span })
+            }
         }
     }
 }
