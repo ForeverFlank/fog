@@ -16,61 +16,32 @@ pub fn eval_type_annotation_expr(
     span: &Span,
 ) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier { name } => Ok(env.get_type(name, span)?),
+        ResolvedExpr::Identifier { name } => env.get_type(name, span),
 
-        // function type
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
-            let left = eval_type_annotation_expr(&args[0], env, span)?;
-            let right = eval_type_annotation_expr(&args[1], env, span)?;
-
-            Ok(Type::Function(Box::new(left), Box::new(right)))
+            eval_function_type(&args[0], &args[1], env, span)
         }
 
-        // product type, a.k.a. tuple
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "*" && args.len() == 2 => {
-            let left = eval_type_annotation_expr(&args[0], env, span)?;
-            let right = eval_type_annotation_expr(&args[1], env, span)?;
-
-            let mut types = Vec::new();
-
-            match left {
-                Type::Product(ts) => types.extend(ts),
-                t => types.push(t),
-            }
-
-            match right {
-                Type::Product(ts) => types.extend(ts),
-                t => types.push(t),
-            }
-
-            Ok(Type::Product(types))
+            eval_product_type(&args[0], &args[1], env, span)
         }
 
-        // sum type
         ResolvedExpr::FuncAppl { fn_name, .. } if fn_name == "+" => Err(FogError::runtime(
             "cannot type annotate a value with sum types".to_string(),
             Some(span.clone()),
         )),
 
-        // either is a function application or a data constructor
-        ResolvedExpr::FuncAppl { fn_name, args } => {
-            if env.contains_type(fn_name) {
-                // the function name is declared,
-                // it's a type constructor or a
-                // type-level function
-                apply_type_level_function(fn_name, args, env, span)
-            } else {
-                // otherwise, it's a data constructor,
-                // which is invalid here
-                Err(FogError::runtime(
-                    format!(
-                        "cannot type annotate a value with data constructor `{}`",
-                        expr.to_string()
-                    ),
-                    Some(span.clone()),
-                ))
-            }
+        ResolvedExpr::FuncAppl { fn_name, args } if env.contains_type(fn_name) => {
+            apply_type_level_function(fn_name, args, env, span)
         }
+
+        ResolvedExpr::FuncAppl { .. } => Err(FogError::runtime(
+            format!(
+                "cannot type annotate a value with data constructor `{}`",
+                expr.to_string()
+            ),
+            Some(span.clone()),
+        )),
 
         _ => Err(FogError::runtime(
             format!("`{}` is not a type", expr.to_string()),
@@ -85,48 +56,113 @@ pub fn eval_type_definition_expr(
     span: &Span,
 ) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier { name } => {
-            if env.contains_type(name) {
-                // declared type
-                env.get_type(name, span)
-            } else {
-                // enum
-                Ok(Type::Sum(vec![DataConstructor {
-                    tag: name.clone(),
-                    types: vec![],
-                }]))
-            }
+        ResolvedExpr::Identifier { name } if env.contains_type(name) => env.get_type(name, span),
+
+        ResolvedExpr::Identifier { name } => Ok(Type::Sum(vec![DataConstructor {
+            tag: name.clone(),
+            types: vec![],
+        }])),
+
+        ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
+            eval_function_type(&args[0], &args[1], env, span)
+        }
+
+        ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "*" && args.len() == 2 => {
+            eval_product_type(&args[0], &args[1], env, span)
         }
 
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "+" && args.len() == 2 => {
-            let left = eval_type_definition_expr(&args[0], env, span)?;
-            let right = eval_type_definition_expr(&args[1], env, span)?;
-
-            let Type::Sum(ctors1) = left else {
-                return Err(FogError::runtime(
-                    format!(
-                        "`{}` is not a data constructor or a sum type",
-                        left.to_string()
-                    ),
-                    Some(span.clone()),
-                ));
-            };
-
-            let Type::Sum(ctors2) = right else {
-                return Err(FogError::runtime(
-                    format!(
-                        "`{}` is not a data constructor or a sum type",
-                        right.to_string()
-                    ),
-                    Some(span.clone()),
-                ));
-            };
-
-            Ok(Type::Sum([&ctors1[..], &ctors2[..]].concat()))
+            eval_sum_type(&args[0], &args[1], env, span)
         }
 
-        _ => eval_type_annotation_expr(expr, env, span),
+        ResolvedExpr::FuncAppl { fn_name, args } if env.contains_type(fn_name) => {
+            apply_type_level_function(fn_name, args, env, span)
+        }
+
+        // data constructor
+        ResolvedExpr::FuncAppl { fn_name, args } => {
+            let field_types = args
+                .iter()
+                .map(|arg| eval_type_annotation_expr(arg, env, span))
+                .collect::<Result<Vec<Type>, _>>()?;
+
+            Ok(Type::Sum(vec![DataConstructor {
+                tag: fn_name.clone(),
+                types: field_types,
+            }]))
+        }
+
+        _ => Err(FogError::runtime(
+            format!("`{}` is not a valid type definition", expr.to_string()),
+            Some(span.clone()),
+        )),
     }
+}
+
+fn eval_product_type(
+    left: &ResolvedExpr,
+    right: &ResolvedExpr,
+    env: &Environment,
+    span: &Span,
+) -> FogResult<Type> {
+    let left = eval_type_annotation_expr(left, env, span)?;
+    let right = eval_type_annotation_expr(right, env, span)?;
+
+    let mut types = Vec::new();
+
+    match left {
+        Type::Product(ts) => types.extend(ts),
+        t => types.push(t),
+    }
+    match right {
+        Type::Product(ts) => types.extend(ts),
+        t => types.push(t),
+    }
+
+    Ok(Type::Product(types))
+}
+
+fn eval_function_type(
+    left: &ResolvedExpr,
+    right: &ResolvedExpr,
+    env: &Environment,
+    span: &Span,
+) -> FogResult<Type> {
+    let left = eval_type_annotation_expr(left, env, span)?;
+    let right = eval_type_annotation_expr(right, env, span)?;
+
+    Ok(Type::Function(Box::new(left), Box::new(right)))
+}
+
+fn eval_sum_type(
+    left: &ResolvedExpr,
+    right: &ResolvedExpr,
+    env: &Environment,
+    span: &Span,
+) -> FogResult<Type> {
+    let left = eval_type_definition_expr(left, env, span)?;
+    let right = eval_type_definition_expr(right, env, span)?;
+
+    let Type::Sum(ctors1) = left else {
+        return Err(FogError::runtime(
+            format!(
+                "`{}` is not a data constructor or a sum type",
+                left.to_string()
+            ),
+            Some(span.clone()),
+        ));
+    };
+    let Type::Sum(ctors2) = right else {
+        return Err(FogError::runtime(
+            format!(
+                "`{}` is not a data constructor or a sum type",
+                right.to_string()
+            ),
+            Some(span.clone()),
+        ));
+    };
+
+    Ok(Type::Sum([&ctors1[..], &ctors2[..]].concat()))
 }
 
 fn apply_type_level_function(

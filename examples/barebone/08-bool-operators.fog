@@ -1,9 +1,0 @@
--- the boolean type
-
-Bool : Type
-Bool = True + False
-
--- logical operators
-
-and : Bool -> Bool -> Bool
--- and b1 b2 = match 

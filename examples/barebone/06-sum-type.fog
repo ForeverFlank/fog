@@ -4,6 +4,7 @@
 -- native sum types are rather uncommon
 -- in mainstream programming languages
 
+
 OptionInt32 : Type
 OptionInt32 = Some Int32 + None
 
