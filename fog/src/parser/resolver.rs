@@ -131,6 +131,7 @@ impl Resolver {
                     span,
                 })
             }
+
             ParsedStatement::Declaration { name, expr, span } => {
                 Ok(ResolvedStatement::Declaration {
                     name,
@@ -138,6 +139,11 @@ impl Resolver {
                     span,
                 })
             }
+
+            ParsedStatement::Expression { expr, span } => Ok(ResolvedStatement::Expression {
+                expr: Self::resolve_expr(expr)?,
+                span,
+            }),
         }
     }
 
@@ -164,6 +170,8 @@ impl Resolver {
 
     fn resolve_expr(parsed_expr: ParsedExpr) -> FogResult<ResolvedExpr> {
         match parsed_expr {
+            ParsedExpr::Block { statements } => resolve_block(statements),
+
             ParsedExpr::Identifier { name } => Ok(ResolvedExpr::Identifier { name }),
             ParsedExpr::Op { .. } => unreachable!(),
 
@@ -257,6 +265,8 @@ impl Resolver {
         self.index += 1;
 
         match expr {
+            ParsedExpr::Block { statements } => resolve_block(statements),
+
             ParsedExpr::Identifier { name } => Ok(ResolvedExpr::Identifier { name }),
 
             ParsedExpr::Int32Literal { value } => Ok(ResolvedExpr::Int32Literal { value }),
@@ -294,4 +304,13 @@ impl Resolver {
             )),
         }
     }
+}
+
+fn resolve_block(statements: Vec<ParsedStatement>) -> FogResult<ResolvedExpr> {
+    Ok(ResolvedExpr::Block {
+        statements: statements
+            .iter()
+            .map(|stmt| Resolver::resolve_statement(stmt.clone()))
+            .collect::<Result<Vec<_>, _>>()?,
+    })
 }

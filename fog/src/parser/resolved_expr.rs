@@ -5,6 +5,8 @@ use std::rc::Rc;
 use crate::error::Span;
 use crate::util::format_joined;
 
+// --- statements ---
+
 pub enum ResolvedStatement {
     TypeAnnotation {
         name: String,
@@ -16,9 +18,37 @@ pub enum ResolvedStatement {
         expr: ResolvedExpr,
         span: Span,
     },
+    Expression {
+        expr: ResolvedExpr,
+        span: Span,
+    },
 }
 
+impl Display for ResolvedStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResolvedStatement::TypeAnnotation { name, expr, .. } => {
+                write!(f, "{} : {}", name, expr)
+            }
+
+            ResolvedStatement::Declaration { name, expr, .. } => {
+                write!(f, "{} = {}", name, expr)
+            }
+
+            ResolvedStatement::Expression { expr, .. } => {
+                write!(f, "{}", expr)
+            }
+        }
+    }
+}
+
+// --- expressions ---
+
 pub enum ResolvedExpr {
+    Block {
+        statements: Vec<ResolvedStatement>,
+    },
+
     Identifier {
         name: String,
     },
@@ -58,6 +88,16 @@ fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ResolvedExpr) -> fmt::Re
 impl Display for ResolvedExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ResolvedExpr::Block { statements } => {
+                write!(f, "{{\n")?;
+
+                for stmt in statements {
+                    write!(f, "{}\n", stmt)?;
+                }
+
+                write!(f, "}}")
+            }
+
             ResolvedExpr::Identifier { name } => write!(f, "{name}"),
 
             ResolvedExpr::Int32Literal { value } => write!(f, "{value}"),

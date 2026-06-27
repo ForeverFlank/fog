@@ -12,8 +12,6 @@ use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
-use crate::parser::resolved_expr::ResolvedStatement::Declaration;
-use crate::parser::resolved_expr::ResolvedStatement::TypeAnnotation;
 
 pub struct Interpreter {
     pub statements: Vec<ResolvedStatement>,
@@ -96,17 +94,22 @@ impl Interpreter {
 
         for stmt in &interpreter.statements {
             let result = match stmt {
-                TypeAnnotation {
+                ResolvedStatement::TypeAnnotation {
                     name,
                     expr: type_expr,
                     span,
                 } => Self::annotate_type(name, type_expr, top_env, span),
 
-                Declaration {
+                ResolvedStatement::Declaration {
                     name,
                     expr: value_expr,
                     span,
                 } => Self::declare(name, value_expr, top_env, span),
+
+                ResolvedStatement::Expression { span, .. } => Err(FogError::runtime(
+                    "cannot have an expression as a top-level statement".to_string(),
+                    Some(span.clone()),
+                )),
             };
 
             if let Err(error) = result {

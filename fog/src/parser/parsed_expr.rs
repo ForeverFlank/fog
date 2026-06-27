@@ -6,6 +6,7 @@ use crate::util::format_joined;
 
 // --- statement ---
 
+#[derive(Clone)]
 pub enum ParsedStatement {
     TypeAnnotation {
         name: String,
@@ -17,6 +18,28 @@ pub enum ParsedStatement {
         expr: ParsedExpr,
         span: Span,
     },
+    Expression {
+        expr: ParsedExpr,
+        span: Span,
+    },
+}
+
+impl Display for ParsedStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParsedStatement::TypeAnnotation { name, expr, .. } => {
+                write!(f, "{} : {}", name, expr)
+            }
+
+            ParsedStatement::Declaration { name, expr, .. } => {
+                write!(f, "{} = {}", name, expr)
+            }
+
+            ParsedStatement::Expression { expr, .. } => {
+                write!(f, "{}", expr)
+            }
+        }
+    }
 }
 
 // --- operator kind ---
@@ -46,6 +69,10 @@ impl Display for OpKind {
 
 #[derive(Clone)]
 pub enum ParsedExpr {
+    Block {
+        statements: Vec<ParsedStatement>,
+    },
+
     Identifier {
         name: String,
     },
@@ -87,6 +114,16 @@ fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ParsedExpr) -> fmt::Resu
 impl Display for ParsedExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ParsedExpr::Block { statements } => {
+                write!(f, "{{\n")?;
+
+                for stmt in statements {
+                    write!(f, "{}\n", stmt)?;
+                }
+
+                write!(f, "}}")
+            }
+
             ParsedExpr::Identifier { name } => write!(f, "{name}"),
             ParsedExpr::Op { kind } => write!(f, "{kind}"),
 

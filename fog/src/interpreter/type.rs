@@ -162,6 +162,10 @@ pub fn value_type_of(value: &Value, env: &Environment, span: &Span) -> FogResult
 
 pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
+        ResolvedExpr::Block { statements } => {
+            todo!()
+        }
+
         ResolvedExpr::Identifier { name } => Ok(env.get_var(name, span)?.r#type),
 
         ResolvedExpr::Int32Literal { .. } => Ok(Type::Int32),

@@ -11,6 +11,8 @@ use crate::parser::resolved_expr::ResolvedExpr;
 
 pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
+        ResolvedExpr::Block { statements } => todo!(),
+
         // variable
         ResolvedExpr::Identifier { name } => env.get_var(name, span)?.value.ok_or_else(|| {
             FogError::runtime(

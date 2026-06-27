@@ -81,12 +81,12 @@ impl Parser<'_> {
     }
 
     fn parse_statement(&mut self) -> Option<FogResult<ParsedStatement>> {
+        let span = token_span(self.peek());
+
         let name = match &self.peek().kind {
             TokenKind::Identifier(name) => name.clone(),
             _ => return None,
         };
-
-        let span = token_span(self.peek());
 
         self.next();
 
@@ -102,6 +102,12 @@ impl Parser<'_> {
 
                 self.parse_expression()
                     .map(|expr| ParsedStatement::Declaration { name, expr, span })
+            }
+            TokenKind::Newline => {
+                self.next();
+
+                self.parse_expression()
+                    .map(|expr| ParsedStatement::Expression { expr, span })
             }
             _ => Err(FogError::parse(
                 "expected `:` or `=`".to_string(),
@@ -140,6 +146,7 @@ impl Parser<'_> {
 
     fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
         let token = self.peek().clone();
+
         self.next();
 
         match token.kind {
@@ -213,6 +220,22 @@ impl Parser<'_> {
                         }
                     }
                 }
+            }
+
+            TokenKind::LeftBrace => {
+                let mut statements: Vec<ParsedStatement> = Vec::new();
+
+                loop {
+                    if let TokenKind::RightBrace = self.peek().kind {
+                        break;
+                    }
+
+                    if let Some(stmt) = self.parse_statement() {
+                        statements.push(stmt?);
+                    }
+                }
+
+                Ok(ParsedExpr::Block { statements })
             }
 
             _ => Err(FogError::parse(
