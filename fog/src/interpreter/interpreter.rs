@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval_statement::annotate_type;
+use crate::interpreter::eval_statement::annotate;
 use crate::interpreter::eval_statement::declare;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::Type;
@@ -83,7 +83,7 @@ pub fn interpret(statements: &Vec<ResolvedStatement>) -> FogResult<()> {
     for stmt in statements {
         match stmt {
             ResolvedStatement::TypeAnnotation { name, expr, span } => {
-                annotate_type(name, expr, &mut top_env, span)?;
+                annotate(name, expr, &mut top_env, span)?;
             }
             ResolvedStatement::Declaration { name, expr, span } => {
                 declare(name, expr, &mut top_env, span)?;

@@ -12,6 +12,60 @@ use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::runtime_error;
 
+// --- annotation (kind or type) ---
+
+pub enum Annotation {
+    Kind(Kind),
+    Type(Type),
+}
+
+pub fn eval_annotation_expr(
+    expr: &ResolvedExpr,
+    env: &Environment,
+    span: &Span,
+) -> FogResult<Annotation> {
+    match expr {
+        ResolvedExpr::Identifier { name } if name == "Type" => Ok(Annotation::Kind(Kind::Type)),
+
+        ResolvedExpr::Identifier { name } if env.contains_kind(name) => {
+            Ok(Annotation::Kind(env.get_kind(name, span)?))
+        }
+
+        ResolvedExpr::Identifier { name } if env.contains_type(name) => {
+            Ok(Annotation::Type(env.get_type(name, span)?))
+        }
+
+        ResolvedExpr::Identifier { name } => Err(runtime_error!(
+            Some(span.clone()),
+            "unknown type or kind `{}`",
+            name
+        )),
+
+        ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
+            match (
+                eval_annotation_expr(&args[0], env, span)?,
+                eval_annotation_expr(&args[1], env, span)?,
+            ) {
+                (Annotation::Kind(k1), Annotation::Kind(k2)) => {
+                    Ok(Annotation::Kind(Kind::Function(k1.into(), k2.into())))
+                }
+                (Annotation::Type(t1), Annotation::Type(t2)) => {
+                    Ok(Annotation::Type(Type::Function(t1.into(), t2.into())))
+                }
+                _ => Err(runtime_error!(
+                    Some(span.clone()),
+                    "mixed kind and type levels in `{}`",
+                    expr.to_string()
+                )),
+            }
+        }
+
+        _ => Ok(Annotation::Type(eval_type_annotation_expr(
+            expr, env, span,
+        )?)),
+    }
+}
+
 pub fn eval_type_annotation_expr(
     expr: &ResolvedExpr,
     env: &Environment,

@@ -4,7 +4,7 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval_statement::annotate_type;
+use crate::interpreter::eval_statement::annotate;
 use crate::interpreter::eval_statement::declare;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::value::Value;
@@ -21,7 +21,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
             for stmt in statements {
                 match stmt {
                     ResolvedStatement::TypeAnnotation { name, expr, span } => {
-                        annotate_type(name, expr, &mut block_env, span)?;
+                        annotate(name, expr, &mut block_env, span)?;
                     }
                     ResolvedStatement::Declaration { name, expr, span } => {
                         declare(name, expr, &mut block_env, span)?;

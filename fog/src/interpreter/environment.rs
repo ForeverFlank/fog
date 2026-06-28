@@ -228,21 +228,13 @@ impl<'a> Environment<'a> {
     }
 
     pub fn declare_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
-        if self.types.contains_key(name) {
-            return Err(runtime_error!(
-                Some(span.clone()),
-                "type `{}` already declared",
-                name
-            ));
-        }
-
         let kind_of_declared_type = {
             let r#type = self.get_type_var(name, span)?;
 
             if r#type.r#type.is_some() {
                 return Err(runtime_error!(
                     Some(span.clone()),
-                    "variable `{}` already declared in the current scope",
+                    "type `{}` already declared",
                     name
                 ));
             }
