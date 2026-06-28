@@ -1,8 +1,8 @@
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::parse_error;
 use crate::lexer::token::*;
+use crate::parse_error;
 use crate::parser::parsed_expr::*;
 
 pub struct Parser<'a> {
@@ -153,10 +153,7 @@ impl Parser<'_> {
                     let param_type = self.parse_expression()?;
 
                     let TokenKind::FatArrow = self.peek().kind else {
-                        return Err(parse_error!(
-                            Some(token_span(self.peek())),
-                            "expected `=>`"
-                        ));
+                        return Err(parse_error!(Some(token_span(self.peek())), "expected `=>`"));
                     };
                     self.next();
 
@@ -205,10 +202,7 @@ impl Parser<'_> {
                         }
 
                         _ => {
-                            return Err(parse_error!(
-                                Some(token_span(&token)),
-                                "expected `)`"
-                            ));
+                            return Err(parse_error!(Some(token_span(&token)), "expected `)`"));
                         }
                     }
                 }

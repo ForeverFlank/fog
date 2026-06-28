@@ -5,14 +5,14 @@ use std::hash::Hasher;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::runtime_error;
 use crate::interpreter::environment::Environment;
+use crate::interpreter::eval_statement::annotate_type;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
-use crate::interpreter::eval_value::annotate_type;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
+use crate::runtime_error;
 use crate::util::format_joined;
 
 // --- type ---
@@ -179,10 +179,13 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                 }
             }
 
-            Err(runtime_error!(Some(span.clone()), "final operand not found in block statement"))
+            Err(runtime_error!(
+                Some(span.clone()),
+                "final operand not found in block statement"
+            ))
         }
 
-        ResolvedExpr::Identifier { name } => Ok(env.get_var(name, span)?.r#type),
+        ResolvedExpr::Identifier { name } => Ok(env.get_value_var(name, span)?.r#type),
 
         ResolvedExpr::Int32Literal { .. } => Ok(Type::Int32),
         ResolvedExpr::Float32Literal { .. } => Ok(Type::Float32),
@@ -195,7 +198,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
         )),
 
         ResolvedExpr::FuncAppl { fn_name, args } => {
-            let mut curr_type = env.get_var(fn_name, span)?.r#type.clone();
+            let mut curr_type = env.get_value_var(fn_name, span)?.r#type.clone();
 
             for _ in args {
                 curr_type = match curr_type {

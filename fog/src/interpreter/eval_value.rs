@@ -4,11 +4,11 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
+use crate::interpreter::eval_statement::annotate_type;
+use crate::interpreter::eval_statement::declare;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
-use crate::interpreter::eval_type::eval_type_definition_expr;
-use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
-use crate::interpreter::variable::TypeVariable;
+use crate::interpreter::variable::ValueVariable;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 use crate::runtime_error;
@@ -39,7 +39,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
         }
 
         ResolvedExpr::Identifier { name } => env
-            .get_var(name, span)?
+            .get_value_var(name, span)?
             .value
             .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name)),
 
@@ -75,7 +75,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
 
             for arg in args {
                 let argument = eval_value_expr(arg, env, span)?;
-                result = apply_value_function(result, argument, span)?;
+                result = apply_function(result, argument, span)?;
             }
 
             Ok(result)
@@ -83,7 +83,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
     }
 }
 
-fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
+fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
     match function {
         Value::Function {
             param_name,
@@ -95,7 +95,7 @@ fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogRes
 
             child_env.variables.insert(
                 param_name.clone(),
-                TypeVariable {
+                ValueVariable {
                     name: param_name.clone(),
                     value: Some(argument),
                     r#type: param_type,
@@ -117,53 +117,4 @@ fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogRes
             "cannot apply a non-function value"
         )),
     }
-}
-
-// --- todo: fix
-
-pub fn annotate_type(
-    name: &String,
-    expr: &ResolvedExpr,
-    env: &mut Environment,
-    span: &Span,
-) -> FogResult<()> {
-    let r#type = eval_type_annotation_expr(expr, env, span)?;
-    env.annotate_type(name, r#type, span)
-}
-
-pub fn declare(
-    name: &String,
-    expr: &ResolvedExpr,
-    env: &mut Environment,
-    span: &Span,
-) -> FogResult<()> {
-    // declare variable
-    if env.variables.contains_key(name) {
-        if let Type::Type = env.variables[name].r#type {
-            env.variables.remove(name);
-
-            let r#type = eval_type_definition_expr(expr, env, span)?;
-            env.declare_type(name, r#type.clone(), span)?;
-
-            return Ok(());
-        }
-
-        env.declare_value(name, eval_value_expr(expr, env, span)?, span)?;
-
-        return Ok(());
-    }
-
-    // declare type
-    if env.types.contains_key(name) {
-        let r#type = eval_type_definition_expr(expr, env, span)?;
-        env.declare_type(name, r#type.clone(), span)?;
-
-        return Ok(());
-    }
-
-    Err(runtime_error!(
-        Some(span.clone()),
-        "unannotated variable `{}`",
-        name
-    ))
 }

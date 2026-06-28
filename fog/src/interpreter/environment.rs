@@ -9,6 +9,7 @@ use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::r#type::value_type_of;
 use crate::interpreter::value::Value;
+use crate::interpreter::variable::KindVariable;
 use crate::interpreter::variable::TypeVariable;
 use crate::interpreter::variable::ValueVariable;
 use crate::runtime_error;
@@ -17,6 +18,7 @@ use crate::runtime_error;
 pub struct Environment<'a> {
     pub variables: HashMap<String, ValueVariable>,
     pub types: HashMap<String, TypeVariable>,
+    pub kinds: HashMap<String, KindVariable>,
     pub parent: Option<&'a Environment<'a>>,
 }
 
@@ -25,6 +27,7 @@ impl<'a> Environment<'a> {
         Environment {
             variables: HashMap::new(),
             types: HashMap::new(),
+            kinds: HashMap::new(),
             parent: parent,
         }
     }
@@ -32,6 +35,7 @@ impl<'a> Environment<'a> {
     pub fn flatten(&self) -> Environment<'static> {
         let mut variables = HashMap::new();
         let mut types = HashMap::new();
+        let mut kinds = HashMap::new();
 
         if let Some(parent) = self.parent {
             let flat = parent.flatten();
@@ -41,23 +45,25 @@ impl<'a> Environment<'a> {
 
         variables.extend(self.variables.clone());
         types.extend(self.types.clone());
+        kinds.extend(self.kinds.clone());
 
         Environment {
             variables,
             types,
+            kinds,
             parent: None,
         }
     }
 
     // --- getters ---
 
-    pub fn get_var(&self, name: &str, span: &Span) -> FogResult<ValueVariable> {
+    pub fn get_value_var(&self, name: &str, span: &Span) -> FogResult<ValueVariable> {
         if let Some(var) = self.variables.get(name) {
             return Ok(var.clone());
         }
 
         if let Some(parent) = &self.parent {
-            return parent.get_var(name, span);
+            return parent.get_value_var(name, span);
         }
 
         Err(runtime_error!(
@@ -67,18 +73,42 @@ impl<'a> Environment<'a> {
         ))
     }
 
-    pub fn get_type(&self, name: &str, span: &Span) -> FogResult<TypeVariable> {
+    pub fn get_value(&self, name: &str, span: &Span) -> FogResult<Value> {
+        self.get_value_var(name, span)?.get_value()
+    }
+
+    pub fn get_type_var(&self, name: &str, span: &Span) -> FogResult<TypeVariable> {
         if let Some(var) = self.types.get(name) {
             return Ok(var.clone());
         }
 
         if let Some(parent) = &self.parent {
-            return parent.get_type(name, span);
+            return parent.get_type_var(name, span);
         }
 
         Err(runtime_error!(
             Some(span.clone()),
             "type `{}` not found in the current scope",
+            name
+        ))
+    }
+
+    pub fn get_type(&self, name: &str, span: &Span) -> FogResult<Type> {
+        self.get_type_var(name, span)?.get_type()
+    }
+
+    pub fn get_kind(&self, name: &str, span: &Span) -> FogResult<Kind> {
+        if let Some(kind) = self.kinds.get(name) {
+            return Ok(kind.kind.clone());
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.get_kind(name, span);
+        }
+
+        Err(runtime_error!(
+            Some(span.clone()),
+            "kind `{}` not found in the current scope",
             name
         ))
     }
@@ -90,6 +120,18 @@ impl<'a> Environment<'a> {
 
         if let Some(parent) = &self.parent {
             return parent.contains_type(name);
+        }
+
+        false
+    }
+
+    pub fn contains_kind(&self, name: &str) -> bool {
+        if self.kinds.contains_key(name) {
+            return true;
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.contains_kind(name);
         }
 
         false
@@ -149,7 +191,7 @@ impl<'a> Environment<'a> {
         }
 
         let type_of_var = {
-            let var = self.get_var(name, span)?;
+            let var = self.get_value_var(name, span)?;
 
             if var.value.is_some() {
                 return Err(runtime_error!(
@@ -195,7 +237,7 @@ impl<'a> Environment<'a> {
         }
 
         let kind_of_declared_type = {
-            let r#type = self.get_type(name, span)?;
+            let r#type = self.get_type_var(name, span)?;
 
             if r#type.r#type.is_some() {
                 return Err(runtime_error!(

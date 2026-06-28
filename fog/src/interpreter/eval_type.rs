@@ -2,19 +2,15 @@ use std::rc::Rc;
 
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::runtime_error;
 use crate::interpreter::environment::Environment;
+use crate::interpreter::eval_kind::eval_kind_expr;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
-
-enum AnnotationKind {
-    Kind(Kind),
-    Type(Type),
-}
+use crate::runtime_error;
 
 pub fn eval_type_annotation_expr(
     expr: &ResolvedExpr,
@@ -22,9 +18,10 @@ pub fn eval_type_annotation_expr(
     span: &Span,
 ) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier { name } => env.get_type(name, span)?.r#type.ok_or_else(|| {
-            runtime_error!(Some(span.clone()), "undeclared type `{}`", name)
-        }),
+        ResolvedExpr::Identifier { name } => env
+            .get_type_var(name, span)?
+            .r#type
+            .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared type `{}`", name)),
 
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
             eval_function_type(&args[0], &args[1], env, span)
@@ -63,11 +60,10 @@ pub fn eval_type_definition_expr(
     span: &Span,
 ) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier { name } if env.contains_type(name) => {
-            env.get_type(name, span)?.r#type.ok_or_else(|| {
-                runtime_error!(Some(span.clone()), "undeclared type `{}`", name)
-            })
-        }
+        ResolvedExpr::Identifier { name } if env.contains_type(name) => env
+            .get_type_var(name, span)?
+            .r#type
+            .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared type `{}`", name)),
 
         ResolvedExpr::Identifier { name } => Ok(Type::Sum(vec![DataConstructor {
             tag: name.clone(),
@@ -173,13 +169,13 @@ fn eval_sum_type(
     Ok(Type::Sum([&ctors1[..], &ctors2[..]].concat()))
 }
 
-fn apply_type_level_function(
+pub fn apply_type_level_function(
     fn_name: &str,
     args: &Vec<ResolvedExpr>,
     env: &Environment,
     span: &Span,
 ) -> FogResult<Type> {
-    let mut current = env.get_type(fn_name, span)?.r#type;
+    let mut current = env.get_type(fn_name, span)?;
 
     for arg in args {
         let Type::Function(param_type, return_type) = current else {
@@ -190,20 +186,56 @@ fn apply_type_level_function(
             ));
         };
 
-        let arg_type = eval_type_annotation_expr(arg, env, span)?;
+        let arg_kind = eval_type_annotation_expr(arg, env, span)?;
 
-        if arg_type != *param_type {
+        if arg_kind != *param_type {
             return Err(runtime_error!(
                 Some(span.clone()),
                 "type mismatch applying `{}`\n\
                  expected `{}`, found `{}`",
                 fn_name,
                 param_type.to_string(),
-                arg_type.to_string()
+                arg_kind.to_string()
             ));
         }
 
         current = *return_type;
+    }
+
+    Ok(current)
+}
+
+pub fn apply_kind_level_function(
+    fn_name: &str,
+    args: &Vec<ResolvedExpr>,
+    env: &Environment,
+    span: &Span,
+) -> FogResult<Kind> {
+    let mut current = env.get_kind(fn_name, span)?;
+
+    for arg in args {
+        let Kind::Function(param_kind, return_kind) = current else {
+            return Err(runtime_error!(
+                Some(span.clone()),
+                "`{}` is not a valid type constructor",
+                current.to_string()
+            ));
+        };
+
+        let arg_kind = eval_kind_expr(arg, env, span)?;
+
+        if arg_kind != *param_kind {
+            return Err(runtime_error!(
+                Some(span.clone()),
+                "kind mismatch applying `{}`\n\
+                 expected `{}`, found `{}`",
+                fn_name,
+                param_kind.to_string(),
+                arg_kind.to_string()
+            ));
+        }
+
+        current = *return_kind;
     }
 
     Ok(current)

@@ -148,7 +148,10 @@ impl Lexer {
                     decimal = true;
                 } else {
                     return Some(Err(lex_error!(
-                        Some(Span { line: start_line, column: start_column }),
+                        Some(Span {
+                            line: start_line,
+                            column: start_column
+                        }),
                         "Malformed number"
                     )));
                 }
@@ -160,7 +163,10 @@ impl Lexer {
                 Ok(v) => TokenKind::Float32Literal(v),
                 Err(_) => {
                     return Some(Err(lex_error!(
-                        Some(Span { line: start_line, column: start_column }),
+                        Some(Span {
+                            line: start_line,
+                            column: start_column
+                        }),
                         "Float parse error"
                     )));
                 }
@@ -170,7 +176,10 @@ impl Lexer {
                 Ok(v) => TokenKind::Int32Literal(v),
                 Err(_) => {
                     return Some(Err(lex_error!(
-                        Some(Span { line: start_line, column: start_column }),
+                        Some(Span {
+                            line: start_line,
+                            column: start_column
+                        }),
                         "Integer parse error"
                     )));
                 }
