@@ -2,14 +2,11 @@ use std::collections::HashMap;
 
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::interpreter::eval_kind::kind_of;
-use crate::interpreter::eval_type::make_data_constructor_function;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::Type;
-use crate::interpreter::r#type::nest_function_types;
-use crate::interpreter::r#type::value_type_of;
+use crate::interpreter::r#type::kind_of;
 use crate::interpreter::value::Value;
-use crate::interpreter::variable::KindVariable;
+use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::TypeVariable;
 use crate::interpreter::variable::ValueVariable;
 use crate::runtime_error;
@@ -18,7 +15,6 @@ use crate::runtime_error;
 pub struct Environment<'a> {
     pub variables: HashMap<String, ValueVariable>,
     pub types: HashMap<String, TypeVariable>,
-    pub kinds: HashMap<String, KindVariable>,
     pub parent: Option<&'a Environment<'a>>,
 }
 
@@ -27,15 +23,13 @@ impl<'a> Environment<'a> {
         Environment {
             variables: HashMap::new(),
             types: HashMap::new(),
-            kinds: HashMap::new(),
-            parent: parent,
+            parent,
         }
     }
 
     pub fn flatten(&self) -> Environment<'static> {
         let mut variables = HashMap::new();
         let mut types = HashMap::new();
-        let mut kinds = HashMap::new();
 
         if let Some(parent) = self.parent {
             let flat = parent.flatten();
@@ -45,12 +39,10 @@ impl<'a> Environment<'a> {
 
         variables.extend(self.variables.clone());
         types.extend(self.types.clone());
-        kinds.extend(self.kinds.clone());
 
         Environment {
             variables,
             types,
-            kinds,
             parent: None,
         }
     }
@@ -97,22 +89,6 @@ impl<'a> Environment<'a> {
         self.get_type_var(name, span)?.get_type()
     }
 
-    pub fn get_kind(&self, name: &str, span: &Span) -> FogResult<Kind> {
-        if let Some(kind) = self.kinds.get(name) {
-            return Ok(kind.kind.clone());
-        }
-
-        if let Some(parent) = &self.parent {
-            return parent.get_kind(name, span);
-        }
-
-        Err(runtime_error!(
-            Some(span.clone()),
-            "kind `{}` not found in the current scope",
-            name
-        ))
-    }
-
     pub fn contains_type(&self, name: &str) -> bool {
         if self.types.contains_key(name) {
             return true;
@@ -120,18 +96,6 @@ impl<'a> Environment<'a> {
 
         if let Some(parent) = &self.parent {
             return parent.contains_type(name);
-        }
-
-        false
-    }
-
-    pub fn contains_kind(&self, name: &str) -> bool {
-        if self.kinds.contains_key(name) {
-            return true;
-        }
-
-        if let Some(parent) = &self.parent {
-            return parent.contains_kind(name);
         }
 
         false
@@ -185,7 +149,6 @@ impl<'a> Environment<'a> {
     // -- declare
 
     pub fn declare_value(&mut self, name: &str, value: Value, span: &Span) -> FogResult<()> {
-        // discard
         if name == "_" {
             return Ok(());
         }
@@ -204,7 +167,7 @@ impl<'a> Environment<'a> {
             var.r#type.clone()
         };
 
-        let type_of_value = value_type_of(&value, self, span)?;
+        let type_of_value = value_type_of(&value);
 
         if type_of_value != type_of_var {
             return Err(runtime_error!(
@@ -257,41 +220,7 @@ impl<'a> Environment<'a> {
 
         let var = self.types.get_mut(name).unwrap_or_else(|| unreachable!());
 
-        var.r#type = Some(r#type.clone());
-
-        if let Type::Sum(..) = r#type {
-            self.register_data_constructors(&r#type, span)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn register_data_constructors(
-        &mut self,
-        parent_sum_type: &Type,
-        span: &Span,
-    ) -> FogResult<()> {
-        let Type::Sum(ctors) = parent_sum_type else {
-            return Err(runtime_error!(
-                Some(span.clone()),
-                "cannot register data constructors from a non-sum type `{}`",
-                parent_sum_type.to_string()
-            ));
-        };
-
-        for ctor in ctors {
-            let ctor_type = nest_function_types(&ctor.types, parent_sum_type.clone());
-
-            let ctor_value = make_data_constructor_function(
-                ctor.tag.clone(),
-                ctor.types.clone(),
-                parent_sum_type.clone(),
-                Vec::new(),
-            );
-
-            self.annotate_type(&ctor.tag, ctor_type, span)?;
-            self.declare_value(&ctor.tag, ctor_value, span)?;
-        }
+        var.r#type = Some(r#type);
 
         Ok(())
     }

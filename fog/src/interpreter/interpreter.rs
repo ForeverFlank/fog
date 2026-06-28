@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval_statement::annotate;
-use crate::interpreter::eval_statement::declare;
+use crate::interpreter::eval_value::annotate;
+use crate::interpreter::eval_value::declare;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;

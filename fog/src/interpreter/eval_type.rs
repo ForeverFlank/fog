@@ -1,14 +1,9 @@
-use std::rc::Rc;
-
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::eval_kind::eval_kind_expr;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
-use crate::interpreter::r#type::nest_function_types;
-use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::runtime_error;
 
@@ -26,10 +21,6 @@ pub fn eval_annotation_expr(
 ) -> FogResult<Annotation> {
     match expr {
         ResolvedExpr::Identifier { name } if name == "Type" => Ok(Annotation::Kind(Kind::Type)),
-
-        ResolvedExpr::Identifier { name } if env.contains_kind(name) => {
-            Ok(Annotation::Kind(env.get_kind(name, span)?))
-        }
 
         ResolvedExpr::Identifier { name } if env.contains_type(name) => {
             Ok(Annotation::Type(env.get_type(name, span)?))
@@ -257,78 +248,4 @@ pub fn apply_type_level_function(
     }
 
     Ok(current)
-}
-
-pub fn apply_kind_level_function(
-    fn_name: &str,
-    args: &Vec<ResolvedExpr>,
-    env: &Environment,
-    span: &Span,
-) -> FogResult<Kind> {
-    let mut current = env.get_kind(fn_name, span)?;
-
-    for arg in args {
-        let Kind::Function(param_kind, return_kind) = current else {
-            return Err(runtime_error!(
-                Some(span.clone()),
-                "`{}` is not a valid type constructor",
-                current.to_string()
-            ));
-        };
-
-        let arg_kind = eval_kind_expr(arg, env, span)?;
-
-        if arg_kind != *param_kind {
-            return Err(runtime_error!(
-                Some(span.clone()),
-                "kind mismatch applying `{}`\n\
-                 expected `{}`, found `{}`",
-                fn_name,
-                param_kind.to_string(),
-                arg_kind.to_string()
-            ));
-        }
-
-        current = *return_kind;
-    }
-
-    Ok(current)
-}
-
-// --- data constructors ---
-
-pub fn make_data_constructor_function(
-    tag: String,
-    remaining_fields: Vec<Type>,
-    parent_type: Type,
-    collected_fields: Vec<Value>,
-) -> Value {
-    let [next_field, rest @ ..] = remaining_fields.as_slice() else {
-        return Value::Constructor {
-            tag,
-            values: collected_fields,
-            r#type: parent_type,
-        };
-    };
-
-    let next_field = next_field.clone();
-    let rest = rest.to_vec();
-    let parent_type = parent_type.clone();
-
-    let return_type = nest_function_types(&rest, parent_type.clone());
-
-    Value::NativeFunction {
-        param_type: next_field,
-        return_type,
-        function: Rc::new(move |val: Value| {
-            let mut collected_fields = collected_fields.clone();
-            collected_fields.push(val);
-            Ok(make_data_constructor_function(
-                tag.clone(),
-                rest.clone(),
-                parent_type.clone(),
-                collected_fields,
-            ))
-        }),
-    }
 }

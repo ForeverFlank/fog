@@ -1,24 +1,10 @@
-use crate::error::{FogResult, Span};
+use crate::error::FogResult;
+use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::kind::Kind;
-use crate::interpreter::r#type::Type;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::runtime_error;
 
-pub fn kind_of(r#type: &Type) -> Kind {
-    match *r#type {
-        // -> : Kind -> Kind -> Kind
-        Type::Function(_, _) => Kind::Function(
-            Kind::Type.into(),
-            Kind::Function(Kind::Type.into(), Kind::Type.into()).into(),
-        ),
-
-        // otherwise, they're types
-        _ => Kind::Type,
-    }
-}
-
-// used in kind annotations for types
 pub fn eval_kind_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Kind> {
     match expr {
         ResolvedExpr::Identifier { name } if name == "Type" => Ok(Kind::Type),

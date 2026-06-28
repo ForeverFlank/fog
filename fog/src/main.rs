@@ -70,7 +70,7 @@ fn print_tokens(tokens: &Vec<Token>) {
     }
 }
 
-fn print_errors(label: &str, errors: &[FogError]) {
+fn print_errors(label: &str, errors: &Vec<FogError>) {
     for error in errors {
         match error.span.as_ref() {
             Some(span) => println!(

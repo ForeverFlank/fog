@@ -33,9 +33,3 @@ impl TypeVariable {
             .ok_or_else(|| runtime_error!(None, "unassigned type `{}`", self.name))
     }
 }
-
-#[derive(Clone)]
-pub struct KindVariable {
-    pub name: String,
-    pub kind: Kind,
-}
