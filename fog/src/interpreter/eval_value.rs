@@ -10,7 +10,7 @@ use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_type::eval_type_definition_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::nest_function_types;
-use crate::interpreter::typecheck::expr_type_of;
+use crate::interpreter::type_check::expr_type_of;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::ValueVariable;
 use crate::parser::resolved_expr::ResolvedExpr;
@@ -203,7 +203,29 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
 
             Ok(result)
         }
+
+        ResolvedExpr::Match { expr, match_arms } => {
+            let value = eval_value_expr(expr, env, span);
+
+            // TODO proper code
+            for arm in match_arms {
+                if match_pattern(, arm.pattern) {
+                    return eval_value_expr(&arm.value_expr, env, span);
+                }
+            }
+
+            Err(/* not covered */)
+        }
     }
+}
+
+enum Pattern {
+    Value(Value),
+    DataConstructor(...)
+}
+
+fn match_pattern(value: &Value, pattern: &Pattern) -> ?? {
+
 }
 
 fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {

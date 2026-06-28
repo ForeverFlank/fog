@@ -7,6 +7,7 @@ use crate::util::format_joined;
 
 // --- statements ---
 
+#[derive(Clone)]
 pub enum ResolvedStatement {
     TypeAnnotation {
         name: String,
@@ -44,6 +45,7 @@ impl Display for ResolvedStatement {
 
 // --- expressions ---
 
+#[derive(Clone)]
 pub enum ResolvedExpr {
     Block {
         statements: Vec<ResolvedStatement>,
@@ -74,6 +76,17 @@ pub enum ResolvedExpr {
         fn_name: String,
         args: Vec<ResolvedExpr>,
     },
+
+    Match {
+        expr: Box<ResolvedExpr>,
+        match_arms: Vec<MatchArm>,
+    },
+}
+
+#[derive(Clone)]
+pub struct MatchArm {
+    pub pattern: ResolvedExpr,
+    pub value_expr: ResolvedExpr,
 }
 
 fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ResolvedExpr) -> fmt::Result {
@@ -120,6 +133,16 @@ impl Display for ResolvedExpr {
                 }
 
                 Ok(())
+            }
+
+            ResolvedExpr::Match { expr, match_arms } => {
+                write!(f, "match {expr} {{");
+
+                for arm in match_arms {
+                    write!(f, "    {} => {}", arm.pattern, arm.value_expr);
+                }
+
+                write!(f, "}}")
             }
         }
     }

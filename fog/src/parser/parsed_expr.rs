@@ -100,6 +100,17 @@ pub enum ParsedExpr {
     Collection {
         items: Vec<ParsedExpr>,
     },
+
+    Match {
+        expr: Box<ParsedExpr>,
+        match_arms: Vec<MatchArm>,
+    },
+}
+
+#[derive(Clone)]
+pub struct MatchArm {
+    pub pattern: ParsedExpr,
+    pub value: ParsedExpr,
 }
 
 fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ParsedExpr) -> fmt::Result {
@@ -117,6 +128,7 @@ impl Display for ParsedExpr {
             ParsedExpr::Block { statements } => {
                 write!(f, "{{\n")?;
 
+                // TODO: indent?
                 for stmt in statements {
                     write!(f, "    {}\n", stmt)?;
                 }
@@ -147,6 +159,16 @@ impl Display for ParsedExpr {
                 }
 
                 Ok(())
+            }
+
+            ParsedExpr::Match { expr, match_arms } => {
+                write!(f, "match {expr} {{");
+
+                for arm in match_arms {
+                    write!(f, "    {} => {}", arm.pattern, arm.value);
+                }
+
+                write!(f, "}}")
             }
         }
     }

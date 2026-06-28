@@ -7,6 +7,8 @@ use crate::parse_error;
 use crate::parser::parsed_expr::OpKind;
 use crate::parser::parsed_expr::ParsedExpr;
 use crate::parser::parsed_expr::ParsedStatement;
+use crate::parser::resolved_expr;
+use crate::parser::resolved_expr::MatchArm;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 
@@ -191,6 +193,19 @@ impl Resolver {
                 let mut resolver = Resolver::new();
                 resolver.resolve_collection(&items, i32::MIN)
             }
+
+            ParsedExpr::Match { expr, match_arms } => Ok(ResolvedExpr::Match {
+                expr: Self::resolve_expr(*expr)?.into(),
+                match_arms: match_arms
+                    .into_iter()
+                    .map(|arm| {
+                        Ok(MatchArm {
+                            pattern: Self::resolve_expr(arm.pattern)?,
+                            value_expr: Self::resolve_expr(arm.value)?,
+                        })
+                    })
+                    .collect::<FogResult<Vec<_>>>()?,
+            }),
         }
     }
 
@@ -291,6 +306,7 @@ impl Resolver {
 
             ParsedExpr::Tuple { items } => Self::resolve_tuple(items),
 
+            // TODO: this looks really hacky
             ParsedExpr::Collection { items } => {
                 let saved_index = self.index;
                 self.index = 0;
@@ -300,6 +316,19 @@ impl Resolver {
             }
 
             ParsedExpr::Op { .. } => Err(parse_error!(None, "unexpected infix operator")),
+
+            ParsedExpr::Match { expr, match_arms } => Ok(ResolvedExpr::Match {
+                expr: Self::resolve_expr(*expr)?.into(),
+                match_arms: match_arms
+                    .into_iter()
+                    .map(|arm| {
+                        Ok(MatchArm {
+                            pattern: Self::resolve_expr(arm.pattern)?,
+                            value_expr: Self::resolve_expr(arm.value)?,
+                        })
+                    })
+                    .collect::<FogResult<Vec<_>>>()?,
+            }),
         }
     }
 }
