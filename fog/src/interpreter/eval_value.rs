@@ -8,9 +8,10 @@ use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_type::eval_type_definition_expr;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
-use crate::interpreter::variable::Variable;
+use crate::interpreter::variable::TypeVariable;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
+use crate::runtime_error;
 
 pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
@@ -31,18 +32,16 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
                 }
             }
 
-            Err(FogError::runtime(
-                "final operand not found in block statement".to_string(),
+            Err(runtime_error!(
                 Some(span.clone()),
+                "final operand not found in block statement"
             ))
         }
 
-        ResolvedExpr::Identifier { name } => env.get_var(name, span)?.value.ok_or_else(|| {
-            FogError::runtime(
-                format!("undeclared variable `{}`", name),
-                Some(span.clone()),
-            )
-        }),
+        ResolvedExpr::Identifier { name } => env
+            .get_var(name, span)?
+            .value
+            .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name)),
 
         ResolvedExpr::Int32Literal { value } => Ok(Value::Int32(*value)),
         ResolvedExpr::Float32Literal { value } => Ok(Value::Float32(*value)),
@@ -96,7 +95,7 @@ fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogRes
 
             child_env.variables.insert(
                 param_name.clone(),
-                Variable {
+                TypeVariable {
                     name: param_name.clone(),
                     value: Some(argument),
                     r#type: param_type,
@@ -113,12 +112,14 @@ fn apply_value_function(function: Value, argument: Value, span: &Span) -> FogRes
             e
         }),
 
-        _ => Err(FogError::runtime(
-            "cannot apply a non-function value".to_string(),
+        _ => Err(runtime_error!(
             Some(span.clone()),
+            "cannot apply a non-function value"
         )),
     }
 }
+
+// --- todo: fix
 
 pub fn annotate_type(
     name: &String,
@@ -160,8 +161,9 @@ pub fn declare(
         return Ok(());
     }
 
-    Err(FogError::runtime(
-        format!("unannotated variable `{}`", name),
+    Err(runtime_error!(
         Some(span.clone()),
+        "unannotated variable `{}`",
+        name
     ))
 }

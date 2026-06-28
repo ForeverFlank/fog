@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use crate::error::FogError;
 use crate::error::FogResult;
+use crate::parse_error;
 use crate::parser::parsed_expr::OpKind;
 use crate::parser::parsed_expr::ParsedExpr;
 use crate::parser::parsed_expr::ParsedStatement;
@@ -236,7 +237,7 @@ impl Resolver {
         Ok(lhs)
     }
 
-    fn resolve_primary(&mut self, exprs: &[ParsedExpr]) -> FogResult<ResolvedExpr> {
+    fn resolve_primary(&mut self, exprs: &Vec<ParsedExpr>) -> FogResult<ResolvedExpr> {
         let head = self.resolve_atomic(exprs)?;
 
         let name = match &head {
@@ -260,7 +261,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_atomic(&mut self, exprs: &[ParsedExpr]) -> FogResult<ResolvedExpr> {
+    fn resolve_atomic(&mut self, exprs: &Vec<ParsedExpr>) -> FogResult<ResolvedExpr> {
         let expr = exprs[self.index].clone();
         self.index += 1;
 
@@ -298,10 +299,7 @@ impl Resolver {
                 Ok(result)
             }
 
-            ParsedExpr::Op { .. } => Err(FogError::parse(
-                "unexpected infix operator".to_string(),
-                None,
-            )),
+            ParsedExpr::Op { .. } => Err(parse_error!(None, "unexpected infix operator")),
         }
     }
 }

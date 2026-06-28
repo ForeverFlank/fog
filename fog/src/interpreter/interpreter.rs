@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use crate::error::FogError;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::annotate_type;
@@ -8,8 +7,9 @@ use crate::interpreter::eval_value::declare;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
-use crate::interpreter::variable::Variable;
+use crate::interpreter::variable::TypeVariable;
 use crate::parser::resolved_expr::ResolvedStatement;
+use crate::runtime_error;
 
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
@@ -29,7 +29,7 @@ fn create_top_env() -> Environment<'static> {
     let t_unit = Type::Product(Vec::new());
 
     // builtin functions
-    let var_plus_int32_int32 = Variable {
+    let var_plus_int32_int32 = TypeVariable {
         name: "_plus_Int32_Int32".to_string(),
         value: Some(Value::NativeFunction {
             param_type: Type::Int32,
@@ -40,16 +40,10 @@ fn create_top_env() -> Environment<'static> {
                     return_type: Type::Int32,
                     function: Rc::new(move |b: Value| match b {
                         Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
-                        _ => Err(FogError::runtime(
-                            "right operand is not an Int32".to_string(),
-                            None,
-                        )),
+                        _ => Err(runtime_error!(None, "right operand is not an Int32")),
                     }),
                 }),
-                _ => Err(FogError::runtime(
-                    "left operand is not an Int32".to_string(),
-                    None,
-                )),
+                _ => Err(runtime_error!(None, "left operand is not an Int32")),
             }),
         }),
         r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
@@ -78,15 +72,15 @@ pub fn interpret(statements: &Vec<ResolvedStatement>) -> FogResult<()> {
                 declare(name, expr, &mut top_env, span)?;
             }
             ResolvedStatement::Expression { span, .. } => {
-                return Err(FogError::runtime(
-                    "cannot have final operand as a top-level statement".to_string(),
+                return Err(runtime_error!(
                     Some(span.clone()),
+                    "cannot have final operand as a top-level statement"
                 ));
             }
         }
     }
 
-    let mut all_vars: Vec<Variable> = top_env.variables.values().cloned().collect();
+    let mut all_vars: Vec<TypeVariable> = top_env.variables.values().cloned().collect();
     all_vars.sort_by(|a, b| a.name.cmp(&b.name));
 
     println!();

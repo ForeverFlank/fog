@@ -18,30 +18,37 @@ pub struct FogError {
     pub span: Option<Span>,
 }
 
-impl FogError {
-    pub fn lex(message: String, span: Option<Span>) -> FogError {
-        FogError {
-            kind: ErrorKind::Lex,
-            message,
-            span,
+#[macro_export]
+macro_rules! lex_error {
+    ($span:expr, $($arg:tt)*) => {
+        $crate::error::FogError {
+            kind: $crate::error::ErrorKind::Lex,
+            message: format!($($arg)*),
+            span: $span,
         }
-    }
+    };
+}
 
-    pub fn parse(message: String, span: Option<Span>) -> FogError {
-        FogError {
-            kind: ErrorKind::Parse,
-            message,
-            span,
+#[macro_export]
+macro_rules! parse_error {
+    ($span:expr, $($arg:tt)*) => {
+        $crate::error::FogError {
+            kind: $crate::error::ErrorKind::Parse,
+            message: format!($($arg)*),
+            span: $span,
         }
-    }
+    };
+}
 
-    pub fn runtime(message: String, span: Option<Span>) -> FogError {
-        FogError {
-            kind: ErrorKind::Runtime,
-            message,
-            span,
+#[macro_export]
+macro_rules! runtime_error {
+    ($span:expr, $($arg:tt)*) => {
+        $crate::error::FogError {
+            kind: $crate::error::ErrorKind::Runtime,
+            message: format!($($arg)*),
+            span: $span,
         }
-    }
+    };
 }
 
 pub type FogResult<T> = Result<T, FogError>;

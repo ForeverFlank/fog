@@ -1,5 +1,6 @@
 use crate::error::Span;
 use crate::error::{FogError, FogResult};
+use crate::lex_error;
 use crate::lexer::token::*;
 
 pub struct Lexer {
@@ -146,12 +147,9 @@ impl Lexer {
                 if !decimal {
                     decimal = true;
                 } else {
-                    return Some(Err(FogError::lex(
-                        "Malformed number".to_string(),
-                        Some(Span {
-                            line: start_line,
-                            column: start_column,
-                        }),
+                    return Some(Err(lex_error!(
+                        Some(Span { line: start_line, column: start_column }),
+                        "Malformed number"
                     )));
                 }
             }
@@ -161,12 +159,9 @@ impl Lexer {
             match num.parse::<f32>() {
                 Ok(v) => TokenKind::Float32Literal(v),
                 Err(_) => {
-                    return Some(Err(FogError::lex(
-                        "Float parse error".to_string(),
-                        Some(Span {
-                            line: start_line,
-                            column: start_column,
-                        }),
+                    return Some(Err(lex_error!(
+                        Some(Span { line: start_line, column: start_column }),
+                        "Float parse error"
                     )));
                 }
             }
@@ -174,12 +169,9 @@ impl Lexer {
             match num.parse::<i32>() {
                 Ok(v) => TokenKind::Int32Literal(v),
                 Err(_) => {
-                    return Some(Err(FogError::lex(
-                        "Integer parse error".to_string(),
-                        Some(Span {
-                            line: start_line,
-                            column: start_column,
-                        }),
+                    return Some(Err(lex_error!(
+                        Some(Span { line: start_line, column: start_column }),
+                        "Integer parse error"
                     )));
                 }
             }

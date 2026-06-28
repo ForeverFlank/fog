@@ -1,7 +1,7 @@
-pub fn format_joined<T: ToString>(items: &[T], sep: &str) -> String {
+pub fn format_joined<T: ToString>(items: &Vec<T>, sep: &str) -> String {
     items
         .iter()
-        .map(|x: &T| x.to_string())
+        .map(|x| x.to_string())
         .collect::<Vec<String>>()
         .join(sep)
 }

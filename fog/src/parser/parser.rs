@@ -1,6 +1,7 @@
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
+use crate::parse_error;
 use crate::lexer::token::*;
 use crate::parser::parsed_expr::*;
 
@@ -152,9 +153,9 @@ impl Parser<'_> {
                     let param_type = self.parse_expression()?;
 
                     let TokenKind::FatArrow = self.peek().kind else {
-                        return Err(FogError::parse(
-                            "expected `=>`".to_string(),
+                        return Err(parse_error!(
                             Some(token_span(self.peek())),
+                            "expected `=>`"
                         ));
                     };
                     self.next();
@@ -204,9 +205,9 @@ impl Parser<'_> {
                         }
 
                         _ => {
-                            return Err(FogError::parse(
-                                "expected `)`".to_string(),
+                            return Err(parse_error!(
                                 Some(token_span(&token)),
+                                "expected `)`"
                             ));
                         }
                     }
@@ -220,9 +221,9 @@ impl Parser<'_> {
                 Ok(ParsedExpr::Block { statements })
             }
 
-            _ => Err(FogError::parse(
-                "atomic expression parsing error".to_string(),
+            _ => Err(parse_error!(
                 Some(token_span(&token)),
+                "atomic expression parsing error"
             )),
         }
     }
@@ -240,7 +241,7 @@ impl Parser<'_> {
                 break;
             }
             if let TokenKind::Eof = self.peek().kind {
-                return Err(FogError::parse("unclosed block".to_string(), None));
+                return Err(parse_error!(None, "unclosed block"));
             }
 
             let stmt = self.parse_block_statement()?;

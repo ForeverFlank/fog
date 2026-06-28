@@ -5,6 +5,7 @@ use std::hash::Hasher;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
+use crate::runtime_error;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_value::annotate_type;
@@ -178,10 +179,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                 }
             }
 
-            Err(FogError::runtime(
-                "final operand not found in block statement".to_string(),
-                Some(span.clone()),
-            ))
+            Err(runtime_error!(Some(span.clone()), "final operand not found in block statement"))
         }
 
         ResolvedExpr::Identifier { name } => Ok(env.get_var(name, span)?.r#type),
@@ -203,9 +201,10 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                 curr_type = match curr_type {
                     Type::Function(_, return_type) => *return_type,
                     _ => {
-                        return Err(FogError::runtime(
-                            format!("{} is not a function type", curr_type.to_string()),
+                        return Err(runtime_error!(
                             Some(span.clone()),
+                            "{} is not a function type",
+                            curr_type.to_string()
                         ));
                     }
                 };

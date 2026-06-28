@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
-use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
+use crate::runtime_error;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::DataConstructor;
@@ -22,7 +22,9 @@ pub fn eval_type_annotation_expr(
     span: &Span,
 ) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier { name } => env.get_type(name, span),
+        ResolvedExpr::Identifier { name } => env.get_type(name, span)?.r#type.ok_or_else(|| {
+            runtime_error!(Some(span.clone()), "undeclared type `{}`", name)
+        }),
 
         ResolvedExpr::FuncAppl { fn_name, args } if fn_name == "->" && args.len() == 2 => {
             eval_function_type(&args[0], &args[1], env, span)
@@ -32,26 +34,25 @@ pub fn eval_type_annotation_expr(
             eval_product_type(&args[0], &args[1], env, span)
         }
 
-        ResolvedExpr::FuncAppl { fn_name, .. } if fn_name == "+" => Err(FogError::runtime(
-            "cannot type annotate a value with sum types".to_string(),
+        ResolvedExpr::FuncAppl { fn_name, .. } if fn_name == "+" => Err(runtime_error!(
             Some(span.clone()),
+            "cannot type annotate a value with sum types"
         )),
 
         ResolvedExpr::FuncAppl { fn_name, args } if env.contains_type(fn_name) => {
             apply_type_level_function(fn_name, args, env, span)
         }
 
-        ResolvedExpr::FuncAppl { .. } => Err(FogError::runtime(
-            format!(
-                "cannot type annotate a value with data constructor `{}`",
-                expr.to_string()
-            ),
+        ResolvedExpr::FuncAppl { .. } => Err(runtime_error!(
             Some(span.clone()),
+            "cannot type annotate a value with data constructor `{}`",
+            expr.to_string()
         )),
 
-        _ => Err(FogError::runtime(
-            format!("`{}` is not a type", expr.to_string()),
+        _ => Err(runtime_error!(
             Some(span.clone()),
+            "`{}` is not a type",
+            expr.to_string()
         )),
     }
 }
@@ -62,7 +63,11 @@ pub fn eval_type_definition_expr(
     span: &Span,
 ) -> FogResult<Type> {
     match expr {
-        ResolvedExpr::Identifier { name } if env.contains_type(name) => env.get_type(name, span),
+        ResolvedExpr::Identifier { name } if env.contains_type(name) => {
+            env.get_type(name, span)?.r#type.ok_or_else(|| {
+                runtime_error!(Some(span.clone()), "undeclared type `{}`", name)
+            })
+        }
 
         ResolvedExpr::Identifier { name } => Ok(Type::Sum(vec![DataConstructor {
             tag: name.clone(),
@@ -98,9 +103,10 @@ pub fn eval_type_definition_expr(
             }]))
         }
 
-        _ => Err(FogError::runtime(
-            format!("`{}` is not a valid type definition", expr.to_string()),
+        _ => Err(runtime_error!(
             Some(span.clone()),
+            "`{}` is not a valid type definition",
+            expr.to_string()
         )),
     }
 }
@@ -150,21 +156,17 @@ fn eval_sum_type(
     let right = eval_type_definition_expr(right, env, span)?;
 
     let Type::Sum(ctors1) = left else {
-        return Err(FogError::runtime(
-            format!(
-                "`{}` is not a data constructor or a sum type",
-                left.to_string()
-            ),
+        return Err(runtime_error!(
             Some(span.clone()),
+            "`{}` is not a data constructor or a sum type",
+            left.to_string()
         ));
     };
     let Type::Sum(ctors2) = right else {
-        return Err(FogError::runtime(
-            format!(
-                "`{}` is not a data constructor or a sum type",
-                right.to_string()
-            ),
+        return Err(runtime_error!(
             Some(span.clone()),
+            "`{}` is not a data constructor or a sum type",
+            right.to_string()
         ));
     };
 
@@ -177,28 +179,27 @@ fn apply_type_level_function(
     env: &Environment,
     span: &Span,
 ) -> FogResult<Type> {
-    let mut current = env.get_type(fn_name, span)?;
+    let mut current = env.get_type(fn_name, span)?.r#type;
 
     for arg in args {
         let Type::Function(param_type, return_type) = current else {
-            return Err(FogError::runtime(
-                format!("`{}` is not a valid type constructor", current.to_string()),
+            return Err(runtime_error!(
                 Some(span.clone()),
+                "`{}` is not a valid type constructor",
+                current.to_string()
             ));
         };
 
         let arg_type = eval_type_annotation_expr(arg, env, span)?;
 
         if arg_type != *param_type {
-            return Err(FogError::runtime(
-                format!(
-                    "type mismatch applying `{}`\n\
-                     expected `{}`, found `{}`",
-                    fn_name,
-                    param_type.to_string(),
-                    arg_type.to_string()
-                ),
+            return Err(runtime_error!(
                 Some(span.clone()),
+                "type mismatch applying `{}`\n\
+                 expected `{}`, found `{}`",
+                fn_name,
+                param_type.to_string(),
+                arg_type.to_string()
             ));
         }
 
