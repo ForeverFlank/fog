@@ -5,6 +5,7 @@ use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::annotate_type;
 use crate::interpreter::eval_value::declare;
+use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::Variable;
@@ -14,25 +15,25 @@ fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
 
     // the Type itself
-    let t_type = Type::Type;
+    let k_type = Kind::Type;
+
+    // function kind
+    let k_function = Kind::Function(
+        Kind::Type.into(),
+        Kind::Function(Kind::Type.into(), Kind::Type.into()).into(),
+    );
 
     // primitive types
     let t_int32 = Type::Int32;
     let t_float32 = Type::Float32;
     let t_unit = Type::Product(Vec::new());
 
-    // function type
-    let t_function = Type::Function(
-        Box::new(Type::Type),
-        Box::new(Type::Function(Box::new(Type::Type), Box::new(Type::Type))),
-    );
-
     // builtin functions
     let var_plus_int32_int32 = Variable {
         name: "_plus_Int32_Int32".to_string(),
         value: Some(Value::NativeFunction {
             param_type: Type::Int32,
-            return_type: Type::Function(Box::new(Type::Int32), Box::new(Type::Int32)),
+            return_type: Type::Function(Type::Int32.into(), Type::Int32.into()),
             function: Rc::new(|a: Value| match a {
                 Value::Int32(lhs) => Ok(Value::NativeFunction {
                     param_type: Type::Int32,
@@ -54,11 +55,9 @@ fn create_top_env() -> Environment<'static> {
         r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
     };
 
-    vec![t_type, t_int32, t_float32, t_unit, t_function]
-        .iter()
-        .for_each(|r#type| {
-            env.types.insert(r#type.to_string(), r#type.clone());
-        });
+    vec![t_int32, t_float32, t_unit].iter().for_each(|r#type| {
+        env.types.insert(r#type.to_string(), r#type.clone());
+    });
 
     vec![var_plus_int32_int32].iter().for_each(|var| {
         env.variables.insert(var.name.clone(), var.clone());

@@ -8,7 +8,6 @@ use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_value::annotate_type;
-use crate::interpreter::eval_value::declare;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
@@ -19,7 +18,6 @@ use crate::util::format_joined;
 
 #[derive(Clone, Eq)]
 pub enum Type {
-    Type,
     Function(Box<Type>, Box<Type>),
 
     // primitive types
@@ -33,22 +31,20 @@ pub enum Type {
 
 impl Type {
     pub fn function(param_type: Type, return_type: Type) -> Type {
-        Type::Function(Box::new(param_type), Box::new(return_type))
+        Type::Function(param_type.into(), return_type.into())
     }
 }
 
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Type::Type, Type::Type) => true,
-
-            (Type::Int32, Type::Int32) => true,
-            (Type::Float32, Type::Float32) => true,
-
             (
                 Type::Function(param_type_1, return_type_1),
                 Type::Function(param_type_2, return_type_2),
             ) => param_type_1 == param_type_2 && return_type_1 == return_type_2,
+
+            (Type::Int32, Type::Int32) => true,
+            (Type::Float32, Type::Float32) => true,
 
             (Type::Product(types_1), Type::Product(types_2)) => types_1 == types_2,
 
@@ -85,7 +81,6 @@ impl Hash for Type {
 impl ToString for Type {
     fn to_string(&self) -> String {
         match self {
-            Type::Type => "Type".to_string(),
             Type::Function(param_type, return_type) => {
                 format!("{} -> {}", param_type.to_string(), return_type.to_string())
             }
@@ -128,9 +123,9 @@ impl std::fmt::Display for DataConstructor {
 
 // --- functions ---
 
-pub fn nest_function_types(field_types: &[Type], return_type: Type) -> Type {
+pub fn nest_function_types(field_types: &Vec<Type>, return_type: Type) -> Type {
     field_types.iter().rev().fold(return_type, |ret, ft| {
-        Type::Function(Box::new(ft.clone()), Box::new(ret))
+        Type::Function(ft.clone().into(), ret.into())
     })
 }
 

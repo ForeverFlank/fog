@@ -154,8 +154,8 @@ impl Resolver {
     ) -> FogResult<ResolvedExpr> {
         Ok(ResolvedExpr::Lambda {
             param_name,
-            param_type: Box::new(Self::resolve_expr(*param_type)?),
-            body: Rc::new(Self::resolve_expr(*body)?),
+            param_type: Self::resolve_expr(*param_type)?.into(),
+            body: Self::resolve_expr(*body)?.into(),
         })
     }
 

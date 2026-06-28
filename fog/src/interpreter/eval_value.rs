@@ -55,7 +55,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
             param_name: param_name.clone(),
             param_type: eval_type_annotation_expr(param_type, env, span)?,
             body: Rc::clone(body),
-            captured_env: Box::new(env.flatten()),
+            captured_env: env.flatten().into(),
         }),
 
         ResolvedExpr::Tuple { items } => Ok(Value::Tuple(
@@ -136,21 +136,27 @@ pub fn declare(
     env: &mut Environment,
     span: &Span,
 ) -> FogResult<()> {
+    // declare variable
     if env.variables.contains_key(name) {
         if let Type::Type = env.variables[name].r#type {
             env.variables.remove(name);
+
             let r#type = eval_type_definition_expr(expr, env, span)?;
             env.declare_type(name, r#type.clone(), span)?;
+
             return Ok(());
         }
 
         env.declare_value(name, eval_value_expr(expr, env, span)?, span)?;
+
         return Ok(());
     }
 
+    // declare type
     if env.types.contains_key(name) {
         let r#type = eval_type_definition_expr(expr, env, span)?;
         env.declare_type(name, r#type.clone(), span)?;
+
         return Ok(());
     }
 

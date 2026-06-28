@@ -163,8 +163,8 @@ impl Parser<'_> {
 
                     return Ok(ParsedExpr::Lambda {
                         param_name: name,
-                        param_type: Box::new(param_type),
-                        body: Box::new(body),
+                        param_type: param_type.into(),
+                        body: body.into(),
                     });
                 }
 

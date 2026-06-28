@@ -4,11 +4,17 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
+use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
+
+enum AnnotationKind {
+    Kind(Kind),
+    Type(Type),
+}
 
 pub fn eval_type_annotation_expr(
     expr: &ResolvedExpr,
@@ -131,7 +137,7 @@ fn eval_function_type(
     let left = eval_type_annotation_expr(left, env, span)?;
     let right = eval_type_annotation_expr(right, env, span)?;
 
-    Ok(Type::Function(Box::new(left), Box::new(right)))
+    Ok(Type::Function(left.into(), right.into()))
 }
 
 fn eval_sum_type(
