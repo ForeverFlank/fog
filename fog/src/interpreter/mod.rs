@@ -8,7 +8,7 @@ pub mod eval_value;
 pub mod interpreter;
 pub mod kind;
 pub mod r#type;
-pub mod typecheck;
+pub mod type_check;
 pub mod value;
 pub mod variable;
 
