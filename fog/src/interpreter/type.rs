@@ -8,6 +8,7 @@ use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_statement::annotate;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
+use crate::interpreter::eval_type::eval_type_definition_expr;
 use crate::interpreter::r#type::Type::Product;
 use crate::interpreter::value::Value;
 use crate::parser::resolved_expr::ResolvedExpr;
@@ -169,10 +170,36 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                     ResolvedStatement::TypeAnnotation { name, expr, span } => {
                         annotate(name, expr, &mut block_env, span)?;
                     }
+
                     ResolvedStatement::Declaration { name, expr, span } => {
-                        // TODO type declaration
-                        // declare(name, expr, &mut block_env, span)?;
+                        if block_env.variables.contains_key(name) {
+                            // variable declaration
+                            let expr_type = expr_type_of(expr, &block_env, span)?;
+                            let annotated_type = block_env.variables[name].r#type.clone();
+
+                            if expr_type != annotated_type {
+                                return Err(runtime_error!(
+                                    Some(span.clone()),
+                                    "type mismatch when assigning to variable `{}`\n\
+                                     expected `{}`, found `{}`",
+                                    name,
+                                    annotated_type.to_string(),
+                                    expr_type.to_string()
+                                ));
+                            }
+                        } else if block_env.types.contains_key(name) {
+                            // type declaration
+                            let defined_type = eval_type_definition_expr(expr, &block_env, span)?;
+                            block_env.declare_type(name, defined_type, span)?;
+                        } else {
+                            return Err(runtime_error!(
+                                Some(span.clone()),
+                                "unannotated variable `{}`",
+                                name
+                            ));
+                        }
                     }
+
                     ResolvedStatement::Expression { span, expr } => {
                         return expr_type_of(expr, &block_env, span);
                     }

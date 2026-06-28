@@ -30,14 +30,14 @@ pub fn declare(
     env: &mut Environment,
     span: &Span,
 ) -> FogResult<()> {
-    // declare variable
     if env.variables.contains_key(name) {
+        // declare variable
         env.declare_value(name, eval_value_expr(expr, env, span)?, span)?;
         return Ok(());
     }
 
-    // declare type
     if env.types.contains_key(name) {
+        // declare type
         env.declare_type(name, eval_type_definition_expr(expr, env, span)?, span)?;
         return Ok(());
     }

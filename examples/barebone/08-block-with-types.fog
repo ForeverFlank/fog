@@ -1,0 +1,13 @@
+num : Int32
+num = {
+    MyType : Type
+    MyType = Int32
+
+    x : MyType
+    x = 5
+
+    y : MyType
+    y = 7
+
+    _plus_Int32_Int32 x y
+}
