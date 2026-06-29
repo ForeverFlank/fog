@@ -8,6 +8,7 @@ use crate::interpreter::eval_type::Annotation;
 use crate::interpreter::eval_type::eval_annotation_expr;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_type::eval_type_definition_expr;
+use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::type_check::expr_type_of;
@@ -205,27 +206,20 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
         }
 
         ResolvedExpr::Match { expr, match_arms } => {
-            let value = eval_value_expr(expr, env, span);
+            let value = eval_value_expr(expr, env, span)?;
 
-            // TODO proper code
             for arm in match_arms {
-                if match_pattern(, arm.pattern) {
+                if let Some(arm_env) = match_pattern(&value, arm.pattern, env)? {
                     return eval_value_expr(&arm.value_expr, env, span);
                 }
             }
 
-            Err(/* not covered */)
+            Err(runtime_error!(
+                Some(span.clone()),
+                "match statement not covered"
+            ))
         }
     }
-}
-
-enum Pattern {
-    Value(Value),
-    DataConstructor(...)
-}
-
-fn match_pattern(value: &Value, pattern: &Pattern) -> ?? {
-
 }
 
 fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
@@ -262,5 +256,27 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
             Some(span.clone()),
             "cannot apply a non-function value"
         )),
+    }
+}
+
+enum Pattern {
+    Value(Value),
+    DataConstructor(DataConstructor),
+}
+
+fn eval_pattern(expr: &ResolvedExpr) -> FogResult<Pattern> {
+    Ok(())
+}
+
+fn match_pattern<'a>(
+    value: &Value,
+    pattern: &Pattern,
+    env: &Environment,
+) -> FogResult<Option<Environment<'a>>> {
+    let arm_env = Environment::new(Some(env));
+
+    match pattern {
+        Pattern::Value(value) => todo!(),
+        Pattern::DataConstructor(data_constructor) => todo!(),
     }
 }
