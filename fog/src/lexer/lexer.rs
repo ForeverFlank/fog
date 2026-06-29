@@ -41,7 +41,7 @@ impl Lexer {
     }
 
     pub fn tokenize(src: &str) -> (Vec<Token>, Vec<FogError>) {
-        let mut lexer: Lexer = Lexer::new(src);
+        let mut lexer = Lexer::new(src);
         let mut tokens: Vec<Token> = Vec::new();
         let mut errors: Vec<FogError> = Vec::new();
 
@@ -50,8 +50,8 @@ impl Lexer {
                 continue;
             }
 
-            let start_line: usize = lexer.line;
-            let start_column: usize = lexer.column;
+            let start_line = lexer.line;
+            let start_column = lexer.column;
 
             let result: Option<FogResult<Token>> = lexer
                 .parse_newline(start_line, start_column)
@@ -93,14 +93,14 @@ impl Lexer {
     }
 
     fn parse_word(&mut self, start_line: usize, start_column: usize) -> Option<FogResult<Token>> {
-        let pos: usize = self.pos;
-        let ch: char = self.peek()?;
+        let pos = self.pos;
+        let ch = self.peek()?;
 
         if !(ch.is_alphabetic() || ch == '_') {
             return None;
         }
 
-        let mut word: String = String::new();
+        let mut word = String::new();
 
         while let Some(ch) = self.peek() {
             if ch.is_alphanumeric() || ch == '_' {
@@ -111,10 +111,7 @@ impl Lexer {
             }
         }
 
-        let kind: TokenKind = match word.as_str() {
-            "if" => TokenKind::If,
-            _ => TokenKind::Identifier(word),
-        };
+        let kind = match_keyword(&word).unwrap_or(TokenKind::Identifier(word));
 
         Some(Ok(Token {
             kind,
@@ -125,15 +122,20 @@ impl Lexer {
     }
 
     fn parse_number(&mut self, start_line: usize, start_column: usize) -> Option<FogResult<Token>> {
-        let pos: usize = self.pos;
-        let ch: char = self.peek()?;
+        let pos = self.pos;
+        let span = Span {
+            line: start_line,
+            column: start_column,
+        };
+
+        let ch = self.peek()?;
 
         if !ch.is_numeric() {
             return None;
         }
 
-        let mut num: String = String::new();
-        let mut decimal: bool = false;
+        let mut num = String::new();
+        let mut decimal = false;
 
         while let Some(ch) = self.peek() {
             if !(ch.is_numeric() || ch == '.') {
@@ -147,13 +149,7 @@ impl Lexer {
                 if !decimal {
                     decimal = true;
                 } else {
-                    return Some(Err(lex_error!(
-                        Some(Span {
-                            line: start_line,
-                            column: start_column
-                        }),
-                        "Malformed number"
-                    )));
+                    return Some(Err(lex_error!(Some(span), "Malformed number")));
                 }
             }
         }
@@ -162,13 +158,7 @@ impl Lexer {
             match num.parse::<f32>() {
                 Ok(v) => TokenKind::Float32Literal(v),
                 Err(_) => {
-                    return Some(Err(lex_error!(
-                        Some(Span {
-                            line: start_line,
-                            column: start_column
-                        }),
-                        "Float parse error"
-                    )));
+                    return Some(Err(lex_error!(Some(span), "Float parse error")));
                 }
             }
         } else {
@@ -203,10 +193,12 @@ impl Lexer {
             return None;
         }
 
-        let pos: usize = self.pos;
-        let sym: String = self.chars[self.pos..self.pos + 2].iter().collect();
+        let pos = self.pos;
+        let sym = self.chars[self.pos..self.pos + 2]
+            .iter()
+            .collect::<String>();
 
-        let kind: TokenKind = match_two_char_token(&sym)?;
+        let kind = match_two_char_token(&sym)?;
 
         self.next();
         self.next();
@@ -224,10 +216,10 @@ impl Lexer {
         start_line: usize,
         start_column: usize,
     ) -> Option<FogResult<Token>> {
-        let pos: usize = self.pos;
-        let sym: char = self.peek()?;
+        let pos = self.pos;
+        let sym = self.peek()?;
 
-        let token_type: TokenKind = match_one_char_token(sym)?;
+        let token_type = match_one_char_token(sym)?;
 
         self.next();
 
@@ -257,8 +249,8 @@ impl Lexer {
         start_line: usize,
         start_column: usize,
     ) -> Option<FogResult<Token>> {
-        let pos: usize = self.pos;
-        let ch: char = self.peek()?;
+        let pos = self.pos;
+        let ch = self.peek()?;
 
         if ch != '\n' {
             return None;

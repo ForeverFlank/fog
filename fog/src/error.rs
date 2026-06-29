@@ -8,6 +8,7 @@ pub struct Span {
 pub enum ErrorKind {
     Lex,
     Parse,
+    TypeCheck,
     Runtime,
 }
 

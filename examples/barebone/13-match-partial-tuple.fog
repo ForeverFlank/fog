@@ -1,13 +1,12 @@
 -- matching tuples
 
 f : Int32 -> Int32 -> Int32
-f = x : Int32 => y : Int32 =>
-    match (x, y) {
-        (0, 0) => 1
-        (1, a) => a
-        (b, 2) => b
-        _      => 0
-    }
+f = x : Int32 => y : Int32 => match (x, y) {
+    (0, 0) => 1
+    (1, a) => a
+    (b, 2) => b
+    _      => 0
+}
 
 num1 : Int32
 num1 = f 0 0

@@ -39,7 +39,7 @@ pub enum TokenKind {
 
     // keywords
     Match,
-    If,
+    // If,
 }
 
 pub fn match_one_char_token(char: char) -> Option<TokenKind> {
@@ -118,7 +118,7 @@ impl fmt::Display for TokenKind {
             TokenKind::RightComposition => write!(f, "RightComposition"),
 
             TokenKind::Match => write!(f, "Match"),
-            TokenKind::If => write!(f, "If"),
+            // TokenKind::If => write!(f, "If"),
         }
     }
 }

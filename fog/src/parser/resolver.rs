@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::error::FogError;
 use crate::error::FogResult;
@@ -7,7 +6,6 @@ use crate::parse_error;
 use crate::parser::parsed_expr::OpKind;
 use crate::parser::parsed_expr::ParsedExpr;
 use crate::parser::parsed_expr::ParsedStatement;
-use crate::parser::resolved_expr;
 use crate::parser::resolved_expr::MatchArm;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;

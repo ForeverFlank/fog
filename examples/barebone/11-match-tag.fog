@@ -4,16 +4,13 @@ Bool : Type
 Bool = True + False
 
 and : Bool -> Bool -> Bool
-and =
-    b1 : Bool =>
-    b2 : Bool =>
-    match b1 {
+and = b1 : Bool => b2 : Bool => match b1 {
+    False => False
+    True  => match b2 {
         False => False
-        True  => match b2 {
-            False => False
-            True  => True
-        }
+        True  => True
     }
+}
 
 
 b1 : Bool
@@ -24,3 +21,5 @@ b2 = and False True     -- false
 
 b3 : Bool
 b3 = and True True      -- true
+
+

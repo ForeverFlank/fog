@@ -3,7 +3,7 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
-use crate::parser::parsed_expr::*;
+use crate::parser::parsed_expr::{MatchArm, *};
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -136,6 +136,7 @@ impl Parser<'_> {
                 Ok(ParsedExpr::Float32Literal { value })
             }
 
+            // unary minus (negation)
             TokenKind::Minus => {
                 self.next();
 
@@ -147,6 +148,7 @@ impl Parser<'_> {
             TokenKind::Identifier(name) => {
                 self.next();
 
+                // check for lambda with type annotation
                 if let TokenKind::Colon = self.peek().kind {
                     self.next();
 
@@ -169,6 +171,7 @@ impl Parser<'_> {
                 Ok(ParsedExpr::Identifier { name })
             }
 
+            // tuple
             TokenKind::LeftParenthesis => {
                 self.next();
 
@@ -208,6 +211,7 @@ impl Parser<'_> {
                 }
             }
 
+            // block statement
             TokenKind::LeftBrace => {
                 self.next();
 
@@ -215,11 +219,68 @@ impl Parser<'_> {
                 Ok(ParsedExpr::Block { statements })
             }
 
+            // match
+            TokenKind::Match => {
+                self.next();
+
+                let expr = self.parse_expression()?;
+
+                let TokenKind::LeftBrace = self.peek().kind else {
+                    return Err(parse_error!(Some(token_span(self.peek())), "expected `{{`"));
+                };
+                self.next();
+
+                let match_arms = self.parse_match_arms()?;
+
+                Ok(ParsedExpr::Match {
+                    expr: expr.into(),
+                    match_arms,
+                })
+            }
+
             _ => Err(parse_error!(
                 Some(token_span(&token)),
                 "atomic expression parsing error"
             )),
         }
+    }
+
+    fn parse_match_arms(&mut self) -> FogResult<Vec<MatchArm>> {
+        let mut arms = Vec::new();
+
+        while let TokenKind::Newline = self.peek().kind {
+            self.next();
+        }
+
+        loop {
+            if let TokenKind::RightBrace = self.peek().kind {
+                self.next();
+                break;
+            }
+            if let TokenKind::Eof = self.peek().kind {
+                return Err(parse_error!(None, "unclosed match"));
+            }
+
+            let pattern = self.parse_expression()?;
+
+            let TokenKind::FatArrow = self.peek().kind else {
+                return Err(parse_error!(Some(token_span(self.peek())), "expected `=>`"));
+            };
+            self.next();
+
+            let value_expr = self.parse_expression()?;
+
+            arms.push(MatchArm {
+                pattern,
+                value_expr,
+            });
+
+            while let TokenKind::Newline = self.peek().kind {
+                self.next();
+            }
+        }
+
+        Ok(arms)
     }
 
     fn parse_block(&mut self) -> FogResult<Vec<ParsedStatement>> {

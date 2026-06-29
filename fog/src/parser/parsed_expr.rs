@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Display;
 
 use crate::error::Span;
-use crate::util::{format_joined, fmt_parenthesized};
+use crate::util::{fmt_parenthesized, format_joined};
 
 // --- statement ---
 
@@ -153,10 +153,10 @@ impl Display for ParsedExpr {
             }
 
             ParsedExpr::Match { expr, match_arms } => {
-                write!(f, "match {expr} {{");
+                write!(f, "match {expr} {{")?;
 
                 for arm in match_arms {
-                    write!(f, "    {} => {}", arm.pattern, arm.value_expr);
+                    write!(f, "    {} => {}", arm.pattern, arm.value_expr)?;
                 }
 
                 write!(f, "}}")
