@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::error::FogError;
@@ -8,11 +9,11 @@ use crate::interpreter::eval_type::Annotation;
 use crate::interpreter::eval_type::eval_annotation_expr;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_type::eval_type_definition_expr;
-use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::nest_function_types;
 use crate::interpreter::type_check::expr_type_of;
 use crate::interpreter::value::Value;
+use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
@@ -209,8 +210,19 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
             let value = eval_value_expr(expr, env, span)?;
 
             for arm in match_arms {
-                if let Some(arm_env) = match_pattern(&value, arm.pattern, env)? {
-                    return eval_value_expr(&arm.value_expr, env, span);
+                if let Some(bindings) = match_pattern(&value, &arm.pattern, span)? {
+                    let mut arm_env = Environment::new(Some(env));
+                    for (name, val) in &bindings {
+                        arm_env.variables.insert(
+                            name.clone(),
+                            ValueVariable {
+                                name: name.clone(),
+                                value: Some(val.clone()),
+                                r#type: value_type_of(val),
+                            },
+                        );
+                    }
+                    return eval_value_expr(&arm.value_expr, &arm_env, span);
                 }
             }
 
@@ -259,24 +271,75 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
     }
 }
 
-enum Pattern {
-    Value(Value),
-    DataConstructor(DataConstructor),
-}
-
-fn eval_pattern(expr: &ResolvedExpr) -> FogResult<Pattern> {
-    Ok(())
-}
-
-fn match_pattern<'a>(
+fn match_pattern(
     value: &Value,
-    pattern: &Pattern,
-    env: &Environment,
-) -> FogResult<Option<Environment<'a>>> {
-    let arm_env = Environment::new(Some(env));
-
+    pattern: &ResolvedExpr,
+    span: &Span,
+) -> FogResult<Option<HashMap<String, Value>>> {
     match pattern {
-        Pattern::Value(value) => todo!(),
-        Pattern::DataConstructor(data_constructor) => todo!(),
+        ResolvedExpr::Int32Literal { value: pat_val } => match value {
+            Value::Int32(val) if val == pat_val => Ok(Some(HashMap::new())),
+            _ => Ok(None),
+        },
+
+        ResolvedExpr::Float32Literal { value: pat_val } => match value {
+            Value::Float32(val) if val == pat_val => Ok(Some(HashMap::new())),
+            _ => Ok(None),
+        },
+
+        ResolvedExpr::Identifier { name } => {
+            if name == "_" {
+                // 'else' arm
+                Ok(Some(HashMap::new()))
+            } else if name.starts_with(|c: char| c.is_uppercase()) {
+                // enums
+                match value {
+                    Value::Constructor { tag, values, .. } if tag == name && values.is_empty() => {
+                        Ok(Some(HashMap::new()))
+                    }
+                    _ => Ok(None),
+                }
+            } else {
+                // bind value to identifier
+                let mut bindings = HashMap::new();
+                bindings.insert(name.clone(), value.clone());
+                Ok(Some(bindings))
+            }
+        }
+
+        ResolvedExpr::Tuple { items } => match value {
+            Value::Tuple(values) if values.len() == items.len() => {
+                let mut bindings = HashMap::new();
+                for (v, p) in values.iter().zip(items) {
+                    match match_pattern(v, p, span)? {
+                        None => return Ok(None),
+                        Some(b) => bindings.extend(b),
+                    }
+                }
+                Ok(Some(bindings))
+            }
+            _ => Ok(None),
+        },
+
+        // data constructor
+        ResolvedExpr::FuncAppl { fn_name, args } => match value {
+            Value::Constructor { tag, values, .. }
+                if tag == fn_name && values.len() == args.len() =>
+            {
+                let mut bindings = HashMap::new();
+                for (v, p) in values.iter().zip(args) {
+                    match match_pattern(v, p, span)? {
+                        None => return Ok(None),
+                        Some(b) => bindings.extend(b),
+                    }
+                }
+                Ok(Some(bindings))
+            }
+            _ => Ok(None),
+        },
+
+        ResolvedExpr::Block { .. } | ResolvedExpr::Lambda { .. } | ResolvedExpr::Match { .. } => {
+            Err(runtime_error!(None, "unsupported pattern `{pattern}`"))
+        }
     }
 }

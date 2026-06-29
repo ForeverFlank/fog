@@ -2,20 +2,20 @@
 
 matchNum : Int32 -> Int32
 matchNum = x : Int32 => match x {
-    -1 => 1
-     0 => 2
-     1 => 3
-     _ => 0
+    1 => 10
+    2 => 20
+    3 => 30
+    _ => 0
 }
 
-one   : Int32
-one   = matchNum -1
+num1 : Int32
+num1 = matchNum 1
 
-two   : Int32
-two   = matchNum 0
+num2 : Int32
+num2 = matchNum 2
 
-three : Int32
-three = matchNum 1
+num3 : Int32
+num3 = matchNum 3
 
-zero  : Int32
-zero  = matchNum 2
+num4 : Int32
+num4 = matchNum 4

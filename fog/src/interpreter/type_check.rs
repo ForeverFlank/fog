@@ -98,5 +98,10 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                 .map(|expr| expr_type_of(expr, env, span))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
+
+        ResolvedExpr::Match { match_arms, .. } => match match_arms.first() {
+            Some(arm) => expr_type_of(&arm.value_expr, env, span),
+            None => Err(runtime_error!(Some(span.clone()), "match with no arms")),
+        },
     }
 }
