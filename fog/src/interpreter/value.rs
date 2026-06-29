@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 use crate::error::FogResult;
@@ -56,27 +57,25 @@ pub fn value_type_of(value: &Value) -> Type {
     }
 }
 
-impl ToString for Value {
-    fn to_string(&self) -> String {
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Int32(value) => value.to_string(),
-            Value::Float32(value) => value.to_string(),
+            Value::Int32(value) => write!(f, "{}", value),
+            Value::Float32(value) => write!(f, "{}", value),
 
             Value::Function {
                 param_name, body, ..
-            } => {
-                format!("{} => {}", param_name, (*body).to_string())
-            }
+            } => write!(f, "{} => {}", param_name, body),
 
-            Value::NativeFunction { .. } => "[native function]".to_string(),
+            Value::NativeFunction { .. } => write!(f, "[native function]"),
 
-            Value::Tuple(values) => format!("({})", format_joined(values, ", ")),
+            Value::Tuple(values) => write!(f, "({})", format_joined(values, ", ")),
 
             Value::Constructor { tag, values, .. } => {
                 if values.is_empty() {
-                    tag.clone()
+                    write!(f, "{}", tag)
                 } else {
-                    format!("{} {}", tag, format_joined(values, " "))
+                    write!(f, "{} {}", tag, format_joined(values, " "))
                 }
             }
         }

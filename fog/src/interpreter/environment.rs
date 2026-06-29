@@ -108,7 +108,7 @@ impl<'a> Environment<'a> {
         if self.variables.contains_key(name) {
             return Err(runtime_error!(
                 Some(span.clone()),
-                "variable `{}` already annotated its type in the scope",
+                "variable `{}` already annotated its type in the current scope",
                 name
             ));
         }

@@ -13,7 +13,7 @@ use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 
 pub struct Resolver {
-    infix_functions: HashMap<InfixFunctionKey, InfixFuncionInfo>,
+    infix_functions: HashMap<InfixFunctionKey, InfixFunctionInfo>,
     index: usize,
 }
 
@@ -29,7 +29,7 @@ pub enum InfixFunctionKey {
     Identifier(String),
 }
 
-pub struct InfixFuncionInfo {
+pub struct InfixFunctionInfo {
     pub name: String,
     pub associativity: Associativity,
     pub precedence: i32,
@@ -57,7 +57,7 @@ impl Resolver {
             infix_functions: HashMap::from([
                 (
                     InfixFunctionKey::Op(OpKind::Star),
-                    InfixFuncionInfo {
+                    InfixFunctionInfo {
                         name: "*".into(),
                         associativity: Associativity::Left,
                         precedence: 3,
@@ -65,7 +65,7 @@ impl Resolver {
                 ),
                 (
                     InfixFunctionKey::Op(OpKind::Slash),
-                    InfixFuncionInfo {
+                    InfixFunctionInfo {
                         name: "/".into(),
                         associativity: Associativity::Left,
                         precedence: 3,
@@ -73,7 +73,7 @@ impl Resolver {
                 ),
                 (
                     InfixFunctionKey::Op(OpKind::Plus),
-                    InfixFuncionInfo {
+                    InfixFunctionInfo {
                         name: "+".into(),
                         associativity: Associativity::Left,
                         precedence: 2,
@@ -81,7 +81,7 @@ impl Resolver {
                 ),
                 (
                     InfixFunctionKey::Op(OpKind::Minus),
-                    InfixFuncionInfo {
+                    InfixFunctionInfo {
                         name: "-".into(),
                         associativity: Associativity::Left,
                         precedence: 2,
@@ -89,7 +89,7 @@ impl Resolver {
                 ),
                 (
                     InfixFunctionKey::Op(OpKind::Arrow),
-                    InfixFuncionInfo {
+                    InfixFunctionInfo {
                         name: "->".into(),
                         associativity: Associativity::Right,
                         precedence: 1,
@@ -100,7 +100,7 @@ impl Resolver {
         }
     }
 
-    fn get_binary_op(&self, parsed_expr: &ParsedExpr) -> Option<&InfixFuncionInfo> {
+    fn get_binary_op(&self, parsed_expr: &ParsedExpr) -> Option<&InfixFunctionInfo> {
         let key = match parsed_expr {
             ParsedExpr::Op { kind } => InfixFunctionKey::Op(kind.clone()),
             ParsedExpr::Identifier { name } => InfixFunctionKey::Identifier(name.clone()),
@@ -201,7 +201,7 @@ impl Resolver {
                     .map(|arm| {
                         Ok(MatchArm {
                             pattern: Self::resolve_expr(arm.pattern)?,
-                            value_expr: Self::resolve_expr(arm.value)?,
+                            value_expr: Self::resolve_expr(arm.value_expr)?,
                         })
                     })
                     .collect::<FogResult<Vec<_>>>()?,
@@ -324,7 +324,7 @@ impl Resolver {
                     .map(|arm| {
                         Ok(MatchArm {
                             pattern: Self::resolve_expr(arm.pattern)?,
-                            value_expr: Self::resolve_expr(arm.value)?,
+                            value_expr: Self::resolve_expr(arm.value_expr)?,
                         })
                     })
                     .collect::<FogResult<Vec<_>>>()?,

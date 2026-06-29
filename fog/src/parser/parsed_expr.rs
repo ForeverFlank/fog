@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Display;
 
 use crate::error::Span;
-use crate::util::format_joined;
+use crate::util::{format_joined, fmt_parenthesized};
 
 // --- statement ---
 
@@ -110,16 +110,7 @@ pub enum ParsedExpr {
 #[derive(Clone)]
 pub struct MatchArm {
     pub pattern: ParsedExpr,
-    pub value: ParsedExpr,
-}
-
-fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ParsedExpr) -> fmt::Result {
-    let s = expr.to_string();
-    if s.contains(' ') {
-        write!(f, "({s})")
-    } else {
-        write!(f, "{s}")
-    }
+    pub value_expr: ParsedExpr,
 }
 
 impl Display for ParsedExpr {
@@ -165,7 +156,7 @@ impl Display for ParsedExpr {
                 write!(f, "match {expr} {{");
 
                 for arm in match_arms {
-                    write!(f, "    {} => {}", arm.pattern, arm.value);
+                    write!(f, "    {} => {}", arm.pattern, arm.value_expr);
                 }
 
                 write!(f, "}}")

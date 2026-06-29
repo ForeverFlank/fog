@@ -1,4 +1,5 @@
 use std::char;
+use std::fmt;
 
 #[derive(Clone)]
 pub enum TokenKind {
@@ -38,9 +39,7 @@ pub enum TokenKind {
 
     // keywords
     Match,
-    Do,
     If,
-    Else
 }
 
 pub fn match_one_char_token(char: char) -> Option<TokenKind> {
@@ -86,39 +85,40 @@ pub fn match_keyword(str: &str) -> Option<TokenKind> {
     }
 }
 
-impl ToString for TokenKind {
-    fn to_string(&self) -> String {
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TokenKind::Eof => "Eof".to_string(),
-            TokenKind::Newline => "Newline".to_string(),
+            TokenKind::Eof => write!(f, "Eof"),
+            TokenKind::Newline => write!(f, "Newline"),
 
-            TokenKind::Identifier(val) => format!("Identifier ({})", val),
-            TokenKind::Equal => "Equal".to_string(),
-            TokenKind::Colon => "Colon".to_string(),
-            TokenKind::Arrow => "Arrow".to_string(),
-            TokenKind::FatArrow => "FatArrow".to_string(),
-            TokenKind::Comma => "Comma".to_string(),
+            TokenKind::Identifier(val) => write!(f, "Identifier ({})", val),
+            TokenKind::Equal => write!(f, "Equal"),
+            TokenKind::Colon => write!(f, "Colon"),
+            TokenKind::Arrow => write!(f, "Arrow"),
+            TokenKind::FatArrow => write!(f, "FatArrow"),
+            TokenKind::Comma => write!(f, "Comma"),
 
-            TokenKind::LeftParenthesis => "LeftParenthesis".to_string(),
-            TokenKind::RightParenthesis => "RightParenthesis".to_string(),
-            TokenKind::LeftBrace => "LeftBrace".to_string(),
-            TokenKind::RightBrace => "RightBrace".to_string(),
+            TokenKind::LeftParenthesis => write!(f, "LeftParenthesis"),
+            TokenKind::RightParenthesis => write!(f, "RightParenthesis"),
+            TokenKind::LeftBrace => write!(f, "LeftBrace"),
+            TokenKind::RightBrace => write!(f, "RightBrace"),
 
-            TokenKind::Int32Literal(val) => format!("Int32 ({})", val),
-            TokenKind::Float32Literal(val) => format!("Float32 ({})", val),
-            // TokenKind::StringLiteral(val) => format!("String ({})", val),
-            TokenKind::Plus => "Plus".to_string(),
-            TokenKind::Minus => "Minus".to_string(),
-            TokenKind::Star => "Star".to_string(),
-            TokenKind::Slash => "Slash".to_string(),
-            TokenKind::Caret => "Caret".to_string(),
-            TokenKind::Concat => "Concat".to_string(),
-            TokenKind::LeftPipe => "LeftPipe".to_string(),
-            TokenKind::RightPipe => "RightPipe".to_string(),
-            TokenKind::LeftComposition => "LeftComposition".to_string(),
-            TokenKind::RightComposition => "RightComposition".to_string(),
+            TokenKind::Int32Literal(val) => write!(f, "Int32 ({})", val),
+            TokenKind::Float32Literal(val) => write!(f, "Float32 ({})", val),
+            // TokenKind::StringLiteral(val) => write!(f, "String ({})", val),
+            TokenKind::Plus => write!(f, "Plus"),
+            TokenKind::Minus => write!(f, "Minus"),
+            TokenKind::Star => write!(f, "Star"),
+            TokenKind::Slash => write!(f, "Slash"),
+            TokenKind::Caret => write!(f, "Caret"),
+            TokenKind::Concat => write!(f, "Concat"),
+            TokenKind::LeftPipe => write!(f, "LeftPipe"),
+            TokenKind::RightPipe => write!(f, "RightPipe"),
+            TokenKind::LeftComposition => write!(f, "LeftComposition"),
+            TokenKind::RightComposition => write!(f, "RightComposition"),
 
-            TokenKind::If => "If".to_string(),
+            TokenKind::Match => write!(f, "Match"),
+            TokenKind::If => write!(f, "If"),
         }
     }
 }

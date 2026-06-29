@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -69,25 +70,25 @@ impl Hash for Type {
     }
 }
 
-impl ToString for Type {
-    fn to_string(&self) -> String {
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Type::Function(param_type, return_type) => {
-                format!("{} -> {}", param_type.to_string(), return_type.to_string())
+                write!(f, "{} -> {}", param_type, return_type)
             }
 
-            Type::Int32 => "Int32".to_string(),
-            Type::Float32 => "Float32".to_string(),
+            Type::Int32 => write!(f, "Int32"),
+            Type::Float32 => write!(f, "Float32"),
 
             Type::Product(types) => {
                 if types.is_empty() {
-                    "Unit".to_string()
+                    write!(f, "Unit")
                 } else {
-                    format_joined(types, " * ")
+                    write!(f, "{}", format_joined(types, " * "))
                 }
             }
 
-            Type::Sum(ctors) => format_joined(ctors, " + "),
+            Type::Sum(ctors) => write!(f, "{}", format_joined(ctors, " + ")),
         }
     }
 }
@@ -100,12 +101,12 @@ pub struct DataConstructor {
     pub types: Vec<Type>,
 }
 
-impl std::fmt::Display for DataConstructor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for DataConstructor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.tag)?;
 
         for r#type in &self.types {
-            write!(f, " {}", r#type.to_string())?;
+            write!(f, " {}", r#type)?;
         }
 
         Ok(())

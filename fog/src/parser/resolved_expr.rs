@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 
 use crate::error::Span;
-use crate::util::format_joined;
+use crate::util::{format_joined, fmt_parenthesized};
 
 // --- statements ---
 
@@ -87,15 +87,6 @@ pub enum ResolvedExpr {
 pub struct MatchArm {
     pub pattern: ResolvedExpr,
     pub value_expr: ResolvedExpr,
-}
-
-fn fmt_parenthesized(f: &mut fmt::Formatter<'_>, expr: &ResolvedExpr) -> fmt::Result {
-    let s = expr.to_string();
-    if s.contains(' ') {
-        write!(f, "({s})")
-    } else {
-        write!(f, "{s}")
-    }
 }
 
 impl Display for ResolvedExpr {
