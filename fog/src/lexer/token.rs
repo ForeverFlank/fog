@@ -36,8 +36,11 @@ pub enum TokenKind {
     LeftComposition,
     RightComposition,
 
-    // sugars
+    // keywords
+    Match,
+    Do,
     If,
+    Else
 }
 
 pub fn match_one_char_token(char: char) -> Option<TokenKind> {
@@ -70,6 +73,14 @@ pub fn match_two_char_token(str: &str) -> Option<TokenKind> {
         "|>" => Some(TokenKind::RightPipe),
         "<<" => Some(TokenKind::LeftComposition),
         ">>" => Some(TokenKind::RightComposition),
+
+        _ => None,
+    }
+}
+
+pub fn match_keyword(str: &str) -> Option<TokenKind> {
+    match str {
+        "match" => Some(TokenKind::Match),
 
         _ => None,
     }
