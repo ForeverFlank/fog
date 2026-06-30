@@ -19,51 +19,6 @@ use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 use crate::runtime_error;
 
-// --- annotation ---
-
-pub fn annotate(
-    name: &String,
-    expr: &ResolvedExpr,
-    env: &mut Environment,
-    span: &Span,
-) -> FogResult<()> {
-    match eval_annotation_expr(expr, env, span)? {
-        Annotation::Kind(kind) => env.annotate_kind(name, kind, span),
-        Annotation::Type(r#type) => env.annotate_type(name, r#type, span),
-    }
-}
-
-// --- declaration ---
-
-pub fn declare(
-    name: &String,
-    expr: &ResolvedExpr,
-    env: &mut Environment,
-    span: &Span,
-) -> FogResult<()> {
-    if env.variables.contains_key(name) {
-        env.declare_value(name, eval_value_expr(expr, env, span)?, span)?;
-        return Ok(());
-    }
-
-    if env.types.contains_key(name) {
-        let defined_type = eval_type_definition_expr(expr, env, span)?;
-        env.declare_type(name, defined_type.clone(), span)?;
-
-        if let Type::Sum(..) = &defined_type {
-            register_data_constructors(env, &defined_type, span)?;
-        }
-
-        return Ok(());
-    }
-
-    Err(runtime_error!(
-        Some(span.clone()),
-        "unannotated variable `{}`",
-        name
-    ))
-}
-
 // --- data constructors ---
 
 pub fn register_data_constructors(
@@ -135,33 +90,15 @@ pub fn make_data_constructor_function(
 
 pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
     match expr {
-        ResolvedExpr::Block { statements } => {
-            let mut block_env = Environment::new(Some(env));
+        ResolvedExpr::Block { statements } => eval_block(statements, env, span),
 
-            for stmt in statements {
-                match stmt {
-                    ResolvedStatement::TypeAnnotation { name, expr, span } => {
-                        annotate(name, expr, &mut block_env, span)?;
-                    }
-                    ResolvedStatement::Declaration { name, expr, span } => {
-                        declare(name, expr, &mut block_env, span)?;
-                    }
-                    ResolvedStatement::Expression { span, expr } => {
-                        return eval_value_expr(expr, &mut block_env, span);
-                    }
-                }
-            }
-
-            Err(runtime_error!(
-                Some(span.clone()),
-                "final operand not found in block statement"
-            ))
+        ResolvedExpr::Identifier { name } => {
+            let var = env.get_value_var(name, span)?;
+            var.value
+                .borrow()
+                .clone()
+                .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name))
         }
-
-        ResolvedExpr::Identifier { name } => env
-            .get_value_var(name, span)?
-            .value
-            .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name)),
 
         ResolvedExpr::Int32Literal { value } => Ok(Value::Int32(*value)),
         ResolvedExpr::Float32Literal { value } => Ok(Value::Float32(*value)),
@@ -215,11 +152,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
                     for (name, val) in &bindings {
                         arm_env.variables.insert(
                             name.clone(),
-                            ValueVariable {
-                                name: name.clone(),
-                                value: Some(val.clone()),
-                                r#type: value_type_of(val),
-                            },
+                            ValueVariable::with_value(name, val.clone(), value_type_of(val)),
                         );
                     }
                     return eval_value_expr(&arm.value_expr, &arm_env, span);
@@ -232,6 +165,78 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
             ))
         }
     }
+}
+
+pub fn eval_scope(
+    statements: &Vec<ResolvedStatement>,
+    env: &mut Environment,
+) -> FogResult<Option<Value>> {
+    // types' kind annotations
+    for stmt in statements {
+        if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
+            if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env, span) {
+                env.annotate_kind(name, kind, span)?;
+            }
+        }
+    }
+
+    // type definitions
+    for stmt in statements {
+        if let ResolvedStatement::Declaration { name, expr, span } = stmt {
+            if env.types.contains_key(name) {
+                let defined_type = eval_type_definition_expr(expr, env, span)?;
+                env.declare_type(name, defined_type.clone(), span)?;
+
+                if let Type::Sum(_) = &defined_type {
+                    register_data_constructors(env, &defined_type, span)?;
+                }
+            }
+        }
+    }
+
+    // variables' type annotations
+    for stmt in statements {
+        if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
+            match eval_annotation_expr(expr, env, span)? {
+                Annotation::Type(r#type) => env.annotate_type(name, r#type, span)?,
+                _ => (),
+            }
+        }
+    }
+
+    // value declarations
+    for stmt in statements {
+        if let ResolvedStatement::Declaration { name, expr, span } = stmt {
+            if env.variables.contains_key(name) {
+                let value = eval_value_expr(expr, env, span)?;
+                env.declare_value(name, value, span)?;
+            }
+        }
+    }
+
+    // Final expression (blocks only).
+    for stmt in statements {
+        if let ResolvedStatement::Expression { span, expr } = stmt {
+            return Ok(Some(eval_value_expr(expr, env, span)?));
+        }
+    }
+
+    Ok(None)
+}
+
+fn eval_block(
+    statements: &Vec<ResolvedStatement>,
+    env: &Environment,
+    span: &Span,
+) -> FogResult<Value> {
+    let mut block_env = Environment::new(Some(env));
+
+    eval_scope(statements, &mut block_env)?.ok_or_else(|| {
+        runtime_error!(
+            Some(span.clone()),
+            "final operand not found in block statement"
+        )
+    })
 }
 
 fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
@@ -247,11 +252,7 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
 
             child_env.variables.insert(
                 param_name.clone(),
-                ValueVariable {
-                    name: param_name.clone(),
-                    value: Some(argument),
-                    r#type: param_type,
-                },
+                ValueVariable::with_value(&param_name, argument, param_type),
             );
 
             eval_value_expr(&body, &child_env, span)

@@ -42,6 +42,17 @@ macro_rules! parse_error {
 }
 
 #[macro_export]
+macro_rules! type_check_error {
+    ($span:expr, $($arg:tt)*) => {
+        $crate::error::FogError {
+            kind: $crate::error::ErrorKind::TypeCheck,
+            message: format!($($arg)*),
+            span: $span,
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! runtime_error {
     ($span:expr, $($arg:tt)*) => {
         $crate::error::FogError {

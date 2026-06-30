@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::error::FogResult;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::Type;
@@ -7,15 +10,25 @@ use crate::runtime_error;
 #[derive(Clone)]
 pub struct ValueVariable {
     pub name: String,
-    pub value: Option<Value>,
+    pub value: Rc<RefCell<Option<Value>>>,
     pub r#type: Type,
 }
 
 impl ValueVariable {
-    pub fn get_value(&self) -> FogResult<Value> {
-        self.value
-            .clone()
-            .ok_or_else(|| runtime_error!(None, "unassigned variable `{}`", self.name))
+    pub fn new(name: &str, r#type: Type) -> Self {
+        ValueVariable {
+            name: name.to_string(),
+            value: Rc::new(RefCell::new(None)),
+            r#type,
+        }
+    }
+
+    pub fn with_value(name: &str, value: Value, r#type: Type) -> Self {
+        ValueVariable {
+            name: name.to_string(),
+            value: Rc::new(RefCell::new(Some(value))),
+            r#type,
+        }
     }
 }
 

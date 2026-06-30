@@ -82,16 +82,59 @@ impl Parser<'_> {
             if let TokenKind::Eof = parser.peek().kind {
                 break;
             }
+
             match parser.parse_block_statement() {
                 Ok(stmt) => statements.push(stmt),
                 Err(e) => errors.push(e),
             }
+
             while let TokenKind::Newline = parser.peek().kind {
                 parser.next();
             }
         }
 
         (statements, errors)
+    }
+
+    fn parse_block_statement(&mut self) -> FogResult<ParsedStatement> {
+        let span = token_span(self.peek());
+
+        let ahead = self.peek_offset(1).clone();
+
+        match (&self.peek().kind, ahead.kind) {
+            (TokenKind::Identifier(name), TokenKind::Colon) => {
+                let name = name.clone();
+
+                self.next(); // name
+                self.next(); // :
+
+                let expr = self.parse_expression()?;
+
+                Ok(ParsedStatement::TypeAnnotation { name, expr, span })
+            }
+
+            (TokenKind::Identifier(name), TokenKind::Equal) => {
+                let name = name.clone();
+
+                self.next(); // name
+                self.next(); // =
+
+                // forgiving newline
+                if let TokenKind::Newline = self.peek().kind {
+                    self.next();
+                }
+
+                let expr = self.parse_expression()?;
+
+                Ok(ParsedStatement::Declaration { name, expr, span })
+            }
+
+            _ => {
+                let expr = self.parse_expression()?;
+
+                Ok(ParsedStatement::Expression { expr, span })
+            }
+        }
     }
 
     fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
@@ -159,6 +202,11 @@ impl Parser<'_> {
                     };
                     self.next();
 
+                    // forgiving newline
+                    if let TokenKind::Newline = self.peek().kind {
+                        self.next();
+                    }
+
                     let body = self.parse_expression()?;
 
                     return Ok(ParsedExpr::Lambda {
@@ -200,7 +248,6 @@ impl Parser<'_> {
 
                         TokenKind::Comma => {
                             self.next();
-
                             continue;
                         }
 
@@ -253,12 +300,13 @@ impl Parser<'_> {
         }
 
         loop {
+            if let TokenKind::Eof = self.peek().kind {
+                return Err(parse_error!(None, "unclosed match"));
+            }
+
             if let TokenKind::RightBrace = self.peek().kind {
                 self.next();
                 break;
-            }
-            if let TokenKind::Eof = self.peek().kind {
-                return Err(parse_error!(None, "unclosed match"));
             }
 
             let pattern = self.parse_expression()?;
@@ -267,6 +315,11 @@ impl Parser<'_> {
                 return Err(parse_error!(Some(token_span(self.peek())), "expected `=>`"));
             };
             self.next();
+
+            // forgive newline
+            if let TokenKind::Newline = self.peek().kind {
+                self.next();
+            }
 
             let value_expr = self.parse_expression()?;
 
@@ -308,41 +361,5 @@ impl Parser<'_> {
         }
 
         Ok(statements)
-    }
-
-    fn parse_block_statement(&mut self) -> FogResult<ParsedStatement> {
-        let span = token_span(self.peek());
-
-        let ahead = self.peek_offset(1).clone();
-
-        match (&self.peek().kind, ahead.kind) {
-            (TokenKind::Identifier(name), TokenKind::Colon) => {
-                let name = name.clone();
-
-                self.next(); // name
-                self.next(); // :
-
-                let expr = self.parse_expression()?;
-
-                Ok(ParsedStatement::TypeAnnotation { name, expr, span })
-            }
-
-            (TokenKind::Identifier(name), TokenKind::Equal) => {
-                let name = name.clone();
-
-                self.next(); // name
-                self.next(); // =
-
-                let expr = self.parse_expression()?;
-
-                Ok(ParsedStatement::Declaration { name, expr, span })
-            }
-
-            _ => {
-                let expr = self.parse_expression()?;
-
-                Ok(ParsedStatement::Expression { expr, span })
-            }
-        }
     }
 }

@@ -3,4 +3,4 @@ fib 0 = 0
 fib 1 = 1
 fib n = fib (n - 1) + fib (n - 2)
 
-main = 67 |> fib |> toString |> printLine
+main = 5 |> fib |> toString |> printLine

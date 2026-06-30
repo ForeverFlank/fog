@@ -1,0 +1,25 @@
+-- Hofstadter's Female and Male sequences
+
+-- F(0) = 1
+-- F(n) = n - M(F(n - 1)), n > 0
+
+-- M(0) = 0
+-- M(n) = n - F(M(n - 1)), n > 0
+
+f : Int32 -> Int32
+f = n : Int32 => match n {
+    0 => 1
+    n => _minus_Int32_Int32 n (m (f (_minus_Int32_Int32 n 1)))
+}
+
+m : Int32 -> Int32
+m = n : Int32 => match n {
+    0 => 0
+    n => _minus_Int32_Int32 n (f (m (_minus_Int32_Int32 n 1)))
+}
+
+f_7 : Int32
+f_7 = f 7    -- 5
+
+m_7 : Int32
+m_7 = m 7    -- 4

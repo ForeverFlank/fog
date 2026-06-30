@@ -2,14 +2,16 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::interpreter::environment::Environment;
+use crate::interpreter::eval_type::Annotation;
+use crate::interpreter::eval_type::eval_annotation_expr;
 use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_type::eval_type_definition_expr;
-use crate::interpreter::eval_value::annotate;
 use crate::interpreter::r#type::Type;
 use crate::interpreter::r#type::Type::Product;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 use crate::runtime_error;
+use crate::type_check_error;
 
 pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Type> {
     match expr {
@@ -19,7 +21,12 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
             for stmt in statements {
                 match stmt {
                     ResolvedStatement::TypeAnnotation { name, expr, span } => {
-                        annotate(name, expr, &mut block_env, span)?;
+                        match eval_annotation_expr(expr, &block_env, span)? {
+                            Annotation::Kind(kind) => block_env.annotate_kind(name, kind, span)?,
+                            Annotation::Type(r#type) => {
+                                block_env.annotate_type(name, r#type, span)?
+                            }
+                        };
                     }
 
                     ResolvedStatement::Declaration { name, expr, span } => {
@@ -28,13 +35,10 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogR
                             let annotated_type = block_env.variables[name].r#type.clone();
 
                             if expr_type != annotated_type {
-                                return Err(runtime_error!(
+                                return Err(type_check_error!(
                                     Some(span.clone()),
-                                    "type mismatch when assigning to variable `{}`\n\
-                                     expected `{}`, found `{}`",
-                                    name,
-                                    annotated_type.to_string(),
-                                    expr_type.to_string()
+                                    "type mismatch when assigning variable `{expr}` with `{name}`\n\
+                                     expected `{annotated_type}`, found `{expr_type}`"
                                 ));
                             }
                         } else if block_env.types.contains_key(name) {

@@ -5,9 +5,9 @@ Shape : Type
 Shape = Tri Int32 Int32 Int32 + Quad Int32 Int32 Int32 Int32
 
 perimeter : Shape -> Int32
-perimeter = shape : Shape => match {
+perimeter = shape : Shape => match shape {
     Tri s1 s2 s3    => _plus_Int32_Int32 (_plus_Int32_Int32 s1 s2) s3
-    Quads1 s2 s3 s4 => _plus_Int32_Int32 (_plus_Int32_Int32 (_plus_Int32_Int32 s1 s2) s3) s4
+    Quad s1 s2 s3 s4 => _plus_Int32_Int32 (_plus_Int32_Int32 (_plus_Int32_Int32 s1 s2) s3) s4
 }
 
 num1 : Int32

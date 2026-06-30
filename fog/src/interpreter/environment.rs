@@ -10,6 +10,7 @@ use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::TypeVariable;
 use crate::interpreter::variable::ValueVariable;
 use crate::runtime_error;
+use crate::type_check_error;
 
 #[derive(Clone)]
 pub struct Environment<'a> {
@@ -65,10 +66,6 @@ impl<'a> Environment<'a> {
         ))
     }
 
-    pub fn get_value(&self, name: &str, span: &Span) -> FogResult<Value> {
-        self.get_value_var(name, span)?.get_value()
-    }
-
     pub fn get_type_var(&self, name: &str, span: &Span) -> FogResult<TypeVariable> {
         if let Some(var) = self.types.get(name) {
             return Ok(var.clone());
@@ -113,14 +110,8 @@ impl<'a> Environment<'a> {
             ));
         }
 
-        self.variables.insert(
-            name.to_string(),
-            ValueVariable {
-                name: name.to_string(),
-                value: None,
-                r#type,
-            },
-        );
+        self.variables
+            .insert(name.to_string(), ValueVariable::new(name, r#type));
 
         Ok(())
     }
@@ -153,39 +144,31 @@ impl<'a> Environment<'a> {
             return Ok(());
         }
 
-        let type_of_var = {
-            let var = self.get_value_var(name, span)?;
+        let var = self
+            .variables
+            .get(name)
+            .ok_or_else(|| runtime_error!(Some(span.clone()), "variable `{}` not found", name))?;
 
-            if var.value.is_some() {
-                return Err(runtime_error!(
-                    Some(span.clone()),
-                    "variable `{}` already declared in the current scope",
-                    name
-                ));
-            }
-
-            var.r#type.clone()
-        };
-
-        let type_of_value = value_type_of(&value);
-
-        if type_of_value != type_of_var {
+        if var.value.borrow().is_some() {
             return Err(runtime_error!(
                 Some(span.clone()),
-                "type mismatch when assigning to variable `{}`\n\
-                 expected `{}`, found `{}`",
-                name,
-                type_of_var.to_string(),
-                type_of_value.to_string()
+                "variable `{}` already declared in the current scope",
+                name
             ));
         }
 
-        let var = self
-            .variables
-            .get_mut(name)
-            .unwrap_or_else(|| unreachable!());
+        let type_of_value = value_type_of(&value);
+        let type_of_var = var.r#type.clone();
 
-        var.value = Some(value);
+        if type_of_value != type_of_var {
+            return Err(type_check_error!(
+                Some(span.clone()),
+                "type mismatch when assigning variable `{name}` with `{value}`\n\
+                 expected `{type_of_var}`, found `{type_of_value}`"
+            ));
+        }
+
+        *var.value.borrow_mut() = Some(value);
 
         Ok(())
     }

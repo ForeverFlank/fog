@@ -6,6 +6,7 @@ use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::runtime_error;
+use crate::type_check_error;
 
 // --- annotation (kind or type) ---
 
@@ -234,7 +235,7 @@ pub fn apply_type_level_function(
         let arg_kind = eval_type_annotation_expr(arg, env, span)?;
 
         if arg_kind != *param_type {
-            return Err(runtime_error!(
+            return Err(type_check_error!(
                 Some(span.clone()),
                 "type mismatch applying `{}`\n\
                  expected `{}`, found `{}`",

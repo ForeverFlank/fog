@@ -38,7 +38,8 @@ fn is_primary_starter(parsed_expr: &ParsedExpr) -> bool {
         ParsedExpr::Identifier { .. }
         | ParsedExpr::Int32Literal { .. }
         | ParsedExpr::Float32Literal { .. }
-        | ParsedExpr::Tuple { .. } => true,
+        | ParsedExpr::Tuple { .. }
+        | ParsedExpr::Collection { .. } => true,
 
         ParsedExpr::Op { kind } => match kind {
             OpKind::Minus => true,

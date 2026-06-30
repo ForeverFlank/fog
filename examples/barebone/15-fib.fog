@@ -1,0 +1,14 @@
+-- Fibonacci's sequence
+-- fib(0) = 0
+-- fib(1) = 1
+-- fib(n) = fib(n - 1) + fib(n - 2), n ≥ 2
+
+fib : Int32 -> Int32
+fib = n : Int32 => match n {
+    0 => 0
+    1 => 1
+    _ => _plus_Int32_Int32 (fib (_minus_Int32_Int32 n 1)) (fib (_minus_Int32_Int32 n 2))
+}
+
+num : Int32
+num = fib 6     -- 8
