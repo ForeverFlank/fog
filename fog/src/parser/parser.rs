@@ -83,9 +83,16 @@ impl Parser<'_> {
                 break;
             }
 
+            let pos_before = parser.pos;
             match parser.parse_block_statement() {
                 Ok(stmt) => statements.push(stmt),
-                Err(e) => errors.push(e),
+                Err(e) => {
+                    errors.push(e);
+                    // Skip one token if we made no progress, to avoid an infinite loop.
+                    if parser.pos == pos_before {
+                        parser.next();
+                    }
+                }
             }
 
             while let TokenKind::Newline = parser.peek().kind {
@@ -139,6 +146,7 @@ impl Parser<'_> {
 
     fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
         let mut items = Vec::new();
+        let span = token_span(self.peek());
 
         loop {
             let atom = self.parse_atomic()?;
@@ -159,30 +167,28 @@ impl Parser<'_> {
         if items.len() == 1 {
             Ok(items[0].clone())
         } else {
-            Ok(ParsedExpr::Collection { items })
+            Ok(ParsedExpr::Collection { items, span })
         }
     }
 
     fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
         let token = self.peek().clone();
+        let span = token_span(&token);
 
         match token.kind {
             TokenKind::Int32Literal(value) => {
                 self.next();
-
-                Ok(ParsedExpr::Int32Literal { value })
+                Ok(ParsedExpr::Int32Literal { value, span })
             }
 
             TokenKind::Float32Literal(value) => {
                 self.next();
-
-                Ok(ParsedExpr::Float32Literal { value })
+                Ok(ParsedExpr::Float32Literal { value, span })
             }
 
             // unary minus (negation)
             TokenKind::Minus => {
                 self.next();
-
                 Ok(ParsedExpr::Op {
                     kind: OpKind::Minus,
                 })
@@ -213,10 +219,11 @@ impl Parser<'_> {
                         param_name: name,
                         param_type: param_type.into(),
                         body: body.into(),
+                        span,
                     });
                 }
 
-                Ok(ParsedExpr::Identifier { name })
+                Ok(ParsedExpr::Identifier { name, span })
             }
 
             // tuple
@@ -225,8 +232,10 @@ impl Parser<'_> {
 
                 if let TokenKind::RightParenthesis = self.peek().kind {
                     self.next();
-
-                    return Ok(ParsedExpr::Tuple { items: Vec::new() });
+                    return Ok(ParsedExpr::Tuple {
+                        items: Vec::new(),
+                        span,
+                    });
                 }
 
                 let mut items: Vec<ParsedExpr> = Vec::new();
@@ -242,7 +251,7 @@ impl Parser<'_> {
                             if items.len() == 1 {
                                 return Ok(items[0].clone());
                             } else {
-                                return Ok(ParsedExpr::Tuple { items });
+                                return Ok(ParsedExpr::Tuple { items, span });
                             }
                         }
 
@@ -261,16 +270,20 @@ impl Parser<'_> {
             // block statement
             TokenKind::LeftBrace => {
                 self.next();
-
                 let statements = self.parse_block()?;
-                Ok(ParsedExpr::Block { statements })
+                Ok(ParsedExpr::Block { statements, span })
             }
 
             // match
             TokenKind::Match => {
                 self.next();
 
-                let expr = self.parse_expression()?;
+                // `match { arms }` — no explicit scrutinee
+                let expr = if let TokenKind::LeftBrace = self.peek().kind {
+                    None
+                } else {
+                    Some(Box::new(self.parse_expression()?))
+                };
 
                 let TokenKind::LeftBrace = self.peek().kind else {
                     return Err(parse_error!(Some(token_span(self.peek())), "expected `{{`"));
@@ -280,15 +293,13 @@ impl Parser<'_> {
                 let match_arms = self.parse_match_arms()?;
 
                 Ok(ParsedExpr::Match {
-                    expr: expr.into(),
+                    expr,
                     match_arms,
+                    span,
                 })
             }
 
-            _ => Err(parse_error!(
-                Some(token_span(&token)),
-                "atomic expression parsing error"
-            )),
+            _ => Err(parse_error!(Some(span), "atomic expression parsing error")),
         }
     }
 

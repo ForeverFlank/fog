@@ -88,11 +88,11 @@ pub fn make_data_constructor_function(
 
 // --- value expression evaluator ---
 
-pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> FogResult<Value> {
+pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Value> {
     match expr {
-        ResolvedExpr::Block { statements } => eval_block(statements, env, span),
+        ResolvedExpr::Block { statements, span } => eval_block(statements, span.clone(), env),
 
-        ResolvedExpr::Identifier { name } => {
+        ResolvedExpr::Identifier { name, span } => {
             let var = env.get_value_var(name, span)?;
             var.value
                 .borrow()
@@ -100,16 +100,17 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
                 .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name))
         }
 
-        ResolvedExpr::Int32Literal { value } => Ok(Value::Int32(*value)),
-        ResolvedExpr::Float32Literal { value } => Ok(Value::Float32(*value)),
+        ResolvedExpr::Int32Literal { value, .. } => Ok(Value::Int32(*value)),
+        ResolvedExpr::Float32Literal { value, .. } => Ok(Value::Float32(*value)),
 
         ResolvedExpr::Lambda {
             param_name,
             param_type,
             body,
+            ..
         } => {
-            let param_type = eval_type_annotation_expr(param_type, env, span)?;
-            let return_type = expr_type_of(body, env, span)?;
+            let param_type = eval_type_annotation_expr(param_type, env)?;
+            let return_type = expr_type_of(body, env)?;
             Ok(Value::Function {
                 param_name: param_name.clone(),
                 param_type,
@@ -119,35 +120,43 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
             })
         }
 
-        ResolvedExpr::Tuple { items } => Ok(Value::Tuple(
+        ResolvedExpr::Tuple { items, .. } => Ok(Value::Tuple(
             items
                 .iter()
-                .map(|expr| eval_value_expr(expr, env, span))
+                .map(|expr| eval_value_expr(expr, env))
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        ResolvedExpr::FuncAppl { fn_name, args } => {
+        ResolvedExpr::FuncAppl {
+            fn_name,
+            args,
+            span,
+        } => {
             let mut result = eval_value_expr(
                 &ResolvedExpr::Identifier {
                     name: fn_name.clone(),
+                    span: span.clone(),
                 },
                 env,
-                span,
             )?;
 
             for arg in args {
-                let argument = eval_value_expr(arg, env, span)?;
+                let argument = eval_value_expr(arg, env)?;
                 result = apply_function(result, argument, span)?;
             }
 
             Ok(result)
         }
 
-        ResolvedExpr::Match { expr, match_arms } => {
-            let value = eval_value_expr(expr, env, span)?;
+        ResolvedExpr::Match {
+            expr,
+            match_arms,
+            span,
+        } => {
+            let value = eval_value_expr(expr, env)?;
 
             for arm in match_arms {
-                if let Some(bindings) = match_pattern(&value, &arm.pattern, span)? {
+                if let Some(bindings) = match_pattern(&value, &arm.pattern)? {
                     let mut arm_env = Environment::new(Some(env));
                     for (name, val) in &bindings {
                         arm_env.variables.insert(
@@ -155,13 +164,13 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment, span: &Span) -> F
                             ValueVariable::with_value(name, val.clone(), value_type_of(val)),
                         );
                     }
-                    return eval_value_expr(&arm.value_expr, &arm_env, span);
+                    return eval_value_expr(&arm.value_expr, &arm_env);
                 }
             }
 
             Err(runtime_error!(
                 Some(span.clone()),
-                "match statement not covered"
+                "match expression not covered"
             ))
         }
     }
@@ -174,7 +183,7 @@ pub fn eval_scope(
     // types' kind annotations
     for stmt in statements {
         if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
-            if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env, span) {
+            if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
                 env.annotate_kind(name, kind, span)?;
             }
         }
@@ -184,7 +193,7 @@ pub fn eval_scope(
     for stmt in statements {
         if let ResolvedStatement::Declaration { name, expr, span } = stmt {
             if env.types.contains_key(name) {
-                let defined_type = eval_type_definition_expr(expr, env, span)?;
+                let defined_type = eval_type_definition_expr(expr, env)?;
                 env.declare_type(name, defined_type.clone(), span)?;
 
                 if let Type::Sum(_) = &defined_type {
@@ -197,7 +206,7 @@ pub fn eval_scope(
     // variables' type annotations
     for stmt in statements {
         if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
-            match eval_annotation_expr(expr, env, span)? {
+            match eval_annotation_expr(expr, env)? {
                 Annotation::Type(r#type) => env.annotate_type(name, r#type, span)?,
                 _ => (),
             }
@@ -208,7 +217,7 @@ pub fn eval_scope(
     for stmt in statements {
         if let ResolvedStatement::Declaration { name, expr, span } = stmt {
             if env.variables.contains_key(name) {
-                let value = eval_value_expr(expr, env, span)?;
+                let value = eval_value_expr(expr, env)?;
                 env.declare_value(name, value, span)?;
             }
         }
@@ -216,8 +225,8 @@ pub fn eval_scope(
 
     // Final expression (blocks only).
     for stmt in statements {
-        if let ResolvedStatement::Expression { span, expr } = stmt {
-            return Ok(Some(eval_value_expr(expr, env, span)?));
+        if let ResolvedStatement::Expression { expr, .. } = stmt {
+            return Ok(Some(eval_value_expr(expr, env)?));
         }
     }
 
@@ -226,17 +235,13 @@ pub fn eval_scope(
 
 fn eval_block(
     statements: &Vec<ResolvedStatement>,
+    span: Span,
     env: &Environment,
-    span: &Span,
 ) -> FogResult<Value> {
     let mut block_env = Environment::new(Some(env));
 
-    eval_scope(statements, &mut block_env)?.ok_or_else(|| {
-        runtime_error!(
-            Some(span.clone()),
-            "final operand not found in block statement"
-        )
-    })
+    eval_scope(statements, &mut block_env)?
+        .ok_or_else(|| runtime_error!(Some(span), "final operand not found in block statement"))
 }
 
 fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
@@ -255,7 +260,7 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
                 ValueVariable::with_value(&param_name, argument, param_type),
             );
 
-            eval_value_expr(&body, &child_env, span)
+            eval_value_expr(&body, &child_env)
         }
 
         Value::NativeFunction { function, .. } => function(argument).map_err(|mut e| {
@@ -275,25 +280,26 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
 fn match_pattern(
     value: &Value,
     pattern: &ResolvedExpr,
-    span: &Span,
 ) -> FogResult<Option<HashMap<String, Value>>> {
+    let span = pattern.span();
+
     match pattern {
-        ResolvedExpr::Int32Literal { value: pat_val } => match value {
+        ResolvedExpr::Int32Literal { value: pat_val, .. } => match value {
             Value::Int32(val) if val == pat_val => Ok(Some(HashMap::new())),
             _ => Ok(None),
         },
 
-        ResolvedExpr::Float32Literal { value: pat_val } => match value {
+        ResolvedExpr::Float32Literal { value: pat_val, .. } => match value {
             Value::Float32(val) if val == pat_val => Ok(Some(HashMap::new())),
             _ => Ok(None),
         },
 
-        ResolvedExpr::Identifier { name } => {
+        ResolvedExpr::Identifier { name, .. } => {
             if name == "_" {
-                // 'else' arm
+                // wildcard
                 Ok(Some(HashMap::new()))
             } else if name.starts_with(|c: char| c.is_uppercase()) {
-                // enums
+                // nullary constructor
                 match value {
                     Value::Constructor { tag, values, .. } if tag == name && values.is_empty() => {
                         Ok(Some(HashMap::new()))
@@ -308,11 +314,11 @@ fn match_pattern(
             }
         }
 
-        ResolvedExpr::Tuple { items } => match value {
+        ResolvedExpr::Tuple { items, .. } => match value {
             Value::Tuple(values) if values.len() == items.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(items) {
-                    match match_pattern(v, p, span)? {
+                    match match_pattern(v, p)? {
                         None => return Ok(None),
                         Some(b) => bindings.extend(b),
                     }
@@ -322,14 +328,14 @@ fn match_pattern(
             _ => Ok(None),
         },
 
-        // data constructor
-        ResolvedExpr::FuncAppl { fn_name, args } => match value {
+        // data constructor pattern
+        ResolvedExpr::FuncAppl { fn_name, args, .. } => match value {
             Value::Constructor { tag, values, .. }
                 if tag == fn_name && values.len() == args.len() =>
             {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(args) {
-                    match match_pattern(v, p, span)? {
+                    match match_pattern(v, p)? {
                         None => return Ok(None),
                         Some(b) => bindings.extend(b),
                     }
@@ -340,7 +346,10 @@ fn match_pattern(
         },
 
         ResolvedExpr::Block { .. } | ResolvedExpr::Lambda { .. } | ResolvedExpr::Match { .. } => {
-            Err(runtime_error!(None, "unsupported pattern `{pattern}`"))
+            Err(runtime_error!(
+                Some(span),
+                "unsupported pattern `{pattern}`"
+            ))
         }
     }
 }

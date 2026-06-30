@@ -11,7 +11,7 @@ perimeter = shape : Shape => match shape {
 }
 
 num1 : Int32
-num1 = perimeter (Tri 3 4 5)
+num1 = perimeter (Tri 3 4 5)        -- 12
 
 num2 : Int32
-num2 = perimeter (Quad 6 7 8 9)
+num2 = perimeter (Quad 6 7 8 9)     -- 30

@@ -49,38 +49,61 @@ impl Display for ResolvedStatement {
 pub enum ResolvedExpr {
     Block {
         statements: Vec<ResolvedStatement>,
+        span: Span,
     },
 
     Identifier {
         name: String,
+        span: Span,
     },
 
     Int32Literal {
         value: i32,
+        span: Span,
     },
     Float32Literal {
         value: f32,
+        span: Span,
     },
 
     Lambda {
         param_name: String,
         param_type: Box<ResolvedExpr>,
         body: Rc<ResolvedExpr>,
+        span: Span,
     },
 
     Tuple {
         items: Vec<ResolvedExpr>,
+        span: Span,
     },
 
     FuncAppl {
         fn_name: String,
         args: Vec<ResolvedExpr>,
+        span: Span,
     },
 
     Match {
         expr: Box<ResolvedExpr>,
         match_arms: Vec<MatchArm>,
+        span: Span,
     },
+}
+
+impl ResolvedExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            ResolvedExpr::Block { span, .. }
+            | ResolvedExpr::Identifier { span, .. }
+            | ResolvedExpr::Int32Literal { span, .. }
+            | ResolvedExpr::Float32Literal { span, .. }
+            | ResolvedExpr::Lambda { span, .. }
+            | ResolvedExpr::Tuple { span, .. }
+            | ResolvedExpr::FuncAppl { span, .. }
+            | ResolvedExpr::Match { span, .. } => span.clone(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -92,22 +115,20 @@ pub struct MatchArm {
 impl Display for ResolvedExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ResolvedExpr::Block { statements } => {
+            ResolvedExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
-
                 for stmt in statements {
                     write!(f, "    {}\n", stmt)?;
                 }
-
                 write!(f, "}}")
             }
 
-            ResolvedExpr::Identifier { name } => write!(f, "{name}"),
+            ResolvedExpr::Identifier { name, .. } => write!(f, "{name}"),
 
-            ResolvedExpr::Int32Literal { value } => write!(f, "{value}"),
-            ResolvedExpr::Float32Literal { value } => write!(f, "{value}"),
+            ResolvedExpr::Int32Literal { value, .. } => write!(f, "{value}"),
+            ResolvedExpr::Float32Literal { value, .. } => write!(f, "{value}"),
 
-            ResolvedExpr::Tuple { items } => write!(f, "({})", format_joined(items, ", ")),
+            ResolvedExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
 
             ResolvedExpr::Lambda {
                 param_name, body, ..
@@ -115,24 +136,22 @@ impl Display for ResolvedExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            ResolvedExpr::FuncAppl { fn_name, args } => {
+            ResolvedExpr::FuncAppl { fn_name, args, .. } => {
                 write!(f, "{fn_name}")?;
-
                 for arg in args {
                     write!(f, " ")?;
                     fmt_parenthesized(f, arg)?;
                 }
-
                 Ok(())
             }
 
-            ResolvedExpr::Match { expr, match_arms } => {
+            ResolvedExpr::Match {
+                expr, match_arms, ..
+            } => {
                 write!(f, "match {expr} {{\n")?;
-
                 for arm in match_arms {
                     write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;
                 }
-
                 write!(f, "}}")
             }
         }

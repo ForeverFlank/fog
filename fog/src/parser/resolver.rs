@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::error::FogError;
 use crate::error::FogResult;
+use crate::error::Span;
 use crate::parse_error;
 use crate::parser::parsed_expr::OpKind;
 use crate::parser::parsed_expr::ParsedExpr;
@@ -102,7 +103,7 @@ impl Resolver {
     fn get_binary_op(&self, parsed_expr: &ParsedExpr) -> Option<&InfixFunctionInfo> {
         let key = match parsed_expr {
             ParsedExpr::Op { kind } => InfixFunctionKey::Op(kind.clone()),
-            ParsedExpr::Identifier { name } => InfixFunctionKey::Identifier(name.clone()),
+            ParsedExpr::Identifier { name, .. } => InfixFunctionKey::Identifier(name.clone()),
             _ => return None,
         };
         self.infix_functions.get(&key)
@@ -153,58 +154,106 @@ impl Resolver {
         param_name: String,
         param_type: Box<ParsedExpr>,
         body: Box<ParsedExpr>,
+        span: Span,
     ) -> FogResult<ResolvedExpr> {
+        // Desugar `param => match { arms }` into `param => match param { arms }`.
+        let body = match *body {
+            ParsedExpr::Match {
+                expr: None,
+                match_arms,
+                span: match_span,
+            } => ParsedExpr::Match {
+                expr: Some(Box::new(ParsedExpr::Identifier {
+                    name: param_name.clone(),
+                    span: match_span.clone(),
+                })),
+                match_arms,
+                span: match_span,
+            },
+            other => other,
+        };
+
         Ok(ResolvedExpr::Lambda {
             param_name,
             param_type: Self::resolve_expr(*param_type)?.into(),
-            body: Self::resolve_expr(*body)?.into(),
+            body: Self::resolve_expr(body)?.into(),
+            span,
         })
     }
 
-    fn resolve_tuple(items: Vec<ParsedExpr>) -> FogResult<ResolvedExpr> {
+    fn resolve_tuple(items: Vec<ParsedExpr>, span: Span) -> FogResult<ResolvedExpr> {
         Ok(ResolvedExpr::Tuple {
             items: items
                 .into_iter()
                 .map(Self::resolve_expr)
                 .collect::<Result<Vec<_>, _>>()?,
+            span,
+        })
+    }
+
+    fn resolve_match(
+        expr: Option<Box<ParsedExpr>>,
+        match_arms: Vec<crate::parser::parsed_expr::MatchArm>,
+        span: Span,
+    ) -> FogResult<ResolvedExpr> {
+        let scrutinee = match expr {
+            Some(e) => Self::resolve_expr(*e)?,
+            None => {
+                return Err(parse_error!(
+                    Some(span),
+                    "`match {{ ... }}` without a scrutinee can only appear as a direct lambda body"
+                ));
+            }
+        };
+
+        Ok(ResolvedExpr::Match {
+            expr: Box::new(scrutinee),
+            match_arms: match_arms
+                .into_iter()
+                .map(|arm| {
+                    Ok(MatchArm {
+                        pattern: Self::resolve_expr(arm.pattern)?,
+                        value_expr: Self::resolve_expr(arm.value_expr)?,
+                    })
+                })
+                .collect::<FogResult<Vec<_>>>()?,
+            span,
         })
     }
 
     fn resolve_expr(parsed_expr: ParsedExpr) -> FogResult<ResolvedExpr> {
         match parsed_expr {
-            ParsedExpr::Block { statements } => resolve_block(statements),
+            ParsedExpr::Block { statements, span } => resolve_block(statements, span),
 
-            ParsedExpr::Identifier { name } => Ok(ResolvedExpr::Identifier { name }),
+            ParsedExpr::Identifier { name, span } => Ok(ResolvedExpr::Identifier { name, span }),
             ParsedExpr::Op { .. } => unreachable!(),
 
-            ParsedExpr::Int32Literal { value } => Ok(ResolvedExpr::Int32Literal { value }),
-            ParsedExpr::Float32Literal { value } => Ok(ResolvedExpr::Float32Literal { value }),
+            ParsedExpr::Int32Literal { value, span } => {
+                Ok(ResolvedExpr::Int32Literal { value, span })
+            }
+            ParsedExpr::Float32Literal { value, span } => {
+                Ok(ResolvedExpr::Float32Literal { value, span })
+            }
 
             ParsedExpr::Lambda {
                 param_name,
                 param_type,
                 body,
-            } => Self::resolve_lambda(param_name, param_type, body),
+                span,
+            } => Self::resolve_lambda(param_name, param_type, body, span),
 
-            ParsedExpr::Tuple { items } => Self::resolve_tuple(items),
+            ParsedExpr::Tuple { items, span } => Self::resolve_tuple(items, span),
 
-            ParsedExpr::Collection { items } => {
+            ParsedExpr::Collection { items, span: _ } => {
                 let mut resolver = Resolver::new();
                 resolver.resolve_collection(&items, i32::MIN)
             }
 
-            ParsedExpr::Match { expr, match_arms } => Ok(ResolvedExpr::Match {
-                expr: Self::resolve_expr(*expr)?.into(),
-                match_arms: match_arms
-                    .into_iter()
-                    .map(|arm| {
-                        Ok(MatchArm {
-                            pattern: Self::resolve_expr(arm.pattern)?,
-                            value_expr: Self::resolve_expr(arm.value_expr)?,
-                        })
-                    })
-                    .collect::<FogResult<Vec<_>>>()?,
-            }),
+            ParsedExpr::Match {
+                expr,
+                match_arms,
+                span,
+            } => Self::resolve_match(expr, match_arms, span),
         }
     }
 
@@ -232,6 +281,7 @@ impl Resolver {
             let op_name = op.name.clone();
             let op_prec = op.precedence;
             let op_assoc = op.associativity.clone();
+            let lhs_span = lhs.span();
 
             self.index += 1;
 
@@ -245,6 +295,7 @@ impl Resolver {
             lhs = ResolvedExpr::FuncAppl {
                 fn_name: op_name,
                 args: vec![lhs, rhs],
+                span: lhs_span,
             };
         }
 
@@ -254,8 +305,8 @@ impl Resolver {
     fn resolve_primary(&mut self, exprs: &Vec<ParsedExpr>) -> FogResult<ResolvedExpr> {
         let head = self.resolve_atomic(exprs)?;
 
-        let name = match &head {
-            ResolvedExpr::Identifier { name } => name.clone(),
+        let (name, span) = match &head {
+            ResolvedExpr::Identifier { name, span } => (name.clone(), span.clone()),
             _ => return Ok(head),
         };
 
@@ -271,6 +322,7 @@ impl Resolver {
             Ok(ResolvedExpr::FuncAppl {
                 fn_name: name,
                 args,
+                span,
             })
         }
     }
@@ -280,20 +332,26 @@ impl Resolver {
         self.index += 1;
 
         match expr {
-            ParsedExpr::Block { statements } => resolve_block(statements),
+            ParsedExpr::Block { statements, span } => resolve_block(statements, span),
 
-            ParsedExpr::Identifier { name } => Ok(ResolvedExpr::Identifier { name }),
+            ParsedExpr::Identifier { name, span } => Ok(ResolvedExpr::Identifier { name, span }),
 
-            ParsedExpr::Int32Literal { value } => Ok(ResolvedExpr::Int32Literal { value }),
-            ParsedExpr::Float32Literal { value } => Ok(ResolvedExpr::Float32Literal { value }),
+            ParsedExpr::Int32Literal { value, span } => {
+                Ok(ResolvedExpr::Int32Literal { value, span })
+            }
+            ParsedExpr::Float32Literal { value, span } => {
+                Ok(ResolvedExpr::Float32Literal { value, span })
+            }
 
             ParsedExpr::Op {
                 kind: OpKind::Minus,
             } => {
                 let operand = self.resolve_atomic(exprs)?;
+                let span = operand.span();
                 Ok(ResolvedExpr::FuncAppl {
                     fn_name: "-".to_string(),
                     args: vec![operand],
+                    span,
                 })
             }
 
@@ -301,12 +359,13 @@ impl Resolver {
                 param_name,
                 param_type,
                 body,
-            } => Self::resolve_lambda(param_name, param_type, body),
+                span,
+            } => Self::resolve_lambda(param_name, param_type, body, span),
 
-            ParsedExpr::Tuple { items } => Self::resolve_tuple(items),
+            ParsedExpr::Tuple { items, span } => Self::resolve_tuple(items, span),
 
             // TODO: this looks really hacky
-            ParsedExpr::Collection { items } => {
+            ParsedExpr::Collection { items, .. } => {
                 let saved_index = self.index;
                 self.index = 0;
                 let result = self.resolve_collection(&items, i32::MIN)?;
@@ -316,27 +375,21 @@ impl Resolver {
 
             ParsedExpr::Op { .. } => Err(parse_error!(None, "unexpected infix operator")),
 
-            ParsedExpr::Match { expr, match_arms } => Ok(ResolvedExpr::Match {
-                expr: Self::resolve_expr(*expr)?.into(),
-                match_arms: match_arms
-                    .into_iter()
-                    .map(|arm| {
-                        Ok(MatchArm {
-                            pattern: Self::resolve_expr(arm.pattern)?,
-                            value_expr: Self::resolve_expr(arm.value_expr)?,
-                        })
-                    })
-                    .collect::<FogResult<Vec<_>>>()?,
-            }),
+            ParsedExpr::Match {
+                expr,
+                match_arms,
+                span,
+            } => Self::resolve_match(expr, match_arms, span),
         }
     }
 }
 
-fn resolve_block(statements: Vec<ParsedStatement>) -> FogResult<ResolvedExpr> {
+fn resolve_block(statements: Vec<ParsedStatement>, span: Span) -> FogResult<ResolvedExpr> {
     Ok(ResolvedExpr::Block {
         statements: statements
             .iter()
             .map(|stmt| Resolver::resolve_statement(stmt.clone()))
             .collect::<Result<Vec<_>, _>>()?,
+        span,
     })
 }
