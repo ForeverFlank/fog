@@ -1,0 +1,47 @@
+-- ad hoc polymorphism
+-- commonly known as interfaces
+
+-- boilerplate Bool because
+-- this is a barebone example
+
+Bool : Type
+Bool = True + False
+
+and : Bool -> Bool -> Bool
+and = b1 : Bool => b2 : Bool => match (b1, b2) {
+    (True, True) => True
+    _            => False
+}
+
+not : Bool -> Bool
+not = b : Bool => match b {
+    True  => False
+    False => True
+}
+
+-- defining the Equatable type class
+
+Equatable : Type -> Constraint
+Equatable t = {
+    equal    : t -> t -> Bool
+    notEqual : t -> t -> Bool
+}
+
+-- declating a type
+
+Point : Type
+Point = Int32 * Int32
+
+-- implementing the Equatable type class
+-- to that type
+
+Equatable Point = {
+    equal = lhs : Point => rhs : Point => {
+        (xl, yl) = lhs
+        (xr, yr) = rhs
+
+        and (equal xl yl) (equal xr yr)
+    }
+
+    notEqual = lhs : Point => rhs : Point => not (equal lhs rhs)
+}

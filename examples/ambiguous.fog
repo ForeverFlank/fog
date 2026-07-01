@@ -1,7 +1,0 @@
-Option : Type -> Type
-
-MyType1 : Type
-MyType1 = Option Int        -- optional int
-
-MyType2 : Type
-MyType2 = NotAnOption Int   -- data constructor

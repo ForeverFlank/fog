@@ -1,0 +1,13 @@
+List : Type -> Type
+List t = Nil + Cons t (List t)
+
+map : (a -> b) -> List a -> List b
+map f (Cons x xs) = Cons (f x) (map f xs)
+map f Nil         = Nil
+
+range : Int32 -> Int32 -> List Int32
+range start stop = {
+    if start < stop, Cons start (range (start + 1) stop)    -- ascending
+    if start > stop, Cons start (range (start - 1) stop)    -- descending
+    else,            Cons start Nil
+}

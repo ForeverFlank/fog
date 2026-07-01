@@ -5,7 +5,7 @@
 -- Kind is at the top of the type hierarchy.
 -- Kind itself is untyped
 
-Kind : -- nothing
+Kind : (untyped)
 
 
 -- the type itself

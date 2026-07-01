@@ -1,0 +1,66 @@
+-- boilerplate Bool
+
+Bool : Type
+Bool = True + False
+
+and : Bool -> Bool -> Bool
+and = b1 : Bool => b2 : Bool => match (b1, b2) {
+    (True, True) => True
+    _            => False
+}
+
+or : Bool -> Bool -> Bool
+or = b1 : Bool => b2 : Bool => match (b1, b2) {
+    (False, False) => False
+    _              => True
+}
+
+not : Bool -> Bool
+not = b : Bool => match b {
+    True  => False
+    False => True
+}
+
+-- type classes
+
+Equatable : Type -> Constraint
+Equatable t = {
+    equal    : t -> t -> Bool
+    notEqual : t -> t -> Bool
+}
+
+Ordered : Type -> Constraint
+Ordered t = {
+    equatable   : Equatable t
+    lessOrEqual : t -> t -> Bool
+}
+
+-- using the type classes
+
+Version : Type
+Version = Int32 * Int32     -- semantic version number, major and minor
+
+Equatable Version = {
+    equal = v1 : Version => v2 : Version => {
+        (maj1, min1) = v1
+        (maj2, min2) = v2
+
+        and (equalInt32 maj1 min1) (equalInt32 maj2 min2)
+    }
+
+    notEqual = v1 : Version => v2 : Version => not (equalInt32 v1 v2)
+}
+
+Ordered Version = {
+    equatable = Equatable Version
+
+    lessOrEqual = v1 : Version => v2 : Version => {
+        -- M1.m1 <= M2.m2
+        -- iff M1 < M2 or M1 == M2 and m1 <= m2
+        
+        (maj1, min1) = v1
+        (maj2, min2) = v2
+
+        or (lessInt32 maj1 maj2) (and (equalInt32 maj1 maj2) (lessOrEqualInt32 min1 min2))
+    }
+}

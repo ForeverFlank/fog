@@ -1,0 +1,18 @@
+Bool : Type
+Bool = True + False
+
+-- style 1
+-- infix name left|right precedence
+infix or left 3
+or : Bool -> Bool -> Bool
+
+-- style 2
+-- annotation-based
+@infix(left, 3)
+or : Bool -> Bool -> Bool
+
+
+b1 or b2 = match (b1, b2) {
+    (False, False) => False
+    _              => True
+}

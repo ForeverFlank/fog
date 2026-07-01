@@ -7,7 +7,7 @@ fib : Int32 -> Int32
 fib = n : Int32 => match n {
     0 => 0
     1 => 1
-    _ => _plus_Int32_Int32 (fib (_minus_Int32_Int32 n 1)) (fib (_minus_Int32_Int32 n 2))
+    _ => addInt32 (fib (subtractInt32 n 1)) (fib (subtractInt32 n 2))
 }
 
 num : Int32

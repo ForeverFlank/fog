@@ -1,0 +1,21 @@
+IO : Type -> Type
+
+run : IO a -> a
+run = -- internal stuff
+
+join : IO (IO a) -> IO a
+join action = -- internal stuff
+
+fmap : (a -> b) -> IO a -> IO b
+fmap f action = f (run action)
+
+bind : IO a -> (a -> IO b) -> IO b
+bind action f = join (fmap f action)
+
+
+printLine = -- internal stuff
+
+main : IO ()
+main = do {
+    printLine "Hello fog!"
+}

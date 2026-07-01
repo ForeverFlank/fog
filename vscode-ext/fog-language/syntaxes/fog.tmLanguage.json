@@ -10,6 +10,7 @@
         { "include": "#types" },
         { "include": "#functions" },
         { "include": "#operators" },
+        { "include": "#wildcard" },
         { "include": "#variables" }
     ],
     "repository": {
@@ -25,7 +26,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.fog",
-                    "match": "\\b(match|if|else|do)\\b"
+                    "match": "\\b(match|if|else|do|infix)\\b"
                 }
             ]
         },
@@ -64,7 +65,15 @@
             "patterns": [
                 {
                     "name": "keyword.operator.fog",
-                    "match": "=|:|->|\\+|-|\\*|\/"
+                    "match": "//|=>|->|==|!=|<=|>=|\\|\\||\\|>|<\\||>>|<<|=|:|\\+|-|\\*|/|\\^"
+                }
+            ]
+        },
+        "wildcard": {
+            "patterns": [
+                {
+                    "name": "variable.language.wildcard.fog",
+                    "match": "\\b_\\b"
                 }
             ]
         },

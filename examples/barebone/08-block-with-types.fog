@@ -9,5 +9,5 @@ num = {
     y : MyType
     y = 7
 
-    _plus_Int32_Int32 x y
+    addInt32 x y
 }

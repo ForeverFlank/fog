@@ -19,10 +19,11 @@ b1 or b2 = match (b1, b2) {
     _              => True
 }
 
-impl Equatable for Bool {
+Equatable Bool = {
     b1 == b2 = match (b1, b2) {
         (True, True)   => True
         (False, False) => True
         _              => False
     }
+    b1 != b2 = not (b1 == b2)
 }

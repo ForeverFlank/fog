@@ -1,0 +1,21 @@
+-- Option type
+
+Option : Type -> Type
+Option t = Some t + None
+
+orElse : Option Type -> Option Type
+orElse =
+    lhs : Option Type =>
+    rhs : Option Type =>
+    match lhs {
+        Some item => item
+        None      => match rhs {
+            Some item => item
+            None      => None
+        }
+    }
+
+
+a = None
+b = Some 20
+c = orElse a b  -- 20

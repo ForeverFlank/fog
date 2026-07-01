@@ -9,13 +9,13 @@
 f : Int32 -> Int32
 f = n : Int32 => match n {
     0 => 1
-    n => _minus_Int32_Int32 n (m (f (_minus_Int32_Int32 n 1)))
+    n => subtractInt32 n (m (f (subtractInt32 n 1)))
 }
 
 m : Int32 -> Int32
 m = n : Int32 => match n {
     0 => 0
-    n => _minus_Int32_Int32 n (f (m (_minus_Int32_Int32 n 1)))
+    n => subtractInt32 n (f (m (subtractInt32 n 1)))
 }
 
 f_7 : Int32

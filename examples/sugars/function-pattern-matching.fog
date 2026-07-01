@@ -1,0 +1,14 @@
+fib : Int32 -> Int32
+fib 0 = 0
+fib 1 = 1
+fib n = fib (n - 1) + fib (n - 2)
+
+-- desugars to
+fibDesugared : Int32 -> Int32
+fibDesugared n = match n {
+    0 => 0
+    1 => 1
+    n => fib (n - 1) + fib (n - 2)
+}
+
+num = fib 6     -- 8

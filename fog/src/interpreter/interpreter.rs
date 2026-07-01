@@ -32,8 +32,8 @@ fn create_top_env() -> Environment<'static> {
         kind: Kind::Type,
     };
 
-    let var_plus_int32_int32 = ValueVariable::with_value(
-        "_plus_Int32_Int32",
+    let varaddInt32 = ValueVariable::with_value(
+        "addInt32",
         Value::NativeFunction {
             param_type: Type::Int32,
             return_type: Type::Function(Type::Int32.into(), Type::Int32.into()),
@@ -52,8 +52,8 @@ fn create_top_env() -> Environment<'static> {
         Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
     );
 
-    let var_minus_int32_int32 = ValueVariable::with_value(
-        "_minus_Int32_Int32",
+    let varsubtractInt32 = ValueVariable::with_value(
+        "subtractInt32",
         Value::NativeFunction {
             param_type: Type::Int32,
             return_type: Type::Function(Type::Int32.into(), Type::Int32.into()),
@@ -78,11 +78,9 @@ fn create_top_env() -> Environment<'static> {
             env.types.insert(type_var.name.clone(), type_var.clone());
         });
 
-    vec![var_plus_int32_int32, var_minus_int32_int32]
-        .iter()
-        .for_each(|var| {
-            env.variables.insert(var.name.clone(), var.clone());
-        });
+    vec![varaddInt32, varsubtractInt32].iter().for_each(|var| {
+        env.variables.insert(var.name.clone(), var.clone());
+    });
 
     env
 }

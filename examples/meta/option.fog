@@ -1,0 +1,11 @@
+Option : Type -> Type
+Option t = Some t + None
+
+isSome : Option t -> Bool
+isSome (Some _) = True
+isSome None     = False
+
+isNone = not << isSome
+
+orElse = Option t -> Option t -> Option t
+-- ...

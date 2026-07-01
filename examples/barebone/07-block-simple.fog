@@ -1,7 +1,7 @@
 f : Int32 -> Int32 -> Int32
 f = x : Int32 => y : Int32 => {
     a : Int32
-    a = _plus_Int32_Int32 x y
+    a = addInt32 x y
 
     a
 }

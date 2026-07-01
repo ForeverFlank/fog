@@ -1,0 +1,10 @@
+-- type inference
+
+-- Int32
+thing1 = 20
+
+-- Int32 * Int32
+thing2 = (20, 30)
+
+-- Int32 -> Int32
+thing3 = x : Int32 => addInt32 x 1

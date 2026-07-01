@@ -1,0 +1,8 @@
+fib : Int32 -> Int32
+fib n = {
+    if n == 0, 0
+    if n == 1, 1
+    else,      fib (n - 1) + fib (n - 2)
+}
+
+num = fib 6     -- 8
