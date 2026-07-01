@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+* {
+    font-family: "Barlow", sans-serif;
+}
+
+.mono * {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 300;
+}
