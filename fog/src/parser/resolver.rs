@@ -221,6 +221,13 @@ impl Resolver {
             ParsedDeclPattern::Op { .. } => {
                 Err(parse_error!(None, "unexpected operator in pattern"))
             }
+
+            ParsedDeclPattern::Int32Literal { value, span } => {
+                Ok(ResolvedDeclPattern::Int32Literal { value, span })
+            }
+            ParsedDeclPattern::Float32Literal { value, span } => {
+                Ok(ResolvedDeclPattern::Float32Literal { value, span })
+            }
         }
     }
 

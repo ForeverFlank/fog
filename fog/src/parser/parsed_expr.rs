@@ -42,6 +42,14 @@ pub enum ParsedDeclPattern {
     Op {
         kind: OpKind,
     },
+    Int32Literal {
+        value: i32,
+        span: Span,
+    },
+    Float32Literal {
+        value: f32,
+        span: Span,
+    },
 }
 
 impl Display for ParsedStatement {
@@ -82,6 +90,8 @@ impl Display for ParsedDeclPattern {
                 Ok(())
             }
             ParsedDeclPattern::Op { kind } => write!(f, "{kind}"),
+            ParsedDeclPattern::Int32Literal { value, .. } => write!(f, "{value}"),
+            ParsedDeclPattern::Float32Literal { value, .. } => write!(f, "{value}"),
         }
     }
 }

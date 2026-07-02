@@ -44,6 +44,39 @@ fn token_span(token: &Token) -> Span {
     }
 }
 
+fn expr_to_decl_pattern(expr: ParsedExpr) -> FogResult<ParsedDeclPattern> {
+    match expr {
+        ParsedExpr::Identifier { name, span } => Ok(ParsedDeclPattern::Identifier { name, span }),
+
+        ParsedExpr::Tuple { items, span } => Ok(ParsedDeclPattern::Tuple {
+            items: items
+                .into_iter()
+                .map(expr_to_decl_pattern)
+                .collect::<Result<Vec<_>, _>>()?,
+            span,
+        }),
+
+        ParsedExpr::Collection { items, span } => Ok(ParsedDeclPattern::Collection {
+            items: items
+                .into_iter()
+                .map(expr_to_decl_pattern)
+                .collect::<Result<Vec<_>, _>>()?,
+            span,
+        }),
+
+        ParsedExpr::Op { kind } => Ok(ParsedDeclPattern::Op { kind }),
+
+        ParsedExpr::Int32Literal { value, span } => {
+            Ok(ParsedDeclPattern::Int32Literal { value, span })
+        }
+        ParsedExpr::Float32Literal { value, span } => {
+            Ok(ParsedDeclPattern::Float32Literal { value, span })
+        }
+
+        _ => Err(parse_error!(Some(expr.span()), "invalid pattern")),
+    }
+}
+
 impl Parser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
         let eof_token = Token {
@@ -149,14 +182,27 @@ impl Parser<'_> {
             }
 
             _ => {
-                // this branch now could be either
-                // an assignent statement's lhs:
-                // assigning to tuple -- (x, y) = tup
-                // or assigning a function -- f x = x + 1
-                // but let's just leave it just for tuple, for now
-                let expr = self.parse_expression()?;
+                let lhs = self.parse_expression()?;
 
-                Ok(ParsedStatement::Expression { expr, span })
+                if let TokenKind::Equal = self.peek().kind {
+                    self.next(); // =
+
+                    // forgiving newline
+                    if let TokenKind::Newline = self.peek().kind {
+                        self.next();
+                    }
+
+                    let pattern = expr_to_decl_pattern(lhs)?;
+                    let expr = self.parse_expression()?;
+
+                    return Ok(ParsedStatement::Declaration {
+                        pattern,
+                        expr,
+                        span,
+                    });
+                }
+
+                Ok(ParsedStatement::Expression { expr: lhs, span })
             }
         }
     }

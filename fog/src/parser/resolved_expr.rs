@@ -40,6 +40,14 @@ pub enum ResolvedDeclPattern {
         items: Vec<ResolvedDeclPattern>,
         span: Span,
     },
+    Int32Literal {
+        value: i32,
+        span: Span,
+    },
+    Float32Literal {
+        value: f32,
+        span: Span,
+    },
 }
 
 impl Display for ResolvedStatement {
@@ -79,6 +87,8 @@ impl Display for ResolvedDeclPattern {
 
                 Ok(())
             }
+            ResolvedDeclPattern::Int32Literal { value, .. } => write!(f, "{value}"),
+            ResolvedDeclPattern::Float32Literal { value, .. } => write!(f, "{value}"),
         }
     }
 }
