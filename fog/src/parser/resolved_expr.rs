@@ -35,7 +35,7 @@ pub enum ResolvedDeclPattern {
         items: Vec<ResolvedDeclPattern>,
         span: Span,
     },
-    Collection {
+    FunctionClause {
         name: String,
         items: Vec<ResolvedDeclPattern>,
         span: Span,
@@ -69,7 +69,7 @@ impl Display for ResolvedDeclPattern {
             ResolvedDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
-            ResolvedDeclPattern::Collection { items, .. } => {
+            ResolvedDeclPattern::FunctionClause { items, .. } => {
                 for (i, expr) in items.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;

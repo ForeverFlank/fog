@@ -161,6 +161,7 @@ impl Resolver {
             ParsedDeclPattern::Identifier { name, span } => {
                 Ok(ResolvedDeclPattern::Identifier { name, span })
             }
+
             ParsedDeclPattern::Tuple { items, span } => Ok(ResolvedDeclPattern::Tuple {
                 items: items
                     .into_iter()
@@ -168,13 +169,58 @@ impl Resolver {
                     .collect::<Result<Vec<_>, _>>()?,
                 span,
             }),
-            ParsedDeclPattern::Collection { items, span } => Ok(ResolvedDeclPattern::Collection {
-                items: items
-                    .into_iter()
-                    .map(Self::resolve_decl_pattern)
-                    .collect::<Result<Vec<_>, _>>()?,
-                span,
-            }),
+
+            ParsedDeclPattern::Collection { items, span } => {
+                if items.len() == 3 {
+                    let is_infix = match &items[1] {
+                        ParsedDeclPattern::Op { .. } => true,
+                        ParsedDeclPattern::Identifier { .. } => {
+                            !matches!(items[0], ParsedDeclPattern::Identifier { .. })
+                        }
+                        _ => false,
+                    };
+
+                    if is_infix {
+                        let [lhs, op, rhs]: [ParsedDeclPattern; 3] = items.try_into().ok().unwrap();
+
+                        let name = match op {
+                            ParsedDeclPattern::Op { kind } => kind.to_string(),
+                            ParsedDeclPattern::Identifier { name, .. } => name,
+                            _ => unreachable!(),
+                        };
+
+                        return Ok(ResolvedDeclPattern::FunctionClause {
+                            name,
+                            items: vec![
+                                Self::resolve_decl_pattern(lhs)?,
+                                Self::resolve_decl_pattern(rhs)?,
+                            ],
+                            span,
+                        });
+                    }
+                }
+
+                let mut items = items.into_iter();
+
+                let name = match items.next() {
+                    Some(ParsedDeclPattern::Identifier { name, .. }) => name,
+                    _ => {
+                        return Err(parse_error!(Some(span), "pattern must start with a name"));
+                    }
+                };
+
+                Ok(ResolvedDeclPattern::FunctionClause {
+                    name,
+                    items: items
+                        .map(Self::resolve_decl_pattern)
+                        .collect::<Result<Vec<_>, _>>()?,
+                    span,
+                })
+            }
+
+            ParsedDeclPattern::Op { .. } => {
+                Err(parse_error!(None, "unexpected operator in pattern"))
+            }
         }
     }
 

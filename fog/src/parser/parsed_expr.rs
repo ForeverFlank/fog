@@ -39,6 +39,9 @@ pub enum ParsedDeclPattern {
         items: Vec<ParsedDeclPattern>,
         span: Span,
     },
+    Op {
+        kind: OpKind,
+    },
 }
 
 impl Display for ParsedStatement {
@@ -78,6 +81,7 @@ impl Display for ParsedDeclPattern {
 
                 Ok(())
             }
+            ParsedDeclPattern::Op { kind } => write!(f, "{kind}"),
         }
     }
 }
