@@ -30,26 +30,30 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
                         };
                     }
 
-                    ResolvedStatement::Declaration { name, expr, span } => {
-                        if block_env.variables.contains_key(name) {
+                    ResolvedStatement::Declaration {
+                        pattern,
+                        expr,
+                        span,
+                    } => {
+                        if block_env.variables.contains_key(pattern) {
                             let expr_type = expr_type_of(expr, &block_env)?;
-                            let annotated_type = block_env.variables[name].r#type.clone();
+                            let annotated_type = block_env.variables[pattern].r#type.clone();
 
                             if expr_type != annotated_type {
                                 return Err(type_check_error!(
                                     Some(span.clone()),
-                                    "type mismatch when assigning variable `{expr}` with `{name}`\n\
+                                    "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
                                      expected `{annotated_type}`, found `{expr_type}`"
                                 ));
                             }
-                        } else if block_env.types.contains_key(name) {
+                        } else if block_env.types.contains_key(pattern) {
                             let defined_type = eval_type_definition_expr(expr, &block_env)?;
-                            block_env.declare_type(name, defined_type, span)?;
+                            block_env.declare_type(pattern, defined_type, span)?;
                         } else {
                             return Err(runtime_error!(
                                 Some(span.clone()),
                                 "unannotated variable `{}`",
-                                name
+                                pattern
                             ));
                         }
                     }

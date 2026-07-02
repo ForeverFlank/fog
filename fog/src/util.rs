@@ -11,7 +11,7 @@ pub fn format_joined<T: ToString>(items: &Vec<T>, sep: &str) -> String {
 
 pub fn fmt_parenthesized<T: Display>(f: &mut fmt::Formatter<'_>, expr: &T) -> fmt::Result {
     let s = expr.to_string();
-    if s.contains(' ') {
+    if s.contains(' ') && !(s.starts_with('(') && s.ends_with(')')) {
         write!(f, "({s})")
     } else {
         write!(f, "{s}")

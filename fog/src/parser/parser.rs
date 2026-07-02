@@ -3,7 +3,11 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
-use crate::parser::parsed_expr::{MatchArm, *};
+use crate::parser::parsed_expr::{ParsedMatchArm, *};
+
+pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
+    Parser::parse(tokens)
+}
 
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -69,7 +73,7 @@ impl Parser<'_> {
             .unwrap_or(&self.eof_token)
     }
 
-    pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
+    fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
         let mut parser = Parser::new(&tokens);
         let mut statements = Vec::new();
         let mut errors = Vec::new();
@@ -83,13 +87,14 @@ impl Parser<'_> {
                 break;
             }
 
-            let pos_before = parser.pos;
+            let prev_pos = parser.pos;
+
             match parser.parse_block_statement() {
                 Ok(stmt) => statements.push(stmt),
                 Err(e) => {
                     errors.push(e);
-                    // Skip one token if we made no progress, to avoid an infinite loop.
-                    if parser.pos == pos_before {
+
+                    if parser.pos == prev_pos {
                         parser.next();
                     }
                 }
@@ -133,10 +138,22 @@ impl Parser<'_> {
 
                 let expr = self.parse_expression()?;
 
-                Ok(ParsedStatement::Declaration { name, expr, span })
+                Ok(ParsedStatement::Declaration {
+                    pattern: ParsedDeclPattern::Identifier {
+                        name,
+                        span: span.clone(),
+                    },
+                    expr,
+                    span,
+                })
             }
 
             _ => {
+                // this branch now could be either
+                // an assignent statement's lhs:
+                // assigning to tuple -- (x, y) = tup
+                // or assigning a function -- f x = x + 1
+                // but let's just leave it just for tuple, for now
                 let expr = self.parse_expression()?;
 
                 Ok(ParsedStatement::Expression { expr, span })
@@ -298,7 +315,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_match_arms(&mut self) -> FogResult<Vec<MatchArm>> {
+    fn parse_match_arms(&mut self) -> FogResult<Vec<ParsedMatchArm>> {
         let mut arms = Vec::new();
 
         while let TokenKind::Newline = self.peek().kind {
@@ -329,7 +346,7 @@ impl Parser<'_> {
 
             let value_expr = self.parse_expression()?;
 
-            arms.push(MatchArm {
+            arms.push(ParsedMatchArm {
                 pattern,
                 value_expr,
             });

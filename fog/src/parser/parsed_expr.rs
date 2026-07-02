@@ -15,12 +15,28 @@ pub enum ParsedStatement {
         span: Span,
     },
     Declaration {
-        name: String,
+        pattern: ParsedDeclPattern,
         expr: ParsedExpr,
         span: Span,
     },
     Expression {
         expr: ParsedExpr,
+        span: Span,
+    },
+}
+
+#[derive(Clone)]
+pub enum ParsedDeclPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Tuple {
+        items: Vec<ParsedDeclPattern>,
+        span: Span,
+    },
+    Collection {
+        items: Vec<ParsedDeclPattern>,
         span: Span,
     },
 }
@@ -32,12 +48,35 @@ impl Display for ParsedStatement {
                 write!(f, "{} : {}", name, expr)
             }
 
-            ParsedStatement::Declaration { name, expr, .. } => {
-                write!(f, "{} = {}", name, expr)
+            ParsedStatement::Declaration { pattern, expr, .. } => {
+                write!(f, "{} = {}", pattern, expr)
             }
 
             ParsedStatement::Expression { expr, .. } => {
                 write!(f, "{}", expr)
+            }
+        }
+    }
+}
+
+impl Display for ParsedDeclPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParsedDeclPattern::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+            ParsedDeclPattern::Tuple { items, .. } => {
+                write!(f, "{}", format_joined(items, ", "))
+            }
+            ParsedDeclPattern::Collection { items, .. } => {
+                for (i, expr) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " ")?;
+                    }
+                    fmt_parenthesized(f, expr)?;
+                }
+
+                Ok(())
             }
         }
     }
@@ -111,9 +150,15 @@ pub enum ParsedExpr {
 
     Match {
         expr: Box<ParsedExpr>,
-        match_arms: Vec<MatchArm>,
+        match_arms: Vec<ParsedMatchArm>,
         span: Span,
     },
+}
+
+#[derive(Clone)]
+pub struct ParsedMatchArm {
+    pub pattern: ParsedExpr,
+    pub value_expr: ParsedExpr,
 }
 
 impl ParsedExpr {
@@ -131,12 +176,6 @@ impl ParsedExpr {
             ParsedExpr::Op { .. } => unreachable!("Op has no span"),
         }
     }
-}
-
-#[derive(Clone)]
-pub struct MatchArm {
-    pub pattern: ParsedExpr,
-    pub value_expr: ParsedExpr,
 }
 
 impl Display for ParsedExpr {

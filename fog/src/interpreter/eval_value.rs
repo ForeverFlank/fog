@@ -15,6 +15,7 @@ use crate::interpreter::type_check::expr_type_of;
 use crate::interpreter::value::Value;
 use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
+use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedStatement;
 use crate::runtime_error;
@@ -191,14 +192,25 @@ pub fn eval_scope(
 
     // type definitions
     for stmt in statements {
-        if let ResolvedStatement::Declaration { name, expr, span } = stmt {
-            if env.types.contains_key(name) {
-                let defined_type = eval_type_definition_expr(expr, env)?;
-                env.declare_type(name, defined_type.clone(), span)?;
+        if let ResolvedStatement::Declaration {
+            pattern,
+            expr,
+            span,
+        } = stmt
+        {
+            match pattern {
+                ResolvedDeclPattern::Identifier { name, span } => {
+                    if env.types.contains_key(name) {
+                        let defined_type = eval_type_definition_expr(expr, env)?;
+                        env.declare_type(name, defined_type.clone(), span)?;
 
-                if let Type::Sum(_) = &defined_type {
-                    register_data_constructors(env, &defined_type, span)?;
+                        if let Type::Sum(_) = &defined_type {
+                            register_data_constructors(env, &defined_type, span)?;
+                        }
+                    }
                 }
+
+                _ => todo!(),
             }
         }
     }
@@ -215,10 +227,21 @@ pub fn eval_scope(
 
     // value declarations
     for stmt in statements {
-        if let ResolvedStatement::Declaration { name, expr, span } = stmt {
-            if !env.types.contains_key(name) {
-                let value = eval_value_expr(expr, env)?;
-                env.declare_value(name, value, span)?;
+        if let ResolvedStatement::Declaration {
+            pattern,
+            expr,
+            span,
+        } = stmt
+        {
+            match pattern {
+                ResolvedDeclPattern::Identifier { name, span } => {
+                    if !env.types.contains_key(name) {
+                        let value = eval_value_expr(expr, env)?;
+                        env.declare_value(name, value, span)?;
+                    }
+                }
+
+                _ => todo!(),
             }
         }
     }

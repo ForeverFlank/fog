@@ -8,75 +8,61 @@ use crate::util::{fmt_parenthesized, format_joined};
 // --- statements ---
 
 #[derive(Clone)]
-pub enum ResolvedStatement {
+pub enum DesugaredStatement {
     TypeAnnotation {
         name: String,
-        expr: ResolvedExpr,
+        expr: DesugaredExpr,
         span: Span,
     },
     Declaration {
-        pattern: ResolvedDeclPattern,
-        expr: ResolvedExpr,
+        pattern: DesugaredDeclPattern,
+        expr: DesugaredExpr,
         span: Span,
     },
     Expression {
-        expr: ResolvedExpr,
+        expr: DesugaredExpr,
         span: Span,
     },
 }
 
 #[derive(Clone)]
-pub enum ResolvedDeclPattern {
+pub enum DesugaredDeclPattern {
     Identifier {
         name: String,
         span: Span,
     },
     Tuple {
-        items: Vec<ResolvedDeclPattern>,
-        span: Span,
-    },
-    Collection {
-        items: Vec<ResolvedDeclPattern>,
+        items: Vec<DesugaredDeclPattern>,
         span: Span,
     },
 }
 
-impl Display for ResolvedStatement {
+impl Display for DesugaredStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ResolvedStatement::TypeAnnotation { name, expr, .. } => {
+            DesugaredStatement::TypeAnnotation { name, expr, .. } => {
                 write!(f, "{} : {}", name, expr)
             }
 
-            ResolvedStatement::Declaration { pattern, expr, .. } => {
+            DesugaredStatement::Declaration { pattern, expr, .. } => {
                 write!(f, "{} = {}", pattern, expr)
             }
 
-            ResolvedStatement::Expression { expr, .. } => {
+            DesugaredStatement::Expression { expr, .. } => {
                 write!(f, "{}", expr)
             }
         }
     }
 }
 
-impl Display for ResolvedDeclPattern {
+impl Display for DesugaredDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ResolvedDeclPattern::Identifier { name, .. } => {
+            DesugaredDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
-            ResolvedDeclPattern::Tuple { items, .. } => {
+            DesugaredDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
-            }
-            ResolvedDeclPattern::Collection { items, .. } => {
-                for (i, expr) in items.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, " ")?;
-                    }
-                    fmt_parenthesized(f, expr)?;
-                }
-
-                Ok(())
             }
         }
     }
@@ -85,9 +71,9 @@ impl Display for ResolvedDeclPattern {
 // --- expressions ---
 
 #[derive(Clone)]
-pub enum ResolvedExpr {
+pub enum DesugaredExpr {
     Block {
-        statements: Vec<ResolvedStatement>,
+        statements: Vec<DesugaredStatement>,
         span: Span,
     },
 
@@ -107,54 +93,54 @@ pub enum ResolvedExpr {
 
     Lambda {
         param_name: String,
-        param_type: Box<ResolvedExpr>,
-        body: Rc<ResolvedExpr>,
+        param_type: Box<DesugaredExpr>,
+        body: Rc<DesugaredExpr>,
         span: Span,
     },
 
     Tuple {
-        items: Vec<ResolvedExpr>,
+        items: Vec<DesugaredExpr>,
         span: Span,
     },
 
     FuncAppl {
         fn_name: String,
-        args: Vec<ResolvedExpr>,
+        args: Vec<DesugaredExpr>,
         span: Span,
     },
 
     Match {
-        expr: Box<ResolvedExpr>,
-        match_arms: Vec<ResolvedMatchArm>,
+        expr: Box<DesugaredExpr>,
+        match_arms: Vec<DesugaredMatchArm>,
         span: Span,
     },
 }
 
-impl ResolvedExpr {
+impl DesugaredExpr {
     pub fn span(&self) -> Span {
         match self {
-            ResolvedExpr::Block { span, .. }
-            | ResolvedExpr::Identifier { span, .. }
-            | ResolvedExpr::Int32Literal { span, .. }
-            | ResolvedExpr::Float32Literal { span, .. }
-            | ResolvedExpr::Lambda { span, .. }
-            | ResolvedExpr::Tuple { span, .. }
-            | ResolvedExpr::FuncAppl { span, .. }
-            | ResolvedExpr::Match { span, .. } => span.clone(),
+            DesugaredExpr::Block { span, .. }
+            | DesugaredExpr::Identifier { span, .. }
+            | DesugaredExpr::Int32Literal { span, .. }
+            | DesugaredExpr::Float32Literal { span, .. }
+            | DesugaredExpr::Lambda { span, .. }
+            | DesugaredExpr::Tuple { span, .. }
+            | DesugaredExpr::FuncAppl { span, .. }
+            | DesugaredExpr::Match { span, .. } => span.clone(),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct ResolvedMatchArm {
-    pub pattern: ResolvedExpr,
-    pub value_expr: ResolvedExpr,
+pub struct DesugaredMatchArm {
+    pub pattern: DesugaredExpr,
+    pub value_expr: DesugaredExpr,
 }
 
-impl Display for ResolvedExpr {
+impl Display for DesugaredExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ResolvedExpr::Block { statements, .. } => {
+            DesugaredExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
                 for stmt in statements {
                     write!(f, "    {}\n", stmt)?;
@@ -162,20 +148,20 @@ impl Display for ResolvedExpr {
                 write!(f, "}}")
             }
 
-            ResolvedExpr::Identifier { name, .. } => write!(f, "{name}"),
+            DesugaredExpr::Identifier { name, .. } => write!(f, "{name}"),
 
-            ResolvedExpr::Int32Literal { value, .. } => write!(f, "{value}"),
-            ResolvedExpr::Float32Literal { value, .. } => write!(f, "{value}"),
+            DesugaredExpr::Int32Literal { value, .. } => write!(f, "{value}"),
+            DesugaredExpr::Float32Literal { value, .. } => write!(f, "{value}"),
 
-            ResolvedExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
+            DesugaredExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
 
-            ResolvedExpr::Lambda {
+            DesugaredExpr::Lambda {
                 param_name, body, ..
             } => {
                 write!(f, "{param_name} => {body}")
             }
 
-            ResolvedExpr::FuncAppl { fn_name, args, .. } => {
+            DesugaredExpr::FuncAppl { fn_name, args, .. } => {
                 write!(f, "{fn_name}")?;
                 for arg in args {
                     write!(f, " ")?;
@@ -184,7 +170,7 @@ impl Display for ResolvedExpr {
                 Ok(())
             }
 
-            ResolvedExpr::Match {
+            DesugaredExpr::Match {
                 expr, match_arms, ..
             } => {
                 write!(f, "match {expr} {{\n")?;
