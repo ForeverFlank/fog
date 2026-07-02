@@ -36,6 +36,7 @@ pub enum ResolvedDeclPattern {
         span: Span,
     },
     Collection {
+        name: String,
         items: Vec<ResolvedDeclPattern>,
         span: Span,
     },
