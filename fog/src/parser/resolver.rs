@@ -11,6 +11,7 @@ use crate::parser::parsed_expr::ParsedStatement;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedMatchArm;
+use crate::parser::resolved_expr::ResolvedMatchPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
 
 pub fn resolve(parsed_statements: Vec<ParsedStatement>) -> (Vec<ResolvedStatement>, Vec<FogError>) {
@@ -315,13 +316,63 @@ impl Resolver {
                 .into_iter()
                 .map(|arm| {
                     Ok(ResolvedMatchArm {
-                        pattern: Self::resolve_expr(arm.pattern)?,
+                        pattern: Self::resolve_expr_as_match_pattern(arm.pattern)?,
                         value_expr: Self::resolve_expr(arm.value_expr)?,
                     })
                 })
                 .collect::<FogResult<Vec<_>>>()?,
             span,
         })
+    }
+
+    fn resolve_expr_as_match_pattern(expr: ParsedExpr) -> FogResult<ResolvedMatchPattern> {
+        let resolved = Self::resolve_expr(expr)?;
+        Self::resolved_expr_to_match_pattern(resolved)
+    }
+
+    fn resolved_expr_to_match_pattern(expr: ResolvedExpr) -> FogResult<ResolvedMatchPattern> {
+        let expr_str = expr.to_string();
+
+        match expr {
+            ResolvedExpr::Identifier { name, span } => {
+                Ok(ResolvedMatchPattern::Identifier { name, span })
+            }
+
+            ResolvedExpr::Int32Literal { value, span } => {
+                Ok(ResolvedMatchPattern::Int32Literal { value, span })
+            }
+            ResolvedExpr::Float32Literal { value, span } => {
+                Ok(ResolvedMatchPattern::Float32Literal { value, span })
+            }
+
+            ResolvedExpr::Tuple { items, span } => Ok(ResolvedMatchPattern::Tuple {
+                items: items
+                    .into_iter()
+                    .map(Self::resolved_expr_to_match_pattern)
+                    .collect::<FogResult<Vec<_>>>()?,
+                span,
+            }),
+            
+            ResolvedExpr::FuncAppl {
+                fn_name,
+                args,
+                span,
+            } => Ok(ResolvedMatchPattern::FuncAppl {
+                fn_name,
+                args: args
+                    .into_iter()
+                    .map(Self::resolved_expr_to_match_pattern)
+                    .collect::<FogResult<Vec<_>>>()?,
+                span,
+            }),
+
+            ResolvedExpr::Block { span, .. }
+            | ResolvedExpr::Lambda { span, .. }
+            | ResolvedExpr::Match { span, .. } => Err(parse_error!(
+                Some(span),
+                "`{expr_str}` cannot be used as a pattern"
+            )),
+        }
     }
 
     fn resolve_collection(

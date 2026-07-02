@@ -133,8 +133,54 @@ impl DesugaredExpr {
 
 #[derive(Clone)]
 pub struct DesugaredMatchArm {
-    pub pattern: DesugaredExpr,
+    pub pattern: DesugaredMatchPattern,
     pub value_expr: DesugaredExpr,
+}
+
+#[derive(Clone)]
+pub enum DesugaredMatchPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Int32Literal {
+        value: i32,
+        span: Span,
+    },
+    Float32Literal {
+        value: f32,
+        span: Span,
+    },
+    Tuple {
+        items: Vec<DesugaredMatchPattern>,
+        span: Span,
+    },
+    FuncAppl {
+        fn_name: String,
+        args: Vec<DesugaredMatchPattern>,
+        span: Span,
+    },
+}
+
+impl Display for DesugaredMatchPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DesugaredMatchPattern::Identifier { name, .. } => write!(f, "{name}"),
+            DesugaredMatchPattern::Int32Literal { value, .. } => write!(f, "{value}"),
+            DesugaredMatchPattern::Float32Literal { value, .. } => write!(f, "{value}"),
+            DesugaredMatchPattern::Tuple { items, .. } => {
+                write!(f, "({})", format_joined(items, ", "))
+            }
+            DesugaredMatchPattern::FuncAppl { fn_name, args, .. } => {
+                write!(f, "{fn_name}")?;
+                for arg in args {
+                    write!(f, " ")?;
+                    fmt_parenthesized(f, arg)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl Display for DesugaredExpr {

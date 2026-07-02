@@ -17,6 +17,7 @@ use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
+use crate::parser::resolved_expr::ResolvedMatchPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
 use crate::runtime_error;
 
@@ -157,7 +158,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
             let value = eval_value_expr(expr, env)?;
 
             for arm in match_arms {
-                if let Some(bindings) = match_pattern(&value, &arm.pattern)? {
+                if let Some(bindings) = match_pattern(&value, &arm.pattern) {
                     let mut arm_env = Environment::new(Some(env));
                     for (name, val) in &bindings {
                         arm_env.variables.insert(
@@ -300,79 +301,67 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
     }
 }
 
-fn match_pattern(
-    value: &Value,
-    pattern: &ResolvedExpr,
-) -> FogResult<Option<HashMap<String, Value>>> {
-    let span = pattern.span();
-
+fn match_pattern(value: &Value, pattern: &ResolvedMatchPattern) -> Option<HashMap<String, Value>> {
     match pattern {
-        ResolvedExpr::Int32Literal { value: pat_val, .. } => match value {
-            Value::Int32(val) if val == pat_val => Ok(Some(HashMap::new())),
-            _ => Ok(None),
+        ResolvedMatchPattern::Int32Literal { value: pat_val, .. } => match value {
+            Value::Int32(val) if val == pat_val => Some(HashMap::new()),
+            _ => None,
         },
 
-        ResolvedExpr::Float32Literal { value: pat_val, .. } => match value {
-            Value::Float32(val) if val == pat_val => Ok(Some(HashMap::new())),
-            _ => Ok(None),
+        ResolvedMatchPattern::Float32Literal { value: pat_val, .. } => match value {
+            Value::Float32(val) if val == pat_val => Some(HashMap::new()),
+            _ => None,
         },
 
-        ResolvedExpr::Identifier { name, .. } => {
+        ResolvedMatchPattern::Identifier { name, .. } => {
             if name == "_" {
                 // wildcard
-                Ok(Some(HashMap::new()))
+                Some(HashMap::new())
             } else if name.starts_with(|c: char| c.is_uppercase()) {
                 // nullary constructor
                 match value {
                     Value::Constructor { tag, values, .. } if tag == name && values.is_empty() => {
-                        Ok(Some(HashMap::new()))
+                        Some(HashMap::new())
                     }
-                    _ => Ok(None),
+                    _ => None,
                 }
             } else {
                 // bind value to identifier
                 let mut bindings = HashMap::new();
                 bindings.insert(name.clone(), value.clone());
-                Ok(Some(bindings))
+                Some(bindings)
             }
         }
 
-        ResolvedExpr::Tuple { items, .. } => match value {
+        ResolvedMatchPattern::Tuple { items, .. } => match value {
             Value::Tuple(values) if values.len() == items.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(items) {
-                    match match_pattern(v, p)? {
-                        None => return Ok(None),
+                    match match_pattern(v, p) {
+                        None => return None,
                         Some(b) => bindings.extend(b),
                     }
                 }
-                Ok(Some(bindings))
+                Some(bindings)
             }
-            _ => Ok(None),
+            _ => None,
         },
 
         // data constructor pattern
-        ResolvedExpr::FuncAppl { fn_name, args, .. } => match value {
+        ResolvedMatchPattern::FuncAppl { fn_name, args, .. } => match value {
             Value::Constructor { tag, values, .. }
                 if tag == fn_name && values.len() == args.len() =>
             {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(args) {
-                    match match_pattern(v, p)? {
-                        None => return Ok(None),
+                    match match_pattern(v, p) {
+                        None => return None,
                         Some(b) => bindings.extend(b),
                     }
                 }
-                Ok(Some(bindings))
+                Some(bindings)
             }
-            _ => Ok(None),
+            _ => None,
         },
-
-        ResolvedExpr::Block { .. } | ResolvedExpr::Lambda { .. } | ResolvedExpr::Match { .. } => {
-            Err(runtime_error!(
-                Some(span),
-                "unsupported pattern `{pattern}`"
-            ))
-        }
     }
 }

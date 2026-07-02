@@ -158,8 +158,70 @@ impl ResolvedExpr {
 
 #[derive(Clone)]
 pub struct ResolvedMatchArm {
-    pub pattern: ResolvedExpr,
+    pub pattern: ResolvedMatchPattern,
     pub value_expr: ResolvedExpr,
+}
+
+
+#[derive(Clone)]
+pub enum ResolvedMatchPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+
+    Int32Literal {
+        value: i32,
+        span: Span,
+    },
+    Float32Literal {
+        value: f32,
+        span: Span,
+    },
+
+    Tuple {
+        items: Vec<ResolvedMatchPattern>,
+        span: Span,
+    },
+    
+    FuncAppl {
+        fn_name: String,
+        args: Vec<ResolvedMatchPattern>,
+        span: Span,
+    },
+}
+
+impl ResolvedMatchPattern {
+    pub fn span(&self) -> Span {
+        match self {
+            ResolvedMatchPattern::Identifier { span, .. }
+            | ResolvedMatchPattern::Int32Literal { span, .. }
+            | ResolvedMatchPattern::Float32Literal { span, .. }
+            | ResolvedMatchPattern::Tuple { span, .. }
+            | ResolvedMatchPattern::FuncAppl { span, .. } => span.clone(),
+        }
+    }
+}
+
+impl Display for ResolvedMatchPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResolvedMatchPattern::Identifier { name, .. } => write!(f, "{name}"),
+            ResolvedMatchPattern::Int32Literal { value, .. } => write!(f, "{value}"),
+            ResolvedMatchPattern::Float32Literal { value, .. } => write!(f, "{value}"),
+            ResolvedMatchPattern::Tuple { items, .. } => {
+                write!(f, "({})", format_joined(items, ", "))
+            }
+            ResolvedMatchPattern::FuncAppl { fn_name, args, .. } => {
+                write!(f, "{fn_name}")?;
+                for arg in args {
+                    write!(f, " ")?;
+                    fmt_parenthesized(f, arg)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl Display for ResolvedExpr {
