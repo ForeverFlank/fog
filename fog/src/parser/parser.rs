@@ -278,12 +278,7 @@ impl Parser<'_> {
             TokenKind::Match => {
                 self.next();
 
-                // `match { arms }` — no explicit scrutinee
-                let expr = if let TokenKind::LeftBrace = self.peek().kind {
-                    None
-                } else {
-                    Some(Box::new(self.parse_expression()?))
-                };
+                let expr = Box::new(self.parse_expression()?);
 
                 let TokenKind::LeftBrace = self.peek().kind else {
                     return Err(parse_error!(Some(token_span(self.peek())), "expected `{{`"));

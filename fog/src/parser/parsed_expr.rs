@@ -109,9 +109,8 @@ pub enum ParsedExpr {
         span: Span,
     },
 
-    // `expr: None` means the scrutinee is implicit (the enclosing lambda's parameter).
     Match {
-        expr: Option<Box<ParsedExpr>>,
+        expr: Box<ParsedExpr>,
         match_arms: Vec<MatchArm>,
         span: Span,
     },
@@ -178,10 +177,7 @@ impl Display for ParsedExpr {
             ParsedExpr::Match {
                 expr, match_arms, ..
             } => {
-                match expr {
-                    Some(e) => write!(f, "match {e} {{")?,
-                    None => write!(f, "match {{")?,
-                }
+                write!(f, "match {expr} {{")?;
                 for arm in match_arms {
                     write!(f, "    {} => {}", arm.pattern, arm.value_expr)?;
                 }

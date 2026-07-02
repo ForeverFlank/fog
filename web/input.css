@@ -8,3 +8,7 @@
     font-family: "JetBrains Mono", monospace;
     font-weight: 300;
 }
+
+@theme {
+    --color-fog: #0f90f9;
+}

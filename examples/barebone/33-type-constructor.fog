@@ -1,12 +1,12 @@
 -- Option type
 
 Option : Type -> Type
-Option t = Some t + None
+Option a = Some a + None
 
-orElse : Option Type -> Option Type
+orElse : Option a -> Option a
 orElse =
-    lhs : Option Type =>
-    rhs : Option Type =>
+    lhs : Option a =>
+    rhs : Option a =>
     match lhs {
         Some item => item
         None      => match rhs {

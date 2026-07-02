@@ -180,7 +180,7 @@ pub fn eval_scope(
     statements: &Vec<ResolvedStatement>,
     env: &mut Environment,
 ) -> FogResult<Option<Value>> {
-    // types' kind annotations
+    // type's kind annotations
     for stmt in statements {
         if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
             if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
@@ -203,7 +203,7 @@ pub fn eval_scope(
         }
     }
 
-    // variables' type annotations
+    // variable's type annotations
     for stmt in statements {
         if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
             match eval_annotation_expr(expr, env)? {
@@ -216,14 +216,14 @@ pub fn eval_scope(
     // value declarations
     for stmt in statements {
         if let ResolvedStatement::Declaration { name, expr, span } = stmt {
-            if env.variables.contains_key(name) {
+            if !env.types.contains_key(name) {
                 let value = eval_value_expr(expr, env)?;
                 env.declare_value(name, value, span)?;
             }
         }
     }
 
-    // Final expression (blocks only).
+    // final expression (blocks only)
     for stmt in statements {
         if let ResolvedStatement::Expression { expr, .. } = stmt {
             return Ok(Some(eval_value_expr(expr, env)?));

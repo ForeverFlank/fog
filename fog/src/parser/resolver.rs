@@ -156,27 +156,10 @@ impl Resolver {
         body: Box<ParsedExpr>,
         span: Span,
     ) -> FogResult<ResolvedExpr> {
-        // Desugar `param => match { arms }` into `param => match param { arms }`.
-        let body = match *body {
-            ParsedExpr::Match {
-                expr: None,
-                match_arms,
-                span: match_span,
-            } => ParsedExpr::Match {
-                expr: Some(Box::new(ParsedExpr::Identifier {
-                    name: param_name.clone(),
-                    span: match_span.clone(),
-                })),
-                match_arms,
-                span: match_span,
-            },
-            other => other,
-        };
-
         Ok(ResolvedExpr::Lambda {
             param_name,
             param_type: Self::resolve_expr(*param_type)?.into(),
-            body: Self::resolve_expr(body)?.into(),
+            body: Self::resolve_expr(*body)?.into(),
             span,
         })
     }
@@ -192,19 +175,11 @@ impl Resolver {
     }
 
     fn resolve_match(
-        expr: Option<Box<ParsedExpr>>,
+        expr: Box<ParsedExpr>,
         match_arms: Vec<crate::parser::parsed_expr::MatchArm>,
         span: Span,
     ) -> FogResult<ResolvedExpr> {
-        let scrutinee = match expr {
-            Some(e) => Self::resolve_expr(*e)?,
-            None => {
-                return Err(parse_error!(
-                    Some(span),
-                    "`match {{ ... }}` without a scrutinee can only appear as a direct lambda body"
-                ));
-            }
-        };
+        let scrutinee = Self::resolve_expr(*expr)?;
 
         Ok(ResolvedExpr::Match {
             expr: Box::new(scrutinee),

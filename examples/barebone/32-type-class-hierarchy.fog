@@ -24,15 +24,15 @@ not = b : Bool => match b {
 -- type classes
 
 Equatable : Type -> Constraint
-Equatable t = {
-    equal    : t -> t -> Bool
-    notEqual : t -> t -> Bool
+Equatable a = {
+    equal    : a -> a -> Bool
+    notEqual : a -> a -> Bool
 }
 
 Ordered : Type -> Constraint
-Ordered t = {
-    equatable   : Equatable t
-    lessOrEqual : t -> t -> Bool
+Ordered a = {
+    equatable   : Equatable a
+    lessOrEqual : a -> a -> Bool
 }
 
 -- using the type classes

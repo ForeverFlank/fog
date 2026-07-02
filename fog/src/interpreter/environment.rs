@@ -111,7 +111,7 @@ impl<'a> Environment<'a> {
         }
 
         self.variables
-            .insert(name.to_string(), ValueVariable::new(name, r#type));
+            .insert(name.to_string(), ValueVariable::without_value(name, r#type));
 
         Ok(())
     }
@@ -144,31 +144,39 @@ impl<'a> Environment<'a> {
             return Ok(());
         }
 
-        let var = self
-            .variables
-            .get(name)
-            .ok_or_else(|| runtime_error!(Some(span.clone()), "variable `{}` not found", name))?;
-
-        if var.value.borrow().is_some() {
-            return Err(runtime_error!(
-                Some(span.clone()),
-                "variable `{}` already declared in the current scope",
-                name
-            ));
-        }
-
         let type_of_value = value_type_of(&value);
-        let type_of_var = var.r#type.clone();
 
-        if type_of_value != type_of_var {
-            return Err(type_check_error!(
-                Some(span.clone()),
-                "type mismatch when assigning variable `{name}` with `{value}`\n\
-                 expected `{type_of_var}`, found `{type_of_value}`"
-            ));
+        if let Some(var) = self.variables.get(name) {
+            // variable has been type-annotated
+
+            if var.value.borrow().is_some() {
+                return Err(runtime_error!(
+                    Some(span.clone()),
+                    "variable `{}` already declared in the current scope",
+                    name
+                ));
+            }
+
+            let type_of_var = var.r#type.clone();
+
+            if type_of_value != type_of_var {
+                return Err(type_check_error!(
+                    Some(span.clone()),
+                    "type mismatch when assigning variable `{name}` with `{value}`\n\
+                     expected `{type_of_var}`, found `{type_of_value}`"
+                ));
+            }
+
+            *var.value.borrow_mut() = Some(value);
+        } else {
+            // variable hasn't been type-annotated;
+            // infer type from value
+
+            self.variables.insert(
+                name.to_string(),
+                ValueVariable::with_value(name, value, type_of_value),
+            );
         }
-
-        *var.value.borrow_mut() = Some(value);
 
         Ok(())
     }

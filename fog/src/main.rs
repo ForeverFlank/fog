@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// --- Lexer ---
+// --- lexer ---
 
 fn print_tokens(tokens: &Vec<Token>) {
     for token in tokens.as_slice() {

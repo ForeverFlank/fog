@@ -40,7 +40,7 @@ main = num |> toString |> printLine
 
 Because
 
-- fog looks like f ∘ g, of which ∘ denotes function composition. This language is a functional language so it fits.
+- fog looks like f ∘ g, where ∘ denotes function composition. This language is a functional language so it fits.
 - I had a brain fog making this language.
 - You will have a brain fog writing in this language, too.
 

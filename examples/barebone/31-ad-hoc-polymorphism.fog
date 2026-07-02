@@ -22,9 +22,9 @@ not = b : Bool => match b {
 -- defining the Equatable type class
 
 Equatable : Type -> Constraint
-Equatable t = {
-    equal    : t -> t -> Bool
-    notEqual : t -> t -> Bool
+Equatable a = {
+    equal    : a -> a -> Bool
+    notEqual : a -> a -> Bool
 }
 
 -- declating a type

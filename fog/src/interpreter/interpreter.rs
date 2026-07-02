@@ -32,7 +32,7 @@ fn create_top_env() -> Environment<'static> {
         kind: Kind::Type,
     };
 
-    let varaddInt32 = ValueVariable::with_value(
+    let var_add_int32 = ValueVariable::with_value(
         "addInt32",
         Value::NativeFunction {
             param_type: Type::Int32,
@@ -52,7 +52,7 @@ fn create_top_env() -> Environment<'static> {
         Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
     );
 
-    let varsubtractInt32 = ValueVariable::with_value(
+    let var_subtract_int32 = ValueVariable::with_value(
         "subtractInt32",
         Value::NativeFunction {
             param_type: Type::Int32,
@@ -78,9 +78,11 @@ fn create_top_env() -> Environment<'static> {
             env.types.insert(type_var.name.clone(), type_var.clone());
         });
 
-    vec![varaddInt32, varsubtractInt32].iter().for_each(|var| {
-        env.variables.insert(var.name.clone(), var.clone());
-    });
+    vec![var_add_int32, var_subtract_int32]
+        .iter()
+        .for_each(|var| {
+            env.variables.insert(var.name.clone(), var.clone());
+        });
 
     env
 }
