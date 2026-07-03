@@ -171,10 +171,10 @@ fn desugar_match_arm_pattern(
             Ok(DesugaredMatchArmPattern::Identifier { name, span })
         }
 
-        ResolvedMatchArmPattern::DataConstructor { name, items, span } => {
+        ResolvedMatchArmPattern::DataConstructor { name, args, span } => {
             Ok(DesugaredMatchArmPattern::DataConstructor {
                 name,
-                items: items
+                args: args
                     .into_iter()
                     .map(desugar_match_arm_pattern)
                     .collect::<Result<Vec<_>, _>>()?,

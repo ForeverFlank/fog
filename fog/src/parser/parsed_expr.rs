@@ -143,7 +143,7 @@ pub enum ParsedExpr {
         span: Span,
     },
     Collection {
-        items: Vec<ParsedExpr>,
+        args: Vec<ParsedExpr>,
         span: Span,
     },
     Match {
@@ -183,8 +183,8 @@ impl Display for ParsedExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            ParsedExpr::Collection { items, .. } => {
-                for (i, expr) in items.iter().enumerate() {
+            ParsedExpr::Collection { args, .. } => {
+                for (i, expr) in args.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;
                     }

@@ -160,17 +160,17 @@ impl Parser<'_> {
     }
 
     fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
-        let mut items = Vec::new();
+        let mut args = Vec::new();
         let span = token_span(self.peek());
 
         loop {
             let atom = self.parse_atomic()?;
-            items.push(atom);
+            args.push(atom);
 
             let token = self.peek();
 
             if let Some(kind) = get_op_kind(token) {
-                items.push(ParsedExpr::Op { kind, span: span });
+                args.push(ParsedExpr::Op { kind, span: span });
                 self.next();
             } else if is_primary_starter(token) {
                 continue;
@@ -179,10 +179,10 @@ impl Parser<'_> {
             }
         }
 
-        if items.len() == 1 {
-            Ok(items[0].clone())
+        if args.len() == 1 {
+            Ok(args[0].clone())
         } else {
-            Ok(ParsedExpr::Collection { items, span })
+            Ok(ParsedExpr::Collection { args, span })
         }
     }
 

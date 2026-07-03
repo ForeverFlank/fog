@@ -271,7 +271,7 @@ impl Resolver {
 
                 Ok(ResolvedMatchArmPattern::DataConstructor {
                     name,
-                    items: iter
+                    args: iter
                         .map(Self::resolve_function_clause_item)
                         .collect::<Result<Vec<_>, _>>()?,
                     span,
@@ -320,10 +320,10 @@ impl Resolver {
 
             ParsedExpr::Tuple { items, span } => self.resolve_tuple(items, span),
 
-            ParsedExpr::Collection { items, span: _ } => {
+            ParsedExpr::Collection { args, span: _ } => {
                 let mut resolver = Resolver::new();
                 let mut index = 0;
-                resolver.resolve_collection(&items, i32::MIN, &mut index)
+                resolver.resolve_collection(&args, i32::MIN, &mut index)
             }
 
             ParsedExpr::Match {
@@ -415,8 +415,8 @@ impl Resolver {
             }),
 
             // data constructors
-            ParsedExpr::Collection { items, span } => {
-                let first = items.first().ok_or_else(|| {
+            ParsedExpr::Collection { args, span } => {
+                let first = args.first().ok_or_else(|| {
                     parse_error!(Some(span), "collection pattern items cannot be empty")
                 })?;
 
@@ -443,7 +443,7 @@ impl Resolver {
 
                 Ok(ResolvedMatchArmPattern::DataConstructor {
                     name: name.clone(),
-                    items: items
+                    args: args
                         .into_iter()
                         .skip(1)
                         .map(Self::resolve_match_pattern)
@@ -574,9 +574,9 @@ impl Resolver {
 
             ParsedExpr::Tuple { items, span } => self.resolve_tuple(items, span),
 
-            ParsedExpr::Collection { items, .. } => {
+            ParsedExpr::Collection { args, .. } => {
                 let mut inner_index = 0;
-                self.resolve_collection(&items, i32::MIN, &mut inner_index)
+                self.resolve_collection(&args, i32::MIN, &mut inner_index)
             }
 
             ParsedExpr::Op { .. } => Err(parse_error!(None, "unexpected infix operator")),

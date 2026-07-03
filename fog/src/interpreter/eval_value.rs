@@ -18,6 +18,7 @@ use crate::interpreter::variable::ValueVariable;
 use crate::parser::Literal;
 use crate::parser::desugared_expr::DesugaredDeclPattern;
 use crate::parser::desugared_expr::DesugaredExpr;
+use crate::parser::desugared_expr::DesugaredMatchArmPattern;
 use crate::parser::desugared_expr::DesugaredStatement;
 use crate::runtime_error;
 
@@ -172,7 +173,7 @@ pub fn eval_value_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Val
                 }
             }
 
-            Err(runtime_error!(Some(span), "match expression not covered"))
+            Err(runtime_error!(Some(*span), "match expression not covered"))
         }
     }
 }
@@ -192,12 +193,7 @@ pub fn eval_scope(
 
     // type definitions
     for stmt in statements {
-        if let DesugaredStatement::Declaration {
-            pattern,
-            expr,
-            span,
-        } = stmt
-        {
+        if let DesugaredStatement::Declaration { pattern, expr, .. } = stmt {
             match pattern {
                 DesugaredDeclPattern::Identifier { name, span } => {
                     if env.types.contains_key(name) {
@@ -227,12 +223,7 @@ pub fn eval_scope(
 
     // value declarations
     for stmt in statements {
-        if let DesugaredStatement::Declaration {
-            pattern,
-            expr,
-            span,
-        } = stmt
-        {
+        if let DesugaredStatement::Declaration { pattern, expr, .. } = stmt {
             match pattern {
                 DesugaredDeclPattern::Identifier { name, span } => {
                     if !env.types.contains_key(name) {
@@ -302,18 +293,18 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
 
 fn match_pattern(
     value: &Value,
-    pattern: &DesugaredExpr,
+    pattern: &DesugaredMatchArmPattern,
 ) -> FogResult<Option<HashMap<String, Value>>> {
-    let span = pattern.span();
+    // let span = pattern.span();
 
     match pattern {
-        DesugaredExpr::Literal { literal, .. } => match (literal, value) {
+        DesugaredMatchArmPattern::Literal { literal, .. } => match (literal, value) {
             (Literal::Int32(p), Value::Int32(v)) if p == v => Ok(Some(HashMap::new())),
             (Literal::Float32(p), Value::Float32(v)) if p == v => Ok(Some(HashMap::new())),
             _ => Ok(None),
         },
 
-        DesugaredExpr::Identifier { name, .. } => {
+        DesugaredMatchArmPattern::Identifier { name, .. } => {
             if name == "_" {
                 // wildcard
                 Ok(Some(HashMap::new()))
@@ -333,7 +324,7 @@ fn match_pattern(
             }
         }
 
-        DesugaredExpr::Tuple { items, .. } => match value {
+        DesugaredMatchArmPattern::Tuple { items, .. } => match value {
             Value::Tuple(values) if values.len() == items.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(items) {
@@ -348,10 +339,8 @@ fn match_pattern(
         },
 
         // data constructor pattern
-        DesugaredExpr::FunctionAppl { fn_name, args, .. } => match value {
-            Value::Constructor { tag, values, .. }
-                if tag == fn_name && values.len() == args.len() =>
-            {
+        DesugaredMatchArmPattern::DataConstructor { name, args, .. } => match value {
+            Value::Constructor { tag, values, .. } if tag == name && values.len() == args.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(args) {
                     match match_pattern(v, p)? {
@@ -363,12 +352,5 @@ fn match_pattern(
             }
             _ => Ok(None),
         },
-
-        DesugaredExpr::Block { .. }
-        | DesugaredExpr::Lambda { .. }
-        | DesugaredExpr::Match { .. } => Err(runtime_error!(
-            Some(span),
-            "unsupported pattern `{pattern}`"
-        )),
     }
 }

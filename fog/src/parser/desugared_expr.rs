@@ -66,6 +66,7 @@ impl Display for DesugaredDeclPattern {
             DesugaredDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
+
             DesugaredDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
@@ -81,10 +82,6 @@ pub enum DesugaredTupleDeclPattern {
         name: String,
         span: Span,
     },
-    Literal {
-        literal: Literal,
-        span: Span,
-    },
     Tuple {
         items: Vec<DesugaredTupleDeclPattern>,
         span: Span,
@@ -97,9 +94,7 @@ impl Display for DesugaredTupleDeclPattern {
             DesugaredTupleDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
-            DesugaredTupleDeclPattern::Literal { literal, .. } => {
-                write!(f, "{literal}")
-            }
+
             DesugaredTupleDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
@@ -125,9 +120,20 @@ pub enum DesugaredMatchArmPattern {
     },
     DataConstructor {
         name: String,
-        items: Vec<DesugaredMatchArmPattern>,
+        args: Vec<DesugaredMatchArmPattern>,
         span: Span,
     },
+}
+
+impl DesugaredMatchArmPattern {
+    pub fn span(&self) -> Span {
+        match *self {
+            DesugaredMatchArmPattern::Literal { span, .. }
+            | DesugaredMatchArmPattern::Tuple { span, .. }
+            | DesugaredMatchArmPattern::Identifier { span, .. }
+            | DesugaredMatchArmPattern::DataConstructor { span, .. } => span,
+        }
+    }
 }
 
 impl Display for DesugaredMatchArmPattern {
@@ -145,9 +151,9 @@ impl Display for DesugaredMatchArmPattern {
                 write!(f, "{name}")
             }
 
-            DesugaredMatchArmPattern::DataConstructor { name, items, .. } => {
+            DesugaredMatchArmPattern::DataConstructor { name, args, .. } => {
                 write!(f, "{name}")?;
-                for item in items {
+                for item in args {
                     write!(f, " ")?;
                     fmt_parenthesized(f, item)?;
                 }

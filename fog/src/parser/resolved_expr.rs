@@ -136,7 +136,7 @@ pub enum ResolvedMatchArmPattern {
     },
     DataConstructor {
         name: String,
-        items: Vec<ResolvedMatchArmPattern>,
+        args: Vec<ResolvedMatchArmPattern>,
         span: Span,
     },
 }
@@ -156,9 +156,9 @@ impl Display for ResolvedMatchArmPattern {
                 write!(f, "{name}")
             }
 
-            ResolvedMatchArmPattern::DataConstructor { name, items, .. } => {
+            ResolvedMatchArmPattern::DataConstructor { name, args, .. } => {
                 write!(f, "{name}")?;
-                for item in items {
+                for item in args {
                     write!(f, " ")?;
                     fmt_parenthesized(f, item)?;
                 }
