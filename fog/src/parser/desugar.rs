@@ -7,10 +7,14 @@ use crate::parse_error;
 use crate::parser::desugared_expr::DesugaredDeclPattern;
 use crate::parser::desugared_expr::DesugaredExpr;
 use crate::parser::desugared_expr::DesugaredMatchArm;
+use crate::parser::desugared_expr::DesugaredMatchArmPattern;
 use crate::parser::desugared_expr::DesugaredStatement;
+use crate::parser::desugared_expr::DesugaredTupleDeclPattern;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
+use crate::parser::resolved_expr::ResolvedMatchArmPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
+use crate::parser::resolved_expr::ResolvedTupleDeclPattern;
 
 enum DesugarResult {
     Statement(DesugaredStatement),
@@ -63,7 +67,7 @@ fn desugar_block(
                             pattern: DesugaredDeclPattern::Tuple {
                                 items: items
                                     .into_iter()
-                                    .map(desugar_pattern)
+                                    .map(desugar_tuple_decl_pattern)
                                     .collect::<Result<Vec<_>, _>>()?,
                                 span,
                             },
@@ -100,8 +104,8 @@ fn desugar_block(
     (Ok(block), errors)
 }
 
-fn desugar_statement(resolved_stmt: ResolvedStatement) -> FogResult<DesugarResult> {
-    match resolved_stmt {
+fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
+    match stmt {
         ResolvedStatement::TypeAnnotation { name, expr, span } => Ok(DesugarResult::Statement(
             DesugaredStatement::TypeAnnotation {
                 name,
@@ -129,19 +133,72 @@ fn desugar_statement(resolved_stmt: ResolvedStatement) -> FogResult<DesugarResul
     }
 }
 
-fn desugar_pattern(resolved_pattern: ResolvedDeclPattern) -> FogResult<DesugaredDeclPattern> {
-    match resolved_pattern {
+fn desugar_pattern(pattern: ResolvedDeclPattern) -> FogResult<DesugaredDeclPattern> {
+    match pattern {
         ResolvedDeclPattern::Identifier { name, span } => {
             Ok(DesugaredDeclPattern::Identifier { name, span })
         }
 
-        ResolvedDeclPattern::Literal { value, span } => {
-            Ok(DesugaredDeclPattern::Identifier { name: (), span })
+        ResolvedDeclPattern::Tuple { items, span } => Ok(DesugaredDeclPattern::Tuple {
+            items: items
+                .into_iter()
+                .map(desugar_tuple_decl_pattern)
+                .collect::<Result<Vec<_>, _>>()?,
+            span,
+        }),
+
+        ResolvedDeclPattern::FunctionClause { name, items, span } => Ok(),
+    }
+}
+
+fn desugar_tuple_decl_pattern(
+    pattern: ResolvedTupleDeclPattern,
+) -> FogResult<DesugaredTupleDeclPattern> {
+    match pattern {
+        ResolvedTupleDeclPattern::Identifier { name, span } => {
+            Ok(DesugaredTupleDeclPattern::Identifier { name, span })
         }
 
-        ResolvedDeclPattern::Tuple { items, span } => todo!(),
+        ResolvedTupleDeclPattern::Tuple { items, span } => Ok(DesugaredTupleDeclPattern::Tuple {
+            items: items
+                .into_iter()
+                .map(desugar_tuple_decl_pattern)
+                .collect::<Result<Vec<_>, _>>()?,
+            span,
+        }),
+    }
+}
 
-        ResolvedDeclPattern::FunctionClause { name, items, span } => todo!(),
+fn desugar_match_arm_pattern(
+    pattern: ResolvedMatchArmPattern,
+) -> FogResult<DesugaredMatchArmPattern> {
+    match pattern {
+        ResolvedMatchArmPattern::Literal { literal, span } => {
+            Ok(DesugaredMatchArmPattern::Literal { literal, span })
+        }
+
+        ResolvedMatchArmPattern::Tuple { items, span } => Ok(DesugaredMatchArmPattern::Tuple {
+            items: items
+                .into_iter()
+                .map(desugar_match_arm_pattern)
+                .collect::<Result<Vec<_>, _>>()?,
+            span,
+        }),
+
+        ResolvedMatchArmPattern::Identifier { name, span } => {
+            Ok(DesugaredMatchArmPattern::Identifier { name, span })
+        }
+
+        ResolvedMatchArmPattern::DataConstructor { name, items, span } => {
+            Ok(DesugaredMatchArmPattern::DataConstructor {
+                name,
+                items: items
+                    .into_iter()
+                    .map(desugar_match_arm_pattern)
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            })
+        }
     }
 }
 
@@ -151,12 +208,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<DesugaredExpr> {
 
         ResolvedExpr::Identifier { name, span } => Ok(DesugaredExpr::Identifier { name, span }),
 
-        ResolvedExpr::Int32Literal { value, span } => {
-            Ok(DesugaredExpr::Int32Literal { value, span })
-        }
-        ResolvedExpr::Float32Literal { value, span } => {
-            Ok(DesugaredExpr::Float32Literal { value, span })
-        }
+        ResolvedExpr::Literal { literal, span } => Ok(DesugaredExpr::Literal { literal, span }),
 
         ResolvedExpr::Lambda {
             param_name,
@@ -201,7 +253,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<DesugaredExpr> {
                 .into_iter()
                 .map(|arm| {
                     Ok(DesugaredMatchArm {
-                        pattern: desugar_expr(arm.pattern)?,
+                        pattern: desugar_match_arm_pattern(arm.pattern)?,
                         value_expr: desugar_expr(arm.value_expr)?,
                     })
                 })

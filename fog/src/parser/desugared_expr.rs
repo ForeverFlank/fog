@@ -107,6 +107,56 @@ impl Display for DesugaredTupleDeclPattern {
     }
 }
 
+// -- match arm pattern
+
+#[derive(Clone)]
+pub enum DesugaredMatchArmPattern {
+    Literal {
+        literal: Literal,
+        span: Span,
+    },
+    Tuple {
+        items: Vec<DesugaredMatchArmPattern>,
+        span: Span,
+    },
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    DataConstructor {
+        name: String,
+        items: Vec<DesugaredMatchArmPattern>,
+        span: Span,
+    },
+}
+
+impl Display for DesugaredMatchArmPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DesugaredMatchArmPattern::Literal { literal, .. } => {
+                write!(f, "{literal}")
+            }
+
+            DesugaredMatchArmPattern::Tuple { items, .. } => {
+                write!(f, "({})", format_joined(items, ", "))
+            }
+
+            DesugaredMatchArmPattern::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+
+            DesugaredMatchArmPattern::DataConstructor { name, items, .. } => {
+                write!(f, "{name}")?;
+                for item in items {
+                    write!(f, " ")?;
+                    fmt_parenthesized(f, item)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 // --- expressions ---
 
 #[derive(Clone)]
@@ -115,59 +165,34 @@ pub enum DesugaredExpr {
         statements: Vec<DesugaredStatement>,
         span: Span,
     },
-
     Identifier {
         name: String,
         span: Span,
     },
-
-    Int32Literal {
-        value: i32,
+    Literal {
+        literal: Literal,
         span: Span,
     },
-    Float32Literal {
-        value: f32,
-        span: Span,
-    },
-
     Lambda {
         param_name: String,
         param_type: Box<DesugaredExpr>,
         body: Rc<DesugaredExpr>,
         span: Span,
     },
-
     Tuple {
         items: Vec<DesugaredExpr>,
         span: Span,
     },
-
     FuncAppl {
         fn_name: String,
         args: Vec<DesugaredExpr>,
         span: Span,
     },
-
     Match {
         expr: Box<DesugaredExpr>,
         match_arms: Vec<DesugaredMatchArm>,
         span: Span,
     },
-}
-
-impl DesugaredExpr {
-    pub fn span(&self) -> Span {
-        match self {
-            DesugaredExpr::Block { span, .. }
-            | DesugaredExpr::Identifier { span, .. }
-            | DesugaredExpr::Int32Literal { span, .. }
-            | DesugaredExpr::Float32Literal { span, .. }
-            | DesugaredExpr::Lambda { span, .. }
-            | DesugaredExpr::Tuple { span, .. }
-            | DesugaredExpr::FuncAppl { span, .. }
-            | DesugaredExpr::Match { span, .. } => span,
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -187,12 +212,17 @@ impl Display for DesugaredExpr {
                 write!(f, "}}")
             }
 
-            DesugaredExpr::Identifier { name, .. } => write!(f, "{name}"),
+            DesugaredExpr::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
 
-            DesugaredExpr::Int32Literal { value, .. } => write!(f, "{value}"),
-            DesugaredExpr::Float32Literal { value, .. } => write!(f, "{value}"),
+            DesugaredExpr::Literal { literal, .. } => {
+                write!(f, "{literal}")
+            }
 
-            DesugaredExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
+            DesugaredExpr::Tuple { items, .. } => {
+                write!(f, "({})", format_joined(items, ", "))
+            }
 
             DesugaredExpr::Lambda {
                 param_name, body, ..
@@ -202,10 +232,12 @@ impl Display for DesugaredExpr {
 
             DesugaredExpr::FuncAppl { fn_name, args, .. } => {
                 write!(f, "{fn_name}")?;
+
                 for arg in args {
                     write!(f, " ")?;
                     fmt_parenthesized(f, arg)?;
                 }
+
                 Ok(())
             }
 
@@ -213,9 +245,11 @@ impl Display for DesugaredExpr {
                 expr, match_arms, ..
             } => {
                 write!(f, "match {expr} {{\n")?;
+
                 for arm in match_arms {
                     write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;
                 }
+
                 write!(f, "}}")
             }
         }

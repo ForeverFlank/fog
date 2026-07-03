@@ -60,7 +60,7 @@ pub enum ResolvedDeclPattern {
     },
     FunctionClause {
         name: String,
-        items: Vec<ResolvedDeclPattern>,
+        items: Vec<ResolvedMatchArmPattern>,
         span: Span,
     },
 }
@@ -90,16 +90,12 @@ impl Display for ResolvedDeclPattern {
     }
 }
 
-// -- tuple declaration
+// -- tuple declaration patterns
 
 #[derive(Clone)]
 pub enum ResolvedTupleDeclPattern {
     Identifier {
         name: String,
-        span: Span,
-    },
-    Literal {
-        literal: Literal,
         span: Span,
     },
     Tuple {
@@ -115,10 +111,6 @@ impl Display for ResolvedTupleDeclPattern {
                 write!(f, "{name}")
             }
 
-            ResolvedTupleDeclPattern::Literal { literal, .. } => {
-                write!(f, "{literal}")
-            }
-
             ResolvedTupleDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
@@ -126,7 +118,7 @@ impl Display for ResolvedTupleDeclPattern {
     }
 }
 
-// -- match arm pattern
+// -- match arm patterns
 
 #[derive(Clone)]
 pub enum ResolvedMatchArmPattern {
@@ -229,7 +221,7 @@ impl ResolvedExpr {
             | ResolvedExpr::Lambda { span, .. }
             | ResolvedExpr::Tuple { span, .. }
             | ResolvedExpr::FunctionAppl { span, .. }
-            | ResolvedExpr::Match { span, .. } => span,
+            | ResolvedExpr::Match { span, .. } => *span,
         }
     }
 }

@@ -54,10 +54,6 @@ pub enum ParsedDeclPattern {
         name: String,
         span: Span,
     },
-    Literal {
-        literal: Literal,
-        span: Span,
-    },
     Tuple {
         items: Vec<ParsedDeclPattern>,
         span: Span,
@@ -74,8 +70,6 @@ impl Display for ParsedDeclPattern {
             ParsedDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
-
-            ParsedDeclPattern::Literal { literal, .. } => write!(f, "{literal}"),
 
             ParsedDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
