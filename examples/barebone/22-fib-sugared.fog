@@ -1,0 +1,6 @@
+fib : Int32 -> Int32
+fib 0 = 0
+fib 1 = 1
+fib n = addInt32 (fib (subtractInt32 n 1)) (fib (subtractInt32 n 2))
+
+num = fib 6     -- 8

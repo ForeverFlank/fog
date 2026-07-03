@@ -162,7 +162,6 @@ pub struct ResolvedMatchArm {
     pub value_expr: ResolvedExpr,
 }
 
-
 #[derive(Clone)]
 pub enum ResolvedMatchPattern {
     Identifier {
@@ -183,7 +182,7 @@ pub enum ResolvedMatchPattern {
         items: Vec<ResolvedMatchPattern>,
         span: Span,
     },
-    
+
     FuncAppl {
         fn_name: String,
         args: Vec<ResolvedMatchPattern>,

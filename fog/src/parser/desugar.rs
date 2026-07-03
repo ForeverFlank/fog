@@ -51,8 +51,13 @@ fn desugar_block_statements(
 
     let mut fn_clauses: HashMap<String, Vec<FunctionClause>> = HashMap::new();
     let mut fn_stmt_index: HashMap<String, usize> = HashMap::new();
+    let mut type_annotations: HashMap<String, ResolvedExpr> = HashMap::new();
 
     for resolved_stmt in resolved_stmts {
+        if let ResolvedStatement::TypeAnnotation { name, expr, .. } = &resolved_stmt {
+            type_annotations.insert(name.clone(), expr.clone());
+        }
+
         let result = match desugar_statement(resolved_stmt) {
             Ok(result) => result,
             Err(error) => {
@@ -105,8 +110,9 @@ fn desugar_block_statements(
 
     for (name, index) in fn_stmt_index {
         let clauses = fn_clauses.remove(&name).unwrap();
+        let type_annotation = type_annotations.get(&name);
 
-        match desugar_fn_clauses(name, clauses) {
+        match desugar_fn_clauses(name, clauses, type_annotation) {
             Ok(stmt) => statements[index] = stmt,
             Err(error) => errors.push(error),
         }
@@ -115,7 +121,11 @@ fn desugar_block_statements(
     (statements, errors)
 }
 
-fn desugar_fn_clauses(name: String, clauses: Vec<FunctionClause>) -> FogResult<DesugaredStatement> {
+fn desugar_fn_clauses(
+    name: String,
+    clauses: Vec<FunctionClause>,
+    type_annotation: Option<&ResolvedExpr>,
+) -> FogResult<DesugaredStatement> {
     let span = clauses[0].span.clone();
     let arity = clauses[0].arg_patterns.len();
 
@@ -128,7 +138,7 @@ fn desugar_fn_clauses(name: String, clauses: Vec<FunctionClause>) -> FogResult<D
         }
     }
 
-    let param_names: Vec<String> = (0..arity).map(|i| format!("_arg{i}")).collect();
+    let param_names: Vec<String> = (0..arity).map(|i| format!("arg{i}")).collect();
 
     let match_arms = clauses
         .into_iter()
@@ -149,17 +159,28 @@ fn desugar_fn_clauses(name: String, clauses: Vec<FunctionClause>) -> FogResult<D
         span: span.clone(),
     };
 
+    let param_types = type_annotation
+        .and_then(|t| peel_param_types(t, arity))
+        .unwrap_or_else(|| {
+            (0..arity)
+                .map(|_| DesugaredExpr::Identifier {
+                    name: "_".to_string(),
+                    span: span.clone(),
+                })
+                .collect()
+        });
+
     let body = param_names
         .into_iter()
         .rev()
-        .fold(match_expr, |acc, param_name| DesugaredExpr::Lambda {
-            param_name,
-            param_type: Box::new(DesugaredExpr::Identifier {
-                name: "_".to_string(),
+        .zip(param_types.into_iter().rev())
+        .fold(match_expr, |acc, (param_name, param_type)| {
+            DesugaredExpr::Lambda {
+                param_name,
+                param_type: Box::new(param_type),
+                body: Rc::new(acc),
                 span: span.clone(),
-            }),
-            body: Rc::new(acc),
-            span: span.clone(),
+            }
         });
 
     Ok(DesugaredStatement::Declaration {
@@ -170,6 +191,31 @@ fn desugar_fn_clauses(name: String, clauses: Vec<FunctionClause>) -> FogResult<D
         expr: body,
         span,
     })
+}
+
+// peels arity levels of a chain of function types
+fn peel_param_types(type_expr: &ResolvedExpr, arity: usize) -> Option<Vec<DesugaredExpr>> {
+    let mut param_type_exprs = Vec::with_capacity(arity);
+    let mut current = type_expr;
+
+    for _ in 0..arity {
+        let ResolvedExpr::FuncAppl { fn_name, args, .. } = current else {
+            return None;
+        };
+
+        if fn_name != "->" || args.len() != 2 {
+            return None;
+        }
+
+        param_type_exprs.push(args[0].clone());
+        current = &args[1];
+    }
+
+    param_type_exprs
+        .into_iter()
+        .map(desugar_expr)
+        .collect::<FogResult<Vec<_>>>()
+        .ok()
 }
 
 fn param_names_to_expr(param_names: &[String], span: &Span) -> DesugaredExpr {

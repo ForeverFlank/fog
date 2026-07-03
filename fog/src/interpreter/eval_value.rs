@@ -15,10 +15,10 @@ use crate::interpreter::type_check::expr_type_of;
 use crate::interpreter::value::Value;
 use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
-use crate::parser::resolved_expr::ResolvedDeclPattern;
-use crate::parser::resolved_expr::ResolvedExpr;
-use crate::parser::resolved_expr::ResolvedMatchPattern;
-use crate::parser::resolved_expr::ResolvedStatement;
+use crate::parser::desugared_expr::DesugaredDeclPattern;
+use crate::parser::desugared_expr::DesugaredExpr;
+use crate::parser::desugared_expr::DesugaredMatchPattern;
+use crate::parser::desugared_expr::DesugaredStatement;
 use crate::runtime_error;
 
 // --- data constructors ---
@@ -90,11 +90,11 @@ pub fn make_data_constructor_function(
 
 // --- value expression evaluator ---
 
-pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Value> {
+pub fn eval_value_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Value> {
     match expr {
-        ResolvedExpr::Block { statements, span } => eval_block(statements, span.clone(), env),
+        DesugaredExpr::Block { statements, span } => eval_block(statements, span.clone(), env),
 
-        ResolvedExpr::Identifier { name, span } => {
+        DesugaredExpr::Identifier { name, span } => {
             let var = env.get_value_var(name, span)?;
             var.value
                 .borrow()
@@ -102,10 +102,10 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
                 .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name))
         }
 
-        ResolvedExpr::Int32Literal { value, .. } => Ok(Value::Int32(*value)),
-        ResolvedExpr::Float32Literal { value, .. } => Ok(Value::Float32(*value)),
+        DesugaredExpr::Int32Literal { value, .. } => Ok(Value::Int32(*value)),
+        DesugaredExpr::Float32Literal { value, .. } => Ok(Value::Float32(*value)),
 
-        ResolvedExpr::Lambda {
+        DesugaredExpr::Lambda {
             param_name,
             param_type,
             body,
@@ -122,20 +122,20 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
             })
         }
 
-        ResolvedExpr::Tuple { items, .. } => Ok(Value::Tuple(
+        DesugaredExpr::Tuple { items, .. } => Ok(Value::Tuple(
             items
                 .iter()
                 .map(|expr| eval_value_expr(expr, env))
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        ResolvedExpr::FuncAppl {
+        DesugaredExpr::FuncAppl {
             fn_name,
             args,
             span,
         } => {
             let mut result = eval_value_expr(
-                &ResolvedExpr::Identifier {
+                &DesugaredExpr::Identifier {
                     name: fn_name.clone(),
                     span: span.clone(),
                 },
@@ -150,7 +150,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
             Ok(result)
         }
 
-        ResolvedExpr::Match {
+        DesugaredExpr::Match {
             expr,
             match_arms,
             span,
@@ -179,46 +179,41 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
 }
 
 pub fn eval_scope(
-    statements: &Vec<ResolvedStatement>,
+    statements: &Vec<DesugaredStatement>,
     env: &mut Environment,
 ) -> FogResult<Option<Value>> {
     // type's kind annotations
     for stmt in statements {
-        if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
+        if let DesugaredStatement::TypeAnnotation { name, expr, span } = stmt {
             if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
                 env.annotate_kind(name, kind, span)?;
             }
         }
     }
 
-    // type definitions
+    // type definitions (only a bare name can define a type; a tuple pattern
+    // can only ever be a value destructuring assignment)
     for stmt in statements {
-        if let ResolvedStatement::Declaration {
-            pattern,
+        if let DesugaredStatement::Declaration {
+            pattern: DesugaredDeclPattern::Identifier { name, span },
             expr,
-            span,
+            ..
         } = stmt
         {
-            match pattern {
-                ResolvedDeclPattern::Identifier { name, span } => {
-                    if env.types.contains_key(name) {
-                        let defined_type = eval_type_definition_expr(expr, env)?;
-                        env.declare_type(name, defined_type.clone(), span)?;
+            if env.types.contains_key(name) {
+                let defined_type = eval_type_definition_expr(expr, env)?;
+                env.declare_type(name, defined_type.clone(), span)?;
 
-                        if let Type::Sum(_) = &defined_type {
-                            register_data_constructors(env, &defined_type, span)?;
-                        }
-                    }
+                if let Type::Sum(_) = &defined_type {
+                    register_data_constructors(env, &defined_type, span)?;
                 }
-
-                _ => todo!(),
             }
         }
     }
 
     // variable's type annotations
     for stmt in statements {
-        if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
+        if let DesugaredStatement::TypeAnnotation { name, expr, span } = stmt {
             match eval_annotation_expr(expr, env)? {
                 Annotation::Type(r#type) => env.annotate_type(name, r#type, span)?,
                 _ => (),
@@ -228,28 +223,31 @@ pub fn eval_scope(
 
     // value declarations
     for stmt in statements {
-        if let ResolvedStatement::Declaration {
+        if let DesugaredStatement::Declaration {
             pattern,
             expr,
             span,
         } = stmt
         {
             match pattern {
-                ResolvedDeclPattern::Identifier { name, span } => {
+                DesugaredDeclPattern::Identifier { name, .. } => {
                     if !env.types.contains_key(name) {
                         let value = eval_value_expr(expr, env)?;
                         env.declare_value(name, value, span)?;
                     }
                 }
 
-                _ => todo!(),
+                DesugaredDeclPattern::Tuple { .. } => {
+                    let value = eval_value_expr(expr, env)?;
+                    declare_pattern_value(pattern, value, env, span)?;
+                }
             }
         }
     }
 
     // final expression (blocks only)
     for stmt in statements {
-        if let ResolvedStatement::Expression { expr, .. } = stmt {
+        if let DesugaredStatement::Expression { expr, .. } = stmt {
             return Ok(Some(eval_value_expr(expr, env)?));
         }
     }
@@ -257,8 +255,35 @@ pub fn eval_scope(
     Ok(None)
 }
 
+fn declare_pattern_value(
+    pattern: &DesugaredDeclPattern,
+    value: Value,
+    env: &mut Environment,
+    span: &Span,
+) -> FogResult<()> {
+    match pattern {
+        DesugaredDeclPattern::Identifier { name, .. } => env.declare_value(name, value, span),
+
+        // assign values to a possibly nested LHS tuple
+        DesugaredDeclPattern::Tuple { items, .. } => match value {
+            Value::Tuple(values) if values.len() == items.len() => {
+                for (item, val) in items.iter().zip(values) {
+                    declare_pattern_value(item, val, env, span)?;
+                }
+                Ok(())
+            }
+            _ => Err(runtime_error!(
+                Some(span.clone()),
+                "cannot destructure `{}` into a {}-tuple pattern",
+                value,
+                items.len()
+            )),
+        },
+    }
+}
+
 fn eval_block(
-    statements: &Vec<ResolvedStatement>,
+    statements: &Vec<DesugaredStatement>,
     span: Span,
     env: &Environment,
 ) -> FogResult<Value> {
@@ -301,19 +326,19 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
     }
 }
 
-fn match_pattern(value: &Value, pattern: &ResolvedMatchPattern) -> Option<HashMap<String, Value>> {
+fn match_pattern(value: &Value, pattern: &DesugaredMatchPattern) -> Option<HashMap<String, Value>> {
     match pattern {
-        ResolvedMatchPattern::Int32Literal { value: pat_val, .. } => match value {
+        DesugaredMatchPattern::Int32Literal { value: pat_val, .. } => match value {
             Value::Int32(val) if val == pat_val => Some(HashMap::new()),
             _ => None,
         },
 
-        ResolvedMatchPattern::Float32Literal { value: pat_val, .. } => match value {
+        DesugaredMatchPattern::Float32Literal { value: pat_val, .. } => match value {
             Value::Float32(val) if val == pat_val => Some(HashMap::new()),
             _ => None,
         },
 
-        ResolvedMatchPattern::Identifier { name, .. } => {
+        DesugaredMatchPattern::Identifier { name, .. } => {
             if name == "_" {
                 // wildcard
                 Some(HashMap::new())
@@ -333,7 +358,7 @@ fn match_pattern(value: &Value, pattern: &ResolvedMatchPattern) -> Option<HashMa
             }
         }
 
-        ResolvedMatchPattern::Tuple { items, .. } => match value {
+        DesugaredMatchPattern::Tuple { items, .. } => match value {
             Value::Tuple(values) if values.len() == items.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(items) {
@@ -348,7 +373,7 @@ fn match_pattern(value: &Value, pattern: &ResolvedMatchPattern) -> Option<HashMa
         },
 
         // data constructor pattern
-        ResolvedMatchPattern::FuncAppl { fn_name, args, .. } => match value {
+        DesugaredMatchPattern::FuncAppl { fn_name, args, .. } => match value {
             Value::Constructor { tag, values, .. }
                 if tag == fn_name && values.len() == args.len() =>
             {

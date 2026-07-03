@@ -352,7 +352,7 @@ impl Resolver {
                     .collect::<FogResult<Vec<_>>>()?,
                 span,
             }),
-            
+
             ResolvedExpr::FuncAppl {
                 fn_name,
                 args,

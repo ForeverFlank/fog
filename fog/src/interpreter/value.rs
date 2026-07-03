@@ -4,7 +4,7 @@ use std::rc::Rc;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::r#type::Type;
-use crate::parser::resolved_expr::ResolvedExpr;
+use crate::parser::desugared_expr::DesugaredExpr;
 use crate::util::format_joined;
 
 #[derive(Clone)]
@@ -16,7 +16,7 @@ pub enum Value {
         param_name: String,
         param_type: Type,
         return_type: Type,
-        body: Rc<ResolvedExpr>,
+        body: Rc<DesugaredExpr>,
         captured_env: Box<Environment<'static>>,
     },
     NativeFunction {
