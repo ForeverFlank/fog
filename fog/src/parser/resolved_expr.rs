@@ -15,7 +15,7 @@ pub enum ResolvedStatement {
         span: Span,
     },
     Declaration {
-        pattern: ResolvedDeclPattern,
+        pattern: ResolvedPattern,
         expr: ResolvedExpr,
         span: Span,
     },
@@ -25,19 +25,32 @@ pub enum ResolvedStatement {
     },
 }
 
+// --- patterns ---
+
 #[derive(Clone)]
-pub enum ResolvedDeclPattern {
+pub enum ResolvedPattern {
     Identifier {
         name: String,
         span: Span,
     },
-    Tuple {
-        items: Vec<ResolvedDeclPattern>,
+
+    Int32Literal {
+        value: i32,
         span: Span,
     },
-    Collection {
+    Float32Literal {
+        value: f32,
+        span: Span,
+    },
+
+    Tuple {
+        items: Vec<ResolvedPattern>,
+        span: Span,
+    },
+
+    FunctionClause {
         name: String,
-        items: Vec<ResolvedDeclPattern>,
+        items: Vec<ResolvedPattern>,
         span: Span,
     },
 }
@@ -60,16 +73,21 @@ impl Display for ResolvedStatement {
     }
 }
 
-impl Display for ResolvedDeclPattern {
+impl Display for ResolvedPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ResolvedDeclPattern::Identifier { name, .. } => {
+            ResolvedPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
-            ResolvedDeclPattern::Tuple { items, .. } => {
+
+            ResolvedPattern::Int32Literal { value, .. } => write!(f, "{value}"),
+            ResolvedPattern::Float32Literal { value, .. } => write!(f, "{value}"),
+
+            ResolvedPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
-            ResolvedDeclPattern::Collection { items, .. } => {
+
+            ResolvedPattern::FunctionClause { items, .. } => {
                 for (i, expr) in items.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;
@@ -118,7 +136,7 @@ pub enum ResolvedExpr {
         span: Span,
     },
 
-    FuncAppl {
+    FunctionAppl {
         fn_name: String,
         args: Vec<ResolvedExpr>,
         span: Span,
@@ -140,7 +158,7 @@ impl ResolvedExpr {
             | ResolvedExpr::Float32Literal { span, .. }
             | ResolvedExpr::Lambda { span, .. }
             | ResolvedExpr::Tuple { span, .. }
-            | ResolvedExpr::FuncAppl { span, .. }
+            | ResolvedExpr::FunctionAppl { span, .. }
             | ResolvedExpr::Match { span, .. } => span.clone(),
         }
     }
@@ -176,7 +194,7 @@ impl Display for ResolvedExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            ResolvedExpr::FuncAppl { fn_name, args, .. } => {
+            ResolvedExpr::FunctionAppl { fn_name, args, .. } => {
                 write!(f, "{fn_name}")?;
                 for arg in args {
                     write!(f, " ")?;

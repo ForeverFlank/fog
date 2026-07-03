@@ -31,7 +31,7 @@ pub fn eval_annotation_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult
             name
         )),
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
             match (
                 eval_annotation_expr(&args[0], env)?,
                 eval_annotation_expr(&args[1], env)?,
@@ -63,24 +63,24 @@ pub fn eval_type_annotation_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
             .r#type
             .ok_or_else(|| runtime_error!(Some(span), "undeclared type `{}`", name)),
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
             eval_function_type(&args[0], &args[1], env)
         }
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
             eval_product_type(&args[0], &args[1], env)
         }
 
-        ResolvedExpr::FuncAppl { fn_name, .. } if fn_name == "+" => Err(runtime_error!(
+        ResolvedExpr::FunctionAppl { fn_name, .. } if fn_name == "+" => Err(runtime_error!(
             Some(span),
             "cannot type annotate a value with sum types"
         )),
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
             apply_type_level_function(fn_name, args, env, &span)
         }
 
-        ResolvedExpr::FuncAppl { .. } => Err(runtime_error!(
+        ResolvedExpr::FunctionAppl { .. } => Err(runtime_error!(
             Some(span),
             "cannot type annotate a value with data constructor `{}`",
             expr.to_string()
@@ -108,24 +108,24 @@ pub fn eval_type_definition_expr(expr: &ResolvedExpr, env: &Environment) -> FogR
             types: Vec::new(),
         }])),
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
             eval_function_type(&args[0], &args[1], env)
         }
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
             eval_product_type(&args[0], &args[1], env)
         }
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if fn_name == "+" && args.len() == 2 => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if fn_name == "+" && args.len() == 2 => {
             eval_sum_type(&args[0], &args[1], env)
         }
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
             apply_type_level_function(fn_name, args, env, &span)
         }
 
         // data constructor
-        ResolvedExpr::FuncAppl { fn_name, args, .. } => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } => {
             let field_types = args
                 .iter()
                 .map(|arg| eval_type_annotation_expr(arg, env))

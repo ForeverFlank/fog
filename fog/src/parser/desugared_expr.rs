@@ -15,24 +15,12 @@ pub enum DesugaredStatement {
         span: Span,
     },
     Declaration {
-        pattern: DesugaredDeclPattern,
+        pattern: DesugaredPattern,
         expr: DesugaredExpr,
         span: Span,
     },
     Expression {
         expr: DesugaredExpr,
-        span: Span,
-    },
-}
-
-#[derive(Clone)]
-pub enum DesugaredDeclPattern {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-    Tuple {
-        items: Vec<DesugaredDeclPattern>,
         span: Span,
     },
 }
@@ -55,13 +43,37 @@ impl Display for DesugaredStatement {
     }
 }
 
-impl Display for DesugaredDeclPattern {
+// --- patterns ---
+
+#[derive(Clone)]
+pub enum DesugaredPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+
+    Int32Literal {
+        value: i32,
+        span: Span,
+    },
+    Float32Literal {
+        value: f32,
+        span: Span,
+    },
+
+    Tuple {
+        items: Vec<DesugaredPattern>,
+        span: Span,
+    },
+}
+
+impl Display for DesugaredPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DesugaredDeclPattern::Identifier { name, .. } => {
+            DesugaredPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
-            DesugaredDeclPattern::Tuple { items, .. } => {
+            DesugaredPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
         }

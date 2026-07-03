@@ -5,12 +5,12 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::parse_error;
 use crate::parser::parsed_expr::OpKind;
-use crate::parser::parsed_expr::ParsedDeclPattern;
 use crate::parser::parsed_expr::ParsedExpr;
+use crate::parser::parsed_expr::ParsedPattern;
 use crate::parser::parsed_expr::ParsedStatement;
-use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedMatchArm;
+use crate::parser::resolved_expr::ResolvedPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
 
 pub fn resolve(parsed_statements: Vec<ParsedStatement>) -> (Vec<ResolvedStatement>, Vec<FogError>) {
@@ -156,19 +156,29 @@ impl Resolver {
         }
     }
 
-    fn resolve_decl_pattern(decl_pattern: ParsedDeclPattern) -> FogResult<ResolvedDeclPattern> {
+    fn resolve_decl_pattern(decl_pattern: ParsedPattern) -> FogResult<ResolvedPattern> {
         match decl_pattern {
-            ParsedDeclPattern::Identifier { name, span } => {
-                Ok(ResolvedDeclPattern::Identifier { name, span })
+            ParsedPattern::Identifier { name, span } => {
+                Ok(ResolvedPattern::Identifier { name, span })
             }
-            ParsedDeclPattern::Tuple { items, span } => Ok(ResolvedDeclPattern::Tuple {
+
+            ParsedPattern::Int32Literal { value, span } => {
+                Ok(ResolvedPattern::Int32Literal { value, span })
+            }
+            ParsedPattern::Float32Literal { value, span } => {
+                Ok(ResolvedPattern::Float32Literal { value, span })
+            }
+
+            ParsedPattern::Tuple { items, span } => Ok(ResolvedPattern::Tuple {
                 items: items
                     .into_iter()
                     .map(Self::resolve_decl_pattern)
                     .collect::<Result<Vec<_>, _>>()?,
                 span,
             }),
-            ParsedDeclPattern::Collection { items, span } => Ok(ResolvedDeclPattern::Collection {
+
+            ParsedPattern::Collection { items, span } => Ok(ResolvedPattern::FunctionClause {
+                name: todo!(),
                 items: items
                     .into_iter()
                     .map(Self::resolve_decl_pattern)
@@ -307,7 +317,7 @@ impl Resolver {
 
             let rhs = self.resolve_collection(items, next_min_prec, index)?;
 
-            lhs = ResolvedExpr::FuncAppl {
+            lhs = ResolvedExpr::FunctionAppl {
                 fn_name: op_name,
                 args: vec![lhs, rhs],
                 span: lhs_span,
@@ -338,7 +348,7 @@ impl Resolver {
         if args.is_empty() {
             Ok(head)
         } else {
-            Ok(ResolvedExpr::FuncAppl {
+            Ok(ResolvedExpr::FunctionAppl {
                 fn_name: name,
                 args,
                 span,
@@ -371,7 +381,7 @@ impl Resolver {
             } => {
                 let operand = self.resolve_atomic(exprs, index)?;
                 let span = operand.span();
-                Ok(ResolvedExpr::FuncAppl {
+                Ok(ResolvedExpr::FunctionAppl {
                     fn_name: "-".to_string(),
                     args: vec![operand],
                     span,

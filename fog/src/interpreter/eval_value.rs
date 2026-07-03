@@ -15,8 +15,8 @@ use crate::interpreter::type_check::expr_type_of;
 use crate::interpreter::value::Value;
 use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
-use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
+use crate::parser::resolved_expr::ResolvedPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
 use crate::runtime_error;
 
@@ -128,7 +128,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        ResolvedExpr::FuncAppl {
+        ResolvedExpr::FunctionAppl {
             fn_name,
             args,
             span,
@@ -199,7 +199,7 @@ pub fn eval_scope(
         } = stmt
         {
             match pattern {
-                ResolvedDeclPattern::Identifier { name, span } => {
+                ResolvedPattern::Identifier { name, span } => {
                     if env.types.contains_key(name) {
                         let defined_type = eval_type_definition_expr(expr, env)?;
                         env.declare_type(name, defined_type.clone(), span)?;
@@ -234,7 +234,7 @@ pub fn eval_scope(
         } = stmt
         {
             match pattern {
-                ResolvedDeclPattern::Identifier { name, span } => {
+                ResolvedPattern::Identifier { name, span } => {
                     if !env.types.contains_key(name) {
                         let value = eval_value_expr(expr, env)?;
                         env.declare_value(name, value, span)?;
@@ -352,7 +352,7 @@ fn match_pattern(
         },
 
         // data constructor pattern
-        ResolvedExpr::FuncAppl { fn_name, args, .. } => match value {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } => match value {
             Value::Constructor { tag, values, .. }
                 if tag == fn_name && values.len() == args.len() =>
             {

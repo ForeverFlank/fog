@@ -139,7 +139,7 @@ impl Parser<'_> {
                 let expr = self.parse_expression()?;
 
                 Ok(ParsedStatement::Declaration {
-                    pattern: ParsedDeclPattern::Identifier {
+                    pattern: ParsedPattern::Identifier {
                         name,
                         span: span.clone(),
                     },

@@ -82,7 +82,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
             expr_type_of(body, env)?.into(),
         )),
 
-        ResolvedExpr::FuncAppl { fn_name, args, .. } => {
+        ResolvedExpr::FunctionAppl { fn_name, args, .. } => {
             let mut curr_type = env.get_value_var(fn_name, &span)?.r#type.clone();
 
             for _ in args {

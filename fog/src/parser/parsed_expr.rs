@@ -15,28 +15,12 @@ pub enum ParsedStatement {
         span: Span,
     },
     Declaration {
-        pattern: ParsedDeclPattern,
+        pattern: ParsedPattern,
         expr: ParsedExpr,
         span: Span,
     },
     Expression {
         expr: ParsedExpr,
-        span: Span,
-    },
-}
-
-#[derive(Clone)]
-pub enum ParsedDeclPattern {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-    Tuple {
-        items: Vec<ParsedDeclPattern>,
-        span: Span,
-    },
-    Collection {
-        items: Vec<ParsedDeclPattern>,
         span: Span,
     },
 }
@@ -59,16 +43,50 @@ impl Display for ParsedStatement {
     }
 }
 
-impl Display for ParsedDeclPattern {
+// --- pattern ---
+
+#[derive(Clone)]
+pub enum ParsedPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+
+    Int32Literal {
+        value: i32,
+        span: Span,
+    },
+    Float32Literal {
+        value: f32,
+        span: Span,
+    },
+
+    Tuple {
+        items: Vec<ParsedPattern>,
+        span: Span,
+    },
+
+    Collection {
+        items: Vec<ParsedPattern>,
+        span: Span,
+    },
+}
+
+impl Display for ParsedPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParsedDeclPattern::Identifier { name, .. } => {
+            ParsedPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
-            ParsedDeclPattern::Tuple { items, .. } => {
+
+            ParsedPattern::Int32Literal { value, .. } => write!(f, "{value}"),
+            ParsedPattern::Float32Literal { value, .. } => write!(f, "{value}"),
+
+            ParsedPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
-            ParsedDeclPattern::Collection { items, .. } => {
+
+            ParsedPattern::Collection { items, .. } => {
                 for (i, expr) in items.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;
