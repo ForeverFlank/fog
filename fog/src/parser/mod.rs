@@ -1,14 +1,14 @@
 use std::fmt::Display;
 
-use crate::Token;
 use crate::error::FogError;
+use crate::lexer::token::Token;
 
-mod desugar;
-mod desugared_expr;
+pub mod desugar;
+pub mod desugared_expr;
 mod parsed_expr;
 pub mod parser;
-pub mod resolved_expr;
-pub mod resolver;
+mod resolved_expr;
+mod resolver;
 
 #[derive(Clone)]
 pub enum Literal {

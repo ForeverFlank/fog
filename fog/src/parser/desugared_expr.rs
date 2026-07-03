@@ -183,7 +183,7 @@ pub enum DesugaredExpr {
         items: Vec<DesugaredExpr>,
         span: Span,
     },
-    FuncAppl {
+    FunctionAppl {
         fn_name: String,
         args: Vec<DesugaredExpr>,
         span: Span,
@@ -195,9 +195,23 @@ pub enum DesugaredExpr {
     },
 }
 
+impl DesugaredExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            DesugaredExpr::Block { span, .. }
+            | DesugaredExpr::Identifier { span, .. }
+            | DesugaredExpr::Literal { span, .. }
+            | DesugaredExpr::Lambda { span, .. }
+            | DesugaredExpr::Tuple { span, .. }
+            | DesugaredExpr::FunctionAppl { span, .. }
+            | DesugaredExpr::Match { span, .. } => *span,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct DesugaredMatchArm {
-    pub pattern: DesugaredExpr,
+    pub pattern: DesugaredMatchArmPattern,
     pub value_expr: DesugaredExpr,
 }
 
@@ -230,7 +244,7 @@ impl Display for DesugaredExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            DesugaredExpr::FuncAppl { fn_name, args, .. } => {
+            DesugaredExpr::FunctionAppl { fn_name, args, .. } => {
                 write!(f, "{fn_name}")?;
 
                 for arg in args {

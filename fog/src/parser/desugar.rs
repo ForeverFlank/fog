@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::parse_error;
 use crate::parser::desugared_expr::DesugaredDeclPattern;
 use crate::parser::desugared_expr::DesugaredExpr;
 use crate::parser::desugared_expr::DesugaredMatchArm;
@@ -26,82 +25,83 @@ enum DesugarResult {
 }
 
 pub fn desugar(resolved_stmts: Vec<ResolvedStatement>) -> (Vec<DesugaredStatement>, Vec<FogError>) {
-    let mut statements = Vec::new();
-    let mut errors = Vec::new();
-
-    for resolved_stmt in resolved_stmts {
-        match desugar_statement(resolved_stmt) {
-            Ok(stmt) => statements.push(stmt),
-            Err(error) => errors.push(error),
-        }
-    }
-
-    (statements, errors)
+    desugar_statements(resolved_stmts)
 }
 
 fn desugar_block(
     resolved_stmts: Vec<ResolvedStatement>,
     span: Span,
 ) -> (FogResult<DesugaredExpr>, Vec<FogError>) {
-    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<ResolvedDeclPattern>, DesugaredExpr)>> =
+    let (statements, errors) = desugar_statements(resolved_stmts);
+    let block = DesugaredExpr::Block { statements, span };
+
+    (Ok(block), errors)
+}
+
+fn desugar_statements(
+    resolved_stmts: Vec<ResolvedStatement>,
+) -> (Vec<DesugaredStatement>, Vec<FogError>) {
+    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<ResolvedMatchArmPattern>, DesugaredExpr)>> =
         HashMap::new();
     let mut statements = Vec::new();
     let mut errors = Vec::new();
 
     for resolved_stmt in resolved_stmts {
-        match desugar_statement(resolved_stmt) {
-            Ok(res) => match res {
-                DesugarResult::Statement(stmt) => statements.push(stmt),
+        let res = match desugar_statement(resolved_stmt) {
+            Ok(res) => res,
+            Err(error) => {
+                errors.push(error);
+                continue;
+            }
+        };
 
-                DesugarResult::Declaration { pattern, expr, .. } => match pattern {
-                    ResolvedDeclPattern::Identifier { name, span } => {
-                        statements.push(DesugaredStatement::Declaration {
-                            pattern: DesugaredDeclPattern::Identifier { name, span },
-                            expr,
-                            span,
-                        })
+        let (pattern, expr) = match res {
+            DesugarResult::Statement(stmt) => {
+                statements.push(stmt);
+                continue;
+            }
+            DesugarResult::Declaration { pattern, expr, .. } => (pattern, expr),
+        };
+
+        match pattern {
+            ResolvedDeclPattern::Identifier { name, span } => {
+                statements.push(DesugaredStatement::Declaration {
+                    pattern: DesugaredDeclPattern::Identifier { name, span },
+                    expr,
+                    span,
+                });
+            }
+
+            ResolvedDeclPattern::Tuple { items, span } => {
+                let items = match items
+                    .into_iter()
+                    .map(desugar_tuple_decl_pattern)
+                    .collect::<Result<Vec<_>, _>>()
+                {
+                    Ok(items) => items,
+                    Err(error) => {
+                        errors.push(error);
+                        continue;
                     }
+                };
 
-                    ResolvedDeclPattern::Tuple { items, span } => {
-                        statements.push(DesugaredStatement::Declaration {
-                            pattern: DesugaredDeclPattern::Tuple {
-                                items: items
-                                    .into_iter()
-                                    .map(desugar_tuple_decl_pattern)
-                                    .collect::<Result<Vec<_>, _>>()?,
-                                span,
-                            },
-                            expr,
-                            span,
-                        });
-                    }
+                statements.push(DesugaredStatement::Declaration {
+                    pattern: DesugaredDeclPattern::Tuple { items, span },
+                    expr,
+                    span,
+                });
+            }
 
-                    ResolvedDeclPattern::FunctionClause { name, items, span } => {
-                        let mut clauses = fn_decl_patterns.get_mut(&name).unwrap_or({
-                            let mut vec = Vec::new();
-                            fn_decl_patterns.insert(name, vec);
-                            &mut vec
-                        });
-
-                        clauses.push((items, expr));
-                    }
-
-                    ResolvedDeclPattern::Literal { span, .. } => {
-                        errors.push(parse_error!(Some(span), "cannot declare to a literal"));
-                    }
-                },
-            },
-
-            Err(error) => errors.push(error),
+            ResolvedDeclPattern::FunctionClause { name, items, .. } => {
+                fn_decl_patterns
+                    .entry(name)
+                    .or_default()
+                    .push((items, expr));
+            }
         }
     }
 
-    let block = DesugaredExpr::Block {
-        statements: statements,
-        span,
-    };
-
-    (Ok(block), errors)
+    (statements, errors)
 }
 
 fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
@@ -130,24 +130,6 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
                 span,
             }))
         }
-    }
-}
-
-fn desugar_pattern(pattern: ResolvedDeclPattern) -> FogResult<DesugaredDeclPattern> {
-    match pattern {
-        ResolvedDeclPattern::Identifier { name, span } => {
-            Ok(DesugaredDeclPattern::Identifier { name, span })
-        }
-
-        ResolvedDeclPattern::Tuple { items, span } => Ok(DesugaredDeclPattern::Tuple {
-            items: items
-                .into_iter()
-                .map(desugar_tuple_decl_pattern)
-                .collect::<Result<Vec<_>, _>>()?,
-            span,
-        }),
-
-        ResolvedDeclPattern::FunctionClause { name, items, span } => Ok(),
     }
 }
 
@@ -234,7 +216,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<DesugaredExpr> {
             fn_name,
             args,
             span,
-        } => Ok(DesugaredExpr::FuncAppl {
+        } => Ok(DesugaredExpr::FunctionAppl {
             fn_name,
             args: args
                 .into_iter()

@@ -41,6 +41,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     print_errors("parser", &parser_errors);
 
+    if !lexer_errors.is_empty() || !parser_errors.is_empty() {
+        return Err("syntax error".into());
+    }
+
     // -- interpreting
     let res = interpret(&ast);
 
@@ -61,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn print_tokens(tokens: &Vec<Token>) {
     for token in tokens.as_slice() {
-        println!(
+        eprintln!(
             " {: >4}:{: >4} | {}",
             token.line,
             token.column,
@@ -73,11 +77,11 @@ fn print_tokens(tokens: &Vec<Token>) {
 fn print_errors(label: &str, errors: &Vec<FogError>) {
     for error in errors {
         match error.span.as_ref() {
-            Some(span) => println!(
+            Some(span) => eprintln!(
                 "{label} error ({}:{}): {}",
                 span.line, span.column, error.message
             ),
-            None => println!("{label} error: {}", error.message),
+            None => eprintln!("{label} error: {}", error.message),
         }
     }
 }

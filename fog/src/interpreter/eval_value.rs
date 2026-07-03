@@ -16,9 +16,9 @@ use crate::interpreter::value::Value;
 use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
 use crate::parser::Literal;
-use crate::parser::resolved_expr::ResolvedDeclPattern;
-use crate::parser::resolved_expr::ResolvedExpr;
-use crate::parser::resolved_expr::ResolvedStatement;
+use crate::parser::desugared_expr::DesugaredDeclPattern;
+use crate::parser::desugared_expr::DesugaredExpr;
+use crate::parser::desugared_expr::DesugaredStatement;
 use crate::runtime_error;
 
 // --- data constructors ---
@@ -90,11 +90,11 @@ pub fn make_data_constructor_function(
 
 // --- value expression evaluator ---
 
-pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Value> {
+pub fn eval_value_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Value> {
     match expr {
-        ResolvedExpr::Block { statements, span } => eval_block(statements, span, env),
+        DesugaredExpr::Block { statements, span } => eval_block(statements, span, env),
 
-        ResolvedExpr::Identifier { name, span } => {
+        DesugaredExpr::Identifier { name, span } => {
             let var = env.get_value_var(name, span)?;
             var.value
                 .borrow()
@@ -102,12 +102,12 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
                 .ok_or_else(|| runtime_error!(Some(*span), "undeclared variable `{}`", name))
         }
 
-        ResolvedExpr::Literal { literal, span } => match *literal {
+        DesugaredExpr::Literal { literal, .. } => match *literal {
             Literal::Int32(value) => Ok(Value::Int32(value)),
             Literal::Float32(value) => Ok(Value::Float32(value)),
         },
 
-        ResolvedExpr::Lambda {
+        DesugaredExpr::Lambda {
             param_name,
             param_type,
             body,
@@ -124,22 +124,22 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
             })
         }
 
-        ResolvedExpr::Tuple { items, .. } => Ok(Value::Tuple(
+        DesugaredExpr::Tuple { items, .. } => Ok(Value::Tuple(
             items
                 .iter()
                 .map(|expr| eval_value_expr(expr, env))
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        ResolvedExpr::FunctionAppl {
+        DesugaredExpr::FunctionAppl {
             fn_name,
             args,
             span,
         } => {
             let mut result = eval_value_expr(
-                &ResolvedExpr::Identifier {
+                &DesugaredExpr::Identifier {
                     name: fn_name.clone(),
-                    span: span,
+                    span: *span,
                 },
                 env,
             )?;
@@ -152,7 +152,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
             Ok(result)
         }
 
-        ResolvedExpr::Match {
+        DesugaredExpr::Match {
             expr,
             match_arms,
             span,
@@ -178,12 +178,12 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
 }
 
 pub fn eval_scope(
-    statements: &Vec<ResolvedStatement>,
+    statements: &Vec<DesugaredStatement>,
     env: &mut Environment,
 ) -> FogResult<Option<Value>> {
     // type's kind annotations
     for stmt in statements {
-        if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
+        if let DesugaredStatement::TypeAnnotation { name, expr, span } = stmt {
             if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
                 env.annotate_kind(name, kind, span)?;
             }
@@ -192,14 +192,14 @@ pub fn eval_scope(
 
     // type definitions
     for stmt in statements {
-        if let ResolvedStatement::Declaration {
+        if let DesugaredStatement::Declaration {
             pattern,
             expr,
             span,
         } = stmt
         {
             match pattern {
-                ResolvedDeclPattern::Identifier { name, span } => {
+                DesugaredDeclPattern::Identifier { name, span } => {
                     if env.types.contains_key(name) {
                         let defined_type = eval_type_definition_expr(expr, env)?;
                         env.declare_type(name, defined_type.clone(), span)?;
@@ -217,7 +217,7 @@ pub fn eval_scope(
 
     // variable's type annotations
     for stmt in statements {
-        if let ResolvedStatement::TypeAnnotation { name, expr, span } = stmt {
+        if let DesugaredStatement::TypeAnnotation { name, expr, span } = stmt {
             match eval_annotation_expr(expr, env)? {
                 Annotation::Type(r#type) => env.annotate_type(name, r#type, span)?,
                 _ => (),
@@ -227,14 +227,14 @@ pub fn eval_scope(
 
     // value declarations
     for stmt in statements {
-        if let ResolvedStatement::Declaration {
+        if let DesugaredStatement::Declaration {
             pattern,
             expr,
             span,
         } = stmt
         {
             match pattern {
-                ResolvedDeclPattern::Identifier { name, span } => {
+                DesugaredDeclPattern::Identifier { name, span } => {
                     if !env.types.contains_key(name) {
                         let value = eval_value_expr(expr, env)?;
                         env.declare_value(name, value, span)?;
@@ -248,7 +248,7 @@ pub fn eval_scope(
 
     // final expression (blocks only)
     for stmt in statements {
-        if let ResolvedStatement::Expression { expr, .. } = stmt {
+        if let DesugaredStatement::Expression { expr, .. } = stmt {
             return Ok(Some(eval_value_expr(expr, env)?));
         }
     }
@@ -257,7 +257,7 @@ pub fn eval_scope(
 }
 
 fn eval_block(
-    statements: &Vec<ResolvedStatement>,
+    statements: &Vec<DesugaredStatement>,
     span: &Span,
     env: &Environment,
 ) -> FogResult<Value> {
@@ -288,13 +288,13 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
 
         Value::NativeFunction { function, .. } => function(argument).map_err(|mut e| {
             if e.span.is_none() {
-                e.span = Some(span);
+                e.span = Some(*span);
             }
             e
         }),
 
         _ => Err(runtime_error!(
-            Some(span),
+            Some(*span),
             "cannot apply a non-function value"
         )),
     }
@@ -302,22 +302,18 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
 
 fn match_pattern(
     value: &Value,
-    pattern: &ResolvedExpr,
+    pattern: &DesugaredExpr,
 ) -> FogResult<Option<HashMap<String, Value>>> {
-    let span = pattern.span;
+    let span = pattern.span();
 
     match pattern {
-        ResolvedExpr::Int32Literal { value: pat_val, .. } => match value {
-            Value::Int32(val) if val == pat_val => Ok(Some(HashMap::new())),
+        DesugaredExpr::Literal { literal, .. } => match (literal, value) {
+            (Literal::Int32(p), Value::Int32(v)) if p == v => Ok(Some(HashMap::new())),
+            (Literal::Float32(p), Value::Float32(v)) if p == v => Ok(Some(HashMap::new())),
             _ => Ok(None),
         },
 
-        ResolvedExpr::Float32Literal { value: pat_val, .. } => match value {
-            Value::Float32(val) if val == pat_val => Ok(Some(HashMap::new())),
-            _ => Ok(None),
-        },
-
-        ResolvedExpr::Identifier { name, .. } => {
+        DesugaredExpr::Identifier { name, .. } => {
             if name == "_" {
                 // wildcard
                 Ok(Some(HashMap::new()))
@@ -337,7 +333,7 @@ fn match_pattern(
             }
         }
 
-        ResolvedExpr::Tuple { items, .. } => match value {
+        DesugaredExpr::Tuple { items, .. } => match value {
             Value::Tuple(values) if values.len() == items.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(items) {
@@ -352,7 +348,7 @@ fn match_pattern(
         },
 
         // data constructor pattern
-        ResolvedExpr::FunctionAppl { fn_name, args, .. } => match value {
+        DesugaredExpr::FunctionAppl { fn_name, args, .. } => match value {
             Value::Constructor { tag, values, .. }
                 if tag == fn_name && values.len() == args.len() =>
             {
@@ -368,11 +364,11 @@ fn match_pattern(
             _ => Ok(None),
         },
 
-        ResolvedExpr::Block { .. } | ResolvedExpr::Lambda { .. } | ResolvedExpr::Match { .. } => {
-            Err(runtime_error!(
-                Some(span),
-                "unsupported pattern `{pattern}`"
-            ))
-        }
+        DesugaredExpr::Block { .. }
+        | DesugaredExpr::Lambda { .. }
+        | DesugaredExpr::Match { .. } => Err(runtime_error!(
+            Some(span),
+            "unsupported pattern `{pattern}`"
+        )),
     }
 }
