@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::Token;
 use crate::error::FogError;
 
@@ -7,6 +9,21 @@ mod parsed_expr;
 pub mod parser;
 pub mod resolved_expr;
 pub mod resolver;
+
+#[derive(Clone)]
+pub enum Literal {
+    Int32(i32),
+    Float32(f32),
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::Int32(value) => write!(f, "{value}"),
+            Literal::Float32(value) => write!(f, "{value}"),
+        }
+    }
+}
 
 pub fn parse_program(
     tokens: &Vec<Token>,

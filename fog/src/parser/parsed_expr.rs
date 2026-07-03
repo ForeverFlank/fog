@@ -2,6 +2,7 @@ use std::fmt;
 use std::fmt::Display;
 
 use crate::error::Span;
+use crate::parser::Literal;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 
@@ -15,7 +16,7 @@ pub enum ParsedStatement {
         span: Span,
     },
     Declaration {
-        pattern: ParsedPattern,
+        pattern: ParsedDeclPattern,
         expr: ParsedExpr,
         span: Span,
     },
@@ -45,48 +46,42 @@ impl Display for ParsedStatement {
 
 // --- pattern ---
 
+// -- declaration pattern
+
 #[derive(Clone)]
-pub enum ParsedPattern {
+pub enum ParsedDeclPattern {
     Identifier {
         name: String,
         span: Span,
     },
-
-    Int32Literal {
-        value: i32,
+    Literal {
+        literal: Literal,
         span: Span,
     },
-    Float32Literal {
-        value: f32,
-        span: Span,
-    },
-
     Tuple {
-        items: Vec<ParsedPattern>,
+        items: Vec<ParsedDeclPattern>,
         span: Span,
     },
-
     Collection {
-        items: Vec<ParsedPattern>,
+        items: Vec<ParsedDeclPattern>,
         span: Span,
     },
 }
 
-impl Display for ParsedPattern {
+impl Display for ParsedDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParsedPattern::Identifier { name, .. } => {
+            ParsedDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
 
-            ParsedPattern::Int32Literal { value, .. } => write!(f, "{value}"),
-            ParsedPattern::Float32Literal { value, .. } => write!(f, "{value}"),
+            ParsedDeclPattern::Literal { literal, .. } => write!(f, "{literal}"),
 
-            ParsedPattern::Tuple { items, .. } => {
+            ParsedDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
 
-            ParsedPattern::Collection { items, .. } => {
+            ParsedDeclPattern::Collection { items, .. } => {
                 for (i, expr) in items.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;
@@ -131,41 +126,32 @@ pub enum ParsedExpr {
         statements: Vec<ParsedStatement>,
         span: Span,
     },
-
     Identifier {
         name: String,
         span: Span,
     },
     Op {
         kind: OpKind,
-    },
-
-    Int32Literal {
-        value: i32,
         span: Span,
     },
-    Float32Literal {
-        value: f32,
+    Literal {
+        literal: Literal,
         span: Span,
     },
-
     Lambda {
         param_name: String,
         param_type: Box<ParsedExpr>,
         body: Box<ParsedExpr>,
         span: Span,
     },
-
     Tuple {
         items: Vec<ParsedExpr>,
         span: Span,
     },
-
     Collection {
         items: Vec<ParsedExpr>,
         span: Span,
     },
-
     Match {
         expr: Box<ParsedExpr>,
         match_arms: Vec<ParsedMatchArm>,
@@ -175,25 +161,8 @@ pub enum ParsedExpr {
 
 #[derive(Clone)]
 pub struct ParsedMatchArm {
-    pub pattern: ParsedExpr,
+    pub pattern: ParsedExpr, // TODO: MatchArmPattern
     pub value_expr: ParsedExpr,
-}
-
-impl ParsedExpr {
-    pub fn span(&self) -> Span {
-        match self {
-            ParsedExpr::Block { span, .. }
-            | ParsedExpr::Identifier { span, .. }
-            | ParsedExpr::Int32Literal { span, .. }
-            | ParsedExpr::Float32Literal { span, .. }
-            | ParsedExpr::Lambda { span, .. }
-            | ParsedExpr::Tuple { span, .. }
-            | ParsedExpr::Collection { span, .. }
-            | ParsedExpr::Match { span, .. } => span.clone(),
-
-            ParsedExpr::Op { .. } => unreachable!("Op has no span"),
-        }
-    }
 }
 
 impl Display for ParsedExpr {
@@ -208,10 +177,9 @@ impl Display for ParsedExpr {
             }
 
             ParsedExpr::Identifier { name, .. } => write!(f, "{name}"),
-            ParsedExpr::Op { kind } => write!(f, "{kind}"),
+            ParsedExpr::Op { kind, .. } => write!(f, "{kind}"),
 
-            ParsedExpr::Int32Literal { value, .. } => write!(f, "{value}"),
-            ParsedExpr::Float32Literal { value, .. } => write!(f, "{value}"),
+            ParsedExpr::Literal { literal, .. } => write!(f, "{literal}"),
 
             ParsedExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
 

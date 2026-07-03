@@ -3,6 +3,7 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
+use crate::parser::Literal;
 use crate::parser::parsed_expr::{ParsedMatchArm, *};
 
 pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
@@ -139,10 +140,7 @@ impl Parser<'_> {
                 let expr = self.parse_expression()?;
 
                 Ok(ParsedStatement::Declaration {
-                    pattern: ParsedPattern::Identifier {
-                        name,
-                        span: span.clone(),
-                    },
+                    pattern: ParsedDeclPattern::Identifier { name, span: span },
                     expr,
                     span,
                 })
@@ -172,7 +170,7 @@ impl Parser<'_> {
             let token = self.peek();
 
             if let Some(kind) = get_op_kind(token) {
-                items.push(ParsedExpr::Op { kind });
+                items.push(ParsedExpr::Op { kind, span: span });
                 self.next();
             } else if is_primary_starter(token) {
                 continue;
@@ -195,12 +193,18 @@ impl Parser<'_> {
         match token.kind {
             TokenKind::Int32Literal(value) => {
                 self.next();
-                Ok(ParsedExpr::Int32Literal { value, span })
+                Ok(ParsedExpr::Literal {
+                    literal: Literal::Int32(value),
+                    span,
+                })
             }
 
             TokenKind::Float32Literal(value) => {
                 self.next();
-                Ok(ParsedExpr::Float32Literal { value, span })
+                Ok(ParsedExpr::Literal {
+                    literal: Literal::Float32(value),
+                    span,
+                })
             }
 
             // unary minus (negation)
@@ -208,6 +212,7 @@ impl Parser<'_> {
                 self.next();
                 Ok(ParsedExpr::Op {
                     kind: OpKind::Minus,
+                    span,
                 })
             }
 

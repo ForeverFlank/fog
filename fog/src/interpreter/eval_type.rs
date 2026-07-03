@@ -211,7 +211,7 @@ pub fn apply_type_level_function(
     for arg in args {
         let Type::Function(param_type, return_type) = current else {
             return Err(runtime_error!(
-                Some(span.clone()),
+                Some(*span),
                 "`{}` is not a valid type constructor",
                 current.to_string()
             ));
@@ -221,7 +221,7 @@ pub fn apply_type_level_function(
 
         if arg_kind != *param_type {
             return Err(type_check_error!(
-                Some(span.clone()),
+                Some(*span),
                 "type mismatch applying `{}`\n\
                  expected `{}`, found `{}`",
                 fn_name,

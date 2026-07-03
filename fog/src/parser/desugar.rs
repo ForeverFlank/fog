@@ -4,18 +4,18 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parse_error;
+use crate::parser::desugared_expr::DesugaredDeclPattern;
 use crate::parser::desugared_expr::DesugaredExpr;
 use crate::parser::desugared_expr::DesugaredMatchArm;
-use crate::parser::desugared_expr::DesugaredPattern;
 use crate::parser::desugared_expr::DesugaredStatement;
+use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
-use crate::parser::resolved_expr::ResolvedPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
 
 enum DesugarResult {
     Statement(DesugaredStatement),
     Declaration {
-        pattern: ResolvedPattern,
+        pattern: ResolvedDeclPattern,
         expr: DesugaredExpr,
         span: Span,
     },
@@ -39,7 +39,7 @@ fn desugar_block(
     resolved_stmts: Vec<ResolvedStatement>,
     span: Span,
 ) -> (FogResult<DesugaredExpr>, Vec<FogError>) {
-    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<ResolvedPattern>, DesugaredExpr)>> =
+    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<ResolvedDeclPattern>, DesugaredExpr)>> =
         HashMap::new();
     let mut statements = Vec::new();
     let mut errors = Vec::new();
@@ -50,18 +50,21 @@ fn desugar_block(
                 DesugarResult::Statement(stmt) => statements.push(stmt),
 
                 DesugarResult::Declaration { pattern, expr, .. } => match pattern {
-                    ResolvedPattern::Identifier { name, span } => {
+                    ResolvedDeclPattern::Identifier { name, span } => {
                         statements.push(DesugaredStatement::Declaration {
-                            pattern: DesugaredPattern::Identifier { name, span },
+                            pattern: DesugaredDeclPattern::Identifier { name, span },
                             expr,
                             span,
                         })
                     }
 
-                    ResolvedPattern::Tuple { items, span } => {
+                    ResolvedDeclPattern::Tuple { items, span } => {
                         statements.push(DesugaredStatement::Declaration {
-                            pattern: DesugaredPattern::Tuple {
-                                items: items.into_iter().map(),
+                            pattern: DesugaredDeclPattern::Tuple {
+                                items: items
+                                    .into_iter()
+                                    .map(desugar_pattern)
+                                    .collect::<Result<Vec<_>, _>>()?,
                                 span,
                             },
                             expr,
@@ -69,7 +72,7 @@ fn desugar_block(
                         });
                     }
 
-                    ResolvedPattern::FunctionClause { name, items, span } => {
+                    ResolvedDeclPattern::FunctionClause { name, items, span } => {
                         let mut clauses = fn_decl_patterns.get_mut(&name).unwrap_or({
                             let mut vec = Vec::new();
                             fn_decl_patterns.insert(name, vec);
@@ -79,8 +82,7 @@ fn desugar_block(
                         clauses.push((items, expr));
                     }
 
-                    ResolvedPattern::Int32Literal { .. }
-                    | ResolvedPattern::Float32Literal { .. } => {
+                    ResolvedDeclPattern::Literal { span, .. } => {
                         errors.push(parse_error!(Some(span), "cannot declare to a literal"));
                     }
                 },
@@ -127,20 +129,19 @@ fn desugar_statement(resolved_stmt: ResolvedStatement) -> FogResult<DesugarResul
     }
 }
 
-fn desugar_pattern(resolved_pattern: ResolvedPattern) -> FogResult<DesugaredPattern> {
+fn desugar_pattern(resolved_pattern: ResolvedDeclPattern) -> FogResult<DesugaredDeclPattern> {
     match resolved_pattern {
-        ResolvedPattern::Identifier { name, span } => {
-            Ok(DesugaredPattern::Identifier { name, span })
+        ResolvedDeclPattern::Identifier { name, span } => {
+            Ok(DesugaredDeclPattern::Identifier { name, span })
         }
 
-        ResolvedPattern::Int32Literal { value, span } => {
-            Ok(DesugaredPattern::Identifier { name: (), span })
+        ResolvedDeclPattern::Literal { value, span } => {
+            Ok(DesugaredDeclPattern::Identifier { name: (), span })
         }
-        ResolvedPattern::Float32Literal { value, span } => todo!(),
 
-        ResolvedPattern::Tuple { items, span } => todo!(),
+        ResolvedDeclPattern::Tuple { items, span } => todo!(),
 
-        ResolvedPattern::FunctionClause { name, items, span } => todo!(),
+        ResolvedDeclPattern::FunctionClause { name, items, span } => todo!(),
     }
 }
 

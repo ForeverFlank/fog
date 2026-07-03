@@ -15,8 +15,9 @@ use crate::interpreter::type_check::expr_type_of;
 use crate::interpreter::value::Value;
 use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
+use crate::parser::Literal;
+use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
-use crate::parser::resolved_expr::ResolvedPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
 use crate::runtime_error;
 
@@ -29,7 +30,7 @@ pub fn register_data_constructors(
 ) -> FogResult<()> {
     let Type::Sum(ctors) = parent_sum_type else {
         return Err(runtime_error!(
-            Some(span.clone()),
+            Some(*span),
             "cannot register data constructors from a non-sum type `{}`",
             parent_sum_type.to_string()
         ));
@@ -91,18 +92,20 @@ pub fn make_data_constructor_function(
 
 pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Value> {
     match expr {
-        ResolvedExpr::Block { statements, span } => eval_block(statements, span.clone(), env),
+        ResolvedExpr::Block { statements, span } => eval_block(statements, span, env),
 
         ResolvedExpr::Identifier { name, span } => {
             let var = env.get_value_var(name, span)?;
             var.value
                 .borrow()
                 .clone()
-                .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name))
+                .ok_or_else(|| runtime_error!(Some(*span), "undeclared variable `{}`", name))
         }
 
-        ResolvedExpr::Int32Literal { value, .. } => Ok(Value::Int32(*value)),
-        ResolvedExpr::Float32Literal { value, .. } => Ok(Value::Float32(*value)),
+        ResolvedExpr::Literal { literal, span } => match *literal {
+            Literal::Int32(value) => Ok(Value::Int32(value)),
+            Literal::Float32(value) => Ok(Value::Float32(value)),
+        },
 
         ResolvedExpr::Lambda {
             param_name,
@@ -136,7 +139,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
             let mut result = eval_value_expr(
                 &ResolvedExpr::Identifier {
                     name: fn_name.clone(),
-                    span: span.clone(),
+                    span: span,
                 },
                 env,
             )?;
@@ -169,10 +172,7 @@ pub fn eval_value_expr(expr: &ResolvedExpr, env: &Environment) -> FogResult<Valu
                 }
             }
 
-            Err(runtime_error!(
-                Some(span.clone()),
-                "match expression not covered"
-            ))
+            Err(runtime_error!(Some(span), "match expression not covered"))
         }
     }
 }
@@ -199,7 +199,7 @@ pub fn eval_scope(
         } = stmt
         {
             match pattern {
-                ResolvedPattern::Identifier { name, span } => {
+                ResolvedDeclPattern::Identifier { name, span } => {
                     if env.types.contains_key(name) {
                         let defined_type = eval_type_definition_expr(expr, env)?;
                         env.declare_type(name, defined_type.clone(), span)?;
@@ -234,7 +234,7 @@ pub fn eval_scope(
         } = stmt
         {
             match pattern {
-                ResolvedPattern::Identifier { name, span } => {
+                ResolvedDeclPattern::Identifier { name, span } => {
                     if !env.types.contains_key(name) {
                         let value = eval_value_expr(expr, env)?;
                         env.declare_value(name, value, span)?;
@@ -258,13 +258,13 @@ pub fn eval_scope(
 
 fn eval_block(
     statements: &Vec<ResolvedStatement>,
-    span: Span,
+    span: &Span,
     env: &Environment,
 ) -> FogResult<Value> {
     let mut block_env = Environment::new(Some(env));
 
     eval_scope(statements, &mut block_env)?
-        .ok_or_else(|| runtime_error!(Some(span), "final operand not found in block statement"))
+        .ok_or_else(|| runtime_error!(Some(*span), "final operand not found in block statement"))
 }
 
 fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
@@ -288,13 +288,13 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
 
         Value::NativeFunction { function, .. } => function(argument).map_err(|mut e| {
             if e.span.is_none() {
-                e.span = Some(span.clone());
+                e.span = Some(span);
             }
             e
         }),
 
         _ => Err(runtime_error!(
-            Some(span.clone()),
+            Some(span),
             "cannot apply a non-function value"
         )),
     }
@@ -304,7 +304,7 @@ fn match_pattern(
     value: &Value,
     pattern: &ResolvedExpr,
 ) -> FogResult<Option<HashMap<String, Value>>> {
-    let span = pattern.span();
+    let span = pattern.span;
 
     match pattern {
         ResolvedExpr::Int32Literal { value: pat_val, .. } => match value {

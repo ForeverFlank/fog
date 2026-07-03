@@ -92,7 +92,7 @@ pub fn interpret(statements: &Vec<ResolvedStatement>) -> FogResult<()> {
     for stmt in statements {
         if let ResolvedStatement::Expression { span, .. } = stmt {
             return Err(runtime_error!(
-                Some(span.clone()),
+                Some(span),
                 "cannot have final operand as a top-level statement"
             ));
         }

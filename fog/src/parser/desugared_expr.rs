@@ -3,6 +3,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 
 use crate::error::Span;
+use crate::parser::Literal;
 use crate::util::{fmt_parenthesized, format_joined};
 
 // --- statements ---
@@ -15,7 +16,7 @@ pub enum DesugaredStatement {
         span: Span,
     },
     Declaration {
-        pattern: DesugaredPattern,
+        pattern: DesugaredDeclPattern,
         expr: DesugaredExpr,
         span: Span,
     },
@@ -45,35 +46,61 @@ impl Display for DesugaredStatement {
 
 // --- patterns ---
 
+// -- declaration statement
+
 #[derive(Clone)]
-pub enum DesugaredPattern {
+pub enum DesugaredDeclPattern {
     Identifier {
         name: String,
         span: Span,
     },
-
-    Int32Literal {
-        value: i32,
-        span: Span,
-    },
-    Float32Literal {
-        value: f32,
-        span: Span,
-    },
-
     Tuple {
-        items: Vec<DesugaredPattern>,
+        items: Vec<DesugaredTupleDeclPattern>,
         span: Span,
     },
 }
 
-impl Display for DesugaredPattern {
+impl Display for DesugaredDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DesugaredPattern::Identifier { name, .. } => {
+            DesugaredDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
-            DesugaredPattern::Tuple { items, .. } => {
+            DesugaredDeclPattern::Tuple { items, .. } => {
+                write!(f, "{}", format_joined(items, ", "))
+            }
+        }
+    }
+}
+
+// -- tuple declaration
+
+#[derive(Clone)]
+pub enum DesugaredTupleDeclPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Literal {
+        literal: Literal,
+        span: Span,
+    },
+    Tuple {
+        items: Vec<DesugaredTupleDeclPattern>,
+        span: Span,
+    },
+}
+
+impl Display for DesugaredTupleDeclPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DesugaredTupleDeclPattern::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+            DesugaredTupleDeclPattern::Literal { literal, .. } => {
+                write!(f, "{literal}")
+            }
+            DesugaredTupleDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
         }
@@ -138,7 +165,7 @@ impl DesugaredExpr {
             | DesugaredExpr::Lambda { span, .. }
             | DesugaredExpr::Tuple { span, .. }
             | DesugaredExpr::FuncAppl { span, .. }
-            | DesugaredExpr::Match { span, .. } => span.clone(),
+            | DesugaredExpr::Match { span, .. } => span,
         }
     }
 }

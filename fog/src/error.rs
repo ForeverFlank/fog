@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Span {
     pub line: usize,
     pub column: usize,

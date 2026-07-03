@@ -13,7 +13,7 @@ use crate::runtime_error;
 use crate::type_check_error;
 
 pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
-    let span = expr.span();
+    let span = expr.span;
 
     match expr {
         ResolvedExpr::Block { statements, .. } => {
@@ -41,7 +41,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
 
                             if expr_type != annotated_type {
                                 return Err(type_check_error!(
-                                    Some(span.clone()),
+                                    Some(span),
                                     "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
                                      expected `{annotated_type}`, found `{expr_type}`"
                                 ));
@@ -51,7 +51,7 @@ pub fn expr_type_of(expr: &ResolvedExpr, env: &Environment) -> FogResult<Type> {
                             block_env.declare_type(pattern, defined_type, span)?;
                         } else {
                             return Err(runtime_error!(
-                                Some(span.clone()),
+                                Some(span),
                                 "unannotated variable `{}`",
                                 pattern
                             ));
