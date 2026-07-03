@@ -165,6 +165,10 @@ impl Resolver {
                 Ok(ResolvedDeclPattern::Identifier { name, span })
             }
 
+            ParsedDeclPattern::Literal { span, .. } => {
+                Err(parse_error!(Some(span), "invalid declaration pattern"))
+            }
+
             ParsedDeclPattern::Tuple { items, span } => Ok(ResolvedDeclPattern::Tuple {
                 items: items
                     .into_iter()
@@ -240,6 +244,10 @@ impl Resolver {
                 Ok(ResolvedMatchArmPattern::Identifier { name, span })
             }
 
+            ParsedDeclPattern::Literal { literal, span } => {
+                Ok(ResolvedMatchArmPattern::Literal { literal, span })
+            }
+
             ParsedDeclPattern::Tuple { items, span } => Ok(ResolvedMatchArmPattern::Tuple {
                 items: items
                     .into_iter()
@@ -296,7 +304,8 @@ impl Resolver {
                 span,
             }),
 
-            ParsedDeclPattern::Collection { span, .. } => {
+            ParsedDeclPattern::Literal { span, .. }
+            | ParsedDeclPattern::Collection { span, .. } => {
                 Err(parse_error!(Some(span), "invalid tuple pattern"))
             }
         }
@@ -327,10 +336,10 @@ impl Resolver {
             }
 
             ParsedExpr::Match {
-                expr,
+                scrutinee,
                 match_arms,
                 span,
-            } => self.resolve_match(expr, match_arms, span),
+            } => self.resolve_match(scrutinee, match_arms, span),
         }
     }
 
@@ -382,7 +391,7 @@ impl Resolver {
         let scrutinee = self.resolve_expr(*expr)?;
 
         Ok(ResolvedExpr::Match {
-            expr: Box::new(scrutinee),
+            scrutinee: Box::new(scrutinee),
             match_arms: match_arms
                 .into_iter()
                 .map(|arm| {
@@ -582,10 +591,10 @@ impl Resolver {
             ParsedExpr::Op { .. } => Err(parse_error!(None, "unexpected infix operator")),
 
             ParsedExpr::Match {
-                expr,
+                scrutinee,
                 match_arms,
                 span,
-            } => self.resolve_match(expr, match_arms, span),
+            } => self.resolve_match(scrutinee, match_arms, span),
         }
     }
 }

@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
+use crate::parse_error;
 use crate::parser::desugared_expr::DesugaredDeclPattern;
 use crate::parser::desugared_expr::DesugaredExpr;
 use crate::parser::desugared_expr::DesugaredMatchArm;
@@ -41,11 +43,13 @@ fn desugar_block(
 fn desugar_statements(
     resolved_stmts: Vec<ResolvedStatement>,
 ) -> (Vec<DesugaredStatement>, Vec<FogError>) {
-    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<ResolvedMatchArmPattern>, DesugaredExpr)>> =
+    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<DesugaredMatchArmPattern>, DesugaredExpr)>> =
         HashMap::new();
     let mut statements = Vec::new();
     let mut errors = Vec::new();
 
+    // process type annotations and expressions normally,
+    // and collect pattern-based function declarations
     for resolved_stmt in resolved_stmts {
         let res = match desugar_statement(resolved_stmt) {
             Ok(res) => res,
@@ -93,15 +97,163 @@ fn desugar_statements(
             }
 
             ResolvedDeclPattern::FunctionClause { name, items, .. } => {
+                let desugared_items = match items
+                    .into_iter()
+                    .map(desugar_match_arm_pattern)
+                    .collect::<Result<Vec<_>, _>>()
+                {
+                    Ok(items) => items,
+                    Err(error) => {
+                        errors.push(error);
+                        continue;
+                    }
+                };
+
                 fn_decl_patterns
                     .entry(name)
                     .or_default()
-                    .push((items, expr));
+                    .push((desugared_items, expr));
             }
         }
     }
 
+    // combining those pattern-based function declarations
+    // into one big lambda function assignment
+    for (fn_name, patterns) in fn_decl_patterns {
+        let span = patterns[0].0[0].span();
+        let arity = patterns[0].0.len();
+
+        if patterns.iter().any(|(items, _)| items.len() != arity) {
+            errors.push(parse_error!(
+                Some(span),
+                "clauses of function `{fn_name}` don't all take the same number of arguments"
+            ));
+            continue;
+        }
+
+        let param_types = match find_fn_clause_param_types(&statements, &fn_name, arity, span) {
+            Ok(param_types) => param_types,
+            Err(error) => {
+                errors.push(error);
+                continue;
+            }
+        };
+
+        let match_arms = patterns
+            .into_iter()
+            .map(|(mut items, value_expr)| {
+                let pattern = if arity == 1 {
+                    items.remove(0)
+                } else {
+                    DesugaredMatchArmPattern::Tuple {
+                        items: items.clone(),
+                        span: items[0].span(),
+                    }
+                };
+
+                DesugaredMatchArm {
+                    pattern,
+                    value_expr,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let param_names = (0..arity).map(|i| format!("arg{i}")).collect::<Vec<_>>();
+
+        let scrutinee = if arity == 1 {
+            DesugaredExpr::Identifier {
+                name: param_names[0].clone(),
+                span,
+            }
+        } else {
+            DesugaredExpr::Tuple {
+                items: param_names
+                    .iter()
+                    .map(|name| DesugaredExpr::Identifier {
+                        name: name.clone(),
+                        span,
+                    })
+                    .collect(),
+                span,
+            }
+        };
+
+        let match_expr = DesugaredExpr::Match {
+            scrutinee: scrutinee.into(),
+            match_arms,
+            span,
+        };
+
+        // build the chained lambda
+        let lambda = param_names.into_iter().zip(param_types).rev().fold(
+            match_expr,
+            |body, (param_name, param_type)| DesugaredExpr::Lambda {
+                param_name,
+                param_type: param_type.into(),
+                body: Rc::new(body),
+                span,
+            },
+        );
+
+        statements.push(DesugaredStatement::Declaration {
+            pattern: DesugaredDeclPattern::Identifier {
+                name: fn_name,
+                span,
+            },
+            expr: lambda,
+            span,
+        });
+    }
+
     (statements, errors)
+}
+
+fn find_fn_clause_param_types(
+    statements: &Vec<DesugaredStatement>,
+    fn_name: &str,
+    arity: usize,
+    span: Span,
+) -> FogResult<Vec<DesugaredExpr>> {
+    let mut remaining_type = statements
+        .iter()
+        .find_map(|stmt| match stmt {
+            DesugaredStatement::TypeAnnotation { name, expr, .. } if name == fn_name => {
+                Some(expr.clone())
+            }
+            _ => None,
+        })
+        .ok_or_else(|| {
+            parse_error!(
+                Some(span),
+                "function `{fn_name}` needs a type annotation to use pattern-matched clauses"
+            )
+        })?;
+
+    let mut param_types = Vec::with_capacity(arity);
+
+    for _ in 0..arity {
+        match remaining_type {
+            DesugaredExpr::FunctionAppl {
+                fn_name: op,
+                mut args,
+                ..
+            } if op == "->" && args.len() == 2 => {
+                remaining_type = args.pop().unwrap();
+                param_types.push(args.pop().unwrap());
+            }
+
+            _ => {
+                return Err(parse_error!(
+                    Some(span),
+                    "function `{fn_name}` is declared with {arity} argument(s), \
+                     but its type signature only accounts for {}",
+                    param_types.len()
+                ));
+            }
+        }
+    }
+
+    Ok(param_types)
 }
 
 fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
@@ -226,11 +378,11 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<DesugaredExpr> {
         }),
 
         ResolvedExpr::Match {
-            expr,
+            scrutinee,
             match_arms,
             span,
         } => Ok(DesugaredExpr::Match {
-            expr: desugar_expr(*expr)?.into(),
+            scrutinee: desugar_expr(*scrutinee)?.into(),
             match_arms: match_arms
                 .into_iter()
                 .map(|arm| {

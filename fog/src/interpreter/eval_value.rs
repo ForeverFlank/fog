@@ -20,6 +20,7 @@ use crate::parser::desugared_expr::DesugaredDeclPattern;
 use crate::parser::desugared_expr::DesugaredExpr;
 use crate::parser::desugared_expr::DesugaredMatchArmPattern;
 use crate::parser::desugared_expr::DesugaredStatement;
+use crate::parser::desugared_expr::DesugaredTupleDeclPattern;
 use crate::runtime_error;
 
 // --- data constructors ---
@@ -154,11 +155,11 @@ pub fn eval_value_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Val
         }
 
         DesugaredExpr::Match {
-            expr,
+            scrutinee,
             match_arms,
             span,
         } => {
-            let value = eval_value_expr(expr, env)?;
+            let value = eval_value_expr(scrutinee, env)?;
 
             for arm in match_arms {
                 if let Some(bindings) = match_pattern(&value, &arm.pattern)? {
@@ -193,7 +194,12 @@ pub fn eval_scope(
 
     // type definitions
     for stmt in statements {
-        if let DesugaredStatement::Declaration { pattern, expr, .. } = stmt {
+        if let DesugaredStatement::Declaration {
+            pattern,
+            expr,
+            span,
+        } = stmt
+        {
             match pattern {
                 DesugaredDeclPattern::Identifier { name, span } => {
                     if env.types.contains_key(name) {
@@ -206,7 +212,7 @@ pub fn eval_scope(
                     }
                 }
 
-                _ => todo!(),
+                _ => return Err(runtime_error!(Some(*span), "invalid type declaration")),
             }
         }
     }
@@ -232,7 +238,35 @@ pub fn eval_scope(
                     }
                 }
 
-                _ => todo!(),
+                DesugaredDeclPattern::Tuple {
+                    items: pattern_items,
+                    span,
+                } => {
+                    let DesugaredExpr::Tuple {
+                        items: expr_items,
+                        span,
+                    } = expr
+                    else {
+                        return Err(runtime_error!(
+                            Some(*span),
+                            "cannot declare a non-tuple value to a tuple"
+                        ));
+                    };
+
+                    if pattern_items.len() != expr_items.len() {
+                        return Err(runtime_error!(
+                            Some(*span),
+                            "tuple declaration size mismatch"
+                        ));
+                    }
+
+                    for pattern_item in pattern_items {
+                        match *pattern_item {
+                            DesugaredTupleDeclPattern::Identifier { name, span } => ,
+                            DesugaredTupleDeclPattern::Tuple { items, span } => todo!(),
+                        }
+                    }
+                }
             }
         }
     }

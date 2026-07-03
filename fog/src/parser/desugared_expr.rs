@@ -195,7 +195,7 @@ pub enum DesugaredExpr {
         span: Span,
     },
     Match {
-        expr: Box<DesugaredExpr>,
+        scrutinee: Box<DesugaredExpr>,
         match_arms: Vec<DesugaredMatchArm>,
         span: Span,
     },
@@ -262,9 +262,11 @@ impl Display for DesugaredExpr {
             }
 
             DesugaredExpr::Match {
-                expr, match_arms, ..
+                scrutinee,
+                match_arms,
+                ..
             } => {
-                write!(f, "match {expr} {{\n")?;
+                write!(f, "match {scrutinee} {{\n")?;
 
                 for arm in match_arms {
                     write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;

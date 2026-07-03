@@ -4,7 +4,8 @@ use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
 use crate::parser::Literal;
-use crate::parser::parsed_expr::{ParsedMatchArm, *};
+use crate::parser::parsed_expr::ParsedMatchArm;
+use crate::parser::parsed_expr::*;
 
 pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
     Parser::parse(tokens)
@@ -146,16 +147,62 @@ impl Parser<'_> {
                 })
             }
 
+            // either a tuple assignemt, a function clause,
+            // or an final operand expression
             _ => {
-                // this branch now could be either
-                // an assignent statement's lhs:
-                // assigning to tuple -- (x, y) = tup
-                // or assigning a function -- f x = x + 1
-                // but let's just leave it just for tuple, for now
                 let expr = self.parse_expression()?;
 
-                Ok(ParsedStatement::Expression { expr, span })
+                if let TokenKind::Equal = self.peek().kind {
+                    self.next();
+
+                    let pattern = Self::expr_to_decl_pattern(expr)?;
+                    let expr = self.parse_expression()?;
+
+                    Ok(ParsedStatement::Declaration {
+                        pattern,
+                        expr,
+                        span,
+                    })
+                } else {
+                    Ok(ParsedStatement::Expression { expr, span })
+                }
             }
+        }
+    }
+
+    fn expr_to_decl_pattern(expr: ParsedExpr) -> FogResult<ParsedDeclPattern> {
+        match expr {
+            ParsedExpr::Identifier { name, span } => {
+                Ok(ParsedDeclPattern::Identifier { name, span })
+            }
+
+            ParsedExpr::Literal { literal, span } => {
+                Ok(ParsedDeclPattern::Literal { literal, span })
+            }
+
+            ParsedExpr::Tuple { items, span } => Ok(ParsedDeclPattern::Tuple {
+                items: items
+                    .into_iter()
+                    .map(|item| Self::expr_to_decl_pattern(item))
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            }),
+
+            ParsedExpr::Collection { args, span } => Ok(ParsedDeclPattern::Collection {
+                items: args
+                    .into_iter()
+                    .map(|item| Self::expr_to_decl_pattern(item))
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            }),
+
+            ParsedExpr::Block { .. }
+            | ParsedExpr::Op { .. }
+            | ParsedExpr::Lambda { .. }
+            | ParsedExpr::Match { .. } => Err(parse_error!(
+                Some(expr.span()),
+                "invalid declaration pattern"
+            )),
         }
     }
 
@@ -300,7 +347,7 @@ impl Parser<'_> {
             TokenKind::Match => {
                 self.next();
 
-                let expr = Box::new(self.parse_expression()?);
+                let scrutinee = Box::new(self.parse_expression()?);
 
                 let TokenKind::LeftBrace = self.peek().kind else {
                     return Err(parse_error!(Some(token_span(self.peek())), "expected `{{`"));
@@ -310,7 +357,7 @@ impl Parser<'_> {
                 let match_arms = self.parse_match_arms()?;
 
                 Ok(ParsedExpr::Match {
-                    expr,
+                    scrutinee,
                     match_arms,
                     span,
                 })

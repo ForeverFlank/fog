@@ -54,6 +54,10 @@ pub enum ParsedDeclPattern {
         name: String,
         span: Span,
     },
+    Literal {
+        literal: Literal,
+        span: Span,
+    },
     Tuple {
         items: Vec<ParsedDeclPattern>,
         span: Span,
@@ -69,6 +73,10 @@ impl Display for ParsedDeclPattern {
         match self {
             ParsedDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
+            }
+
+            ParsedDeclPattern::Literal { literal, .. } => {
+                write!(f, "{literal}")
             }
 
             ParsedDeclPattern::Tuple { items, .. } => {
@@ -147,16 +155,25 @@ pub enum ParsedExpr {
         span: Span,
     },
     Match {
-        expr: Box<ParsedExpr>,
+        scrutinee: Box<ParsedExpr>,
         match_arms: Vec<ParsedMatchArm>,
         span: Span,
     },
 }
 
-#[derive(Clone)]
-pub struct ParsedMatchArm {
-    pub pattern: ParsedExpr, // TODO: MatchArmPattern
-    pub value_expr: ParsedExpr,
+impl ParsedExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedExpr::Block { span, .. }
+            | ParsedExpr::Identifier { span, .. }
+            | ParsedExpr::Op { span, .. }
+            | ParsedExpr::Literal { span, .. }
+            | ParsedExpr::Lambda { span, .. }
+            | ParsedExpr::Tuple { span, .. }
+            | ParsedExpr::Collection { span, .. }
+            | ParsedExpr::Match { span, .. } => *span,
+        }
+    }
 }
 
 impl Display for ParsedExpr {
@@ -194,9 +211,11 @@ impl Display for ParsedExpr {
             }
 
             ParsedExpr::Match {
-                expr, match_arms, ..
+                scrutinee,
+                match_arms,
+                ..
             } => {
-                write!(f, "match {expr} {{")?;
+                write!(f, "match {scrutinee} {{")?;
                 for arm in match_arms {
                     write!(f, "    {} => {}", arm.pattern, arm.value_expr)?;
                 }
@@ -204,4 +223,10 @@ impl Display for ParsedExpr {
             }
         }
     }
+}
+
+#[derive(Clone)]
+pub struct ParsedMatchArm {
+    pub pattern: ParsedExpr,
+    pub value_expr: ParsedExpr,
 }

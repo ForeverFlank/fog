@@ -206,7 +206,7 @@ pub enum ResolvedExpr {
     },
 
     Match {
-        expr: Box<ResolvedExpr>,
+        scrutinee: Box<ResolvedExpr>,
         match_arms: Vec<ResolvedMatchArm>,
         span: Span,
     },
@@ -259,9 +259,11 @@ impl Display for ResolvedExpr {
             }
 
             ResolvedExpr::Match {
-                expr, match_arms, ..
+                scrutinee,
+                match_arms,
+                ..
             } => {
-                write!(f, "match {expr} {{\n")?;
+                write!(f, "match {scrutinee} {{\n")?;
                 for arm in match_arms {
                     write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;
                 }
