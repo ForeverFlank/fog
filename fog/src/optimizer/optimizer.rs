@@ -1,67 +1,162 @@
-use std::collections::HashMap;
+use std::cmp::min;
+use std::collections::{HashMap, HashSet};
+use std::io::ErrorKind::StaleNetworkFileHandle;
 
 use crate::error::FogError;
-use crate::parser::core_expr::CoreStatement;
+use crate::parser::core_expr::{CoreExpr, CoreStatement};
 
 // --- node ---
 
-struct Node {
-    id: usize,
-    kind: NodeKind,
-    ann_stmt: Option<CoreStatement>,
-    decl_stmt: Option<CoreStatement>,
-    expr_stmt: Option<CoreStatement>,
+enum Node<'a> {
+    TypeAnnotation {
+        name: String,
+        statement: &'a CoreStatement,
+    },
+    Declaration {
+        name: String,
+        statement: &'a CoreStatement,
+    },
+    ExprResult {
+        statement: &'a CoreStatement,
+    },
 }
 
-impl Node {
-    fn new(id: usize, kind: NodeKind) -> Node {
-        Node {
-            id,
-            kind,
-            ann_stmt: None,
-            decl_stmt: None,
-            expr_stmt: None,
+// --- scope ---
+
+struct Scope<'a> {
+    parent: Option<&'a Scope<'a>>,
+    var_names: HashSet<String>,
+    nodes: Vec<Node<'a>>,
+}
+
+impl<'a> Scope<'a> {
+    fn new() -> Scope<'a> {
+        Scope {
+            parent: None,
+            var_names: HashSet::new(),
+            nodes: Vec::new(),
         }
     }
-}
 
-enum NodeKind {
-    Decl(String),
-    Result(usize),
+    fn with_parent(parent: &'a Scope<'a>) -> Scope<'a> {
+        Scope {
+            parent: Some(parent),
+            var_names: HashSet::new(),
+            nodes: Vec::new(),
+        }
+    }
+
+    fn from_statements(parent: Option<&'a Scope<'a>>, stmts: &Vec<&'a CoreStatement>) -> Scope<'a> {
+        let mut scope = Scope {
+            parent,
+            var_names: HashSet::new(),
+            nodes: Vec::new(),
+        };
+
+        for &stmt in stmts {
+            scope.add_statement(stmt);
+        }
+
+        let bound_vars = scope
+            .nodes
+            .iter()
+            .filter_map(|node| match node {
+                Node::TypeAnnotation { name, .. } => Some(name.to_string()),
+                Node::Declaration { name, .. } => Some(name.to_string()),
+                Node::ExprResult { .. } => None,
+            })
+            .collect::<HashSet<String>>();
+
+        let mut dep_graph = DependencyGraph {
+            adj_list: HashMap::new(),
+        };
+
+        for &stmt in stmts {
+            match stmt {
+                CoreStatement::TypeAnnotation { name, expr, span } => {
+                    dep_graph.add_dep_by_expr(name, expr);
+                }
+
+                CoreStatement::Declaration {
+                    pattern,
+                    expr,
+                    span,
+                } => todo!(),
+
+                CoreStatement::Expression { expr, span } => todo!(),
+            }
+        }
+
+        scope
+    }
+
+    fn add_statement(&mut self, stmt: &'a CoreStatement) {
+        let nodes = match stmt {
+            CoreStatement::TypeAnnotation { name, .. } => vec![Node::TypeAnnotation {
+                name: name.to_string(),
+                statement: stmt,
+            }],
+
+            CoreStatement::Declaration { pattern, .. } => pattern
+                .get_all_identifiers()
+                .iter()
+                .map(|name| Node::Declaration {
+                    name: name.to_string(),
+                    statement: stmt,
+                })
+                .collect(),
+
+            CoreStatement::Expression { .. } => vec![Node::ExprResult { statement: stmt }],
+        };
+
+        self.nodes.extend(nodes);
+    }
 }
 
 // --- dependency graph ---
 
-fn build_dependency_graph(stmts: Vec<CoreStatement>) {
-    let mut nodes = HashMap::new();
-    let mut result_nodes = Vec::new();
+struct DependencyGraph {
+    adj_list: HashMap<String, Vec<String>>,
+}
 
-    for stmt in stmts {
-        match stmt {
-            CoreStatement::TypeAnnotation { name, expr, .. } => {
-                nodes
-                    .entry(name)
-                    .or_insert(Node::new(0, NodeKind::Decl(name)))
-                    .ann_stmt = Some(stmt);
-            }
+impl DependencyGraph {
+    fn add_dep_by_name(&mut self, decl_name: &str, depending_on_name: &str) {
+        self.adj_list
+            .entry(decl_name.to_string())
+            .or_insert_with(Vec::new)
+            .push(depending_on_name.to_string());
 
-            CoreStatement::Declaration { pattern, expr, .. } => {
-                for name in pattern.all_identifiers() {
-                    let name_string = name.to_string();
+        self.adj_list
+            .entry(depending_on_name.to_string())
+            .or_insert_with(Vec::new);
+    }
 
-                    nodes
-                        .entry(name_string)
-                        .or_insert(Node::new(0, NodeKind::Decl(name_string)))
-                        .decl_stmt = Some(stmt);
-                }
-            }
-
-            CoreStatement::Expression { expr, .. } => {
-                result_nodes.push(Node::)
-            },
+    fn add_dep_by_expr(&mut self, decl_name: &str, depending_on_expr: &CoreExpr) {
+        match depending_on_expr {
+            CoreExpr::Block { statements, span } => todo!(),
+            CoreExpr::Identifier { name, span } => todo!(),
+            CoreExpr::Literal { literal, span } => todo!(),
+            CoreExpr::Lambda {
+                param_name,
+                param_type,
+                body,
+                span,
+            } => todo!(),
+            CoreExpr::Tuple { items, span } => todo!(),
+            CoreExpr::FunctionAppl {
+                fn_name,
+                args,
+                span,
+            } => todo!(),
+            CoreExpr::Match {
+                scrutinee,
+                match_arms,
+                span,
+            } => todo!(),
         }
     }
 }
+
 /*
 impl DependencyGraph {
     fn new() -> DependencyGraph {
@@ -192,8 +287,6 @@ pub fn optimize(stmts: Vec<CoreStatement>) -> (Vec<CoreStatement>, Vec<FogError>
 fn optimize_block(stmts: Vec<CoreStatement>) -> (Vec<CoreStatement>, Vec<FogError>) {
     let mut optimized_stmts = Vec::new();
     let mut errors = Vec::new();
-
-    // let mut dep_graph = DependencyGraph::new();
 
     (optimized_stmts, errors)
 }
