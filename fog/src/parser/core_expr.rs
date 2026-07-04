@@ -60,6 +60,22 @@ pub enum CoreDeclPattern {
     },
 }
 
+impl CoreDeclPattern {
+    pub fn all_identifiers(&self) -> Vec<&str> {
+        let mut res = Vec::new();
+
+        match self {
+            CoreDeclPattern::Identifier { name, .. } => res.push(name.as_str()),
+
+            CoreDeclPattern::Tuple { items, .. } => items
+                .iter()
+                .for_each(|item| res.extend(item.all_identifiers())),
+        }
+
+        res
+    }
+}
+
 impl Display for CoreDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -86,6 +102,22 @@ pub enum CoreTupleDeclPattern {
         items: Vec<CoreTupleDeclPattern>,
         span: Span,
     },
+}
+
+impl CoreTupleDeclPattern {
+    pub fn all_identifiers(&self) -> Vec<&str> {
+        let mut res = Vec::new();
+
+        match self {
+            CoreTupleDeclPattern::Identifier { name, .. } => res.push(name.as_str()),
+
+            CoreTupleDeclPattern::Tuple { items, .. } => items
+                .iter()
+                .for_each(|item| res.extend(item.all_identifiers())),
+        }
+
+        res
+    }
 }
 
 impl Display for CoreTupleDeclPattern {
