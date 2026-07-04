@@ -148,7 +148,7 @@ pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
 
             for arg in args {
                 let argument = eval_value_expr(arg, env)?;
-                result = apply_function(result, argument, span)?;
+                result = eval_function_appl(result, argument, span)?;
             }
 
             Ok(result)
@@ -304,7 +304,7 @@ fn eval_block(statements: &Vec<CoreStatement>, span: &Span, env: &Environment) -
         .ok_or_else(|| runtime_error!(Some(*span), "final operand not found in block statement"))
 }
 
-fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
+fn eval_function_appl(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
     match function {
         Value::Function {
             param_name,

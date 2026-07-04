@@ -5,12 +5,13 @@ use crate::error::*;
 use crate::interpreter::*;
 use crate::lexer::token::*;
 use crate::lexer::*;
-use crate::parser::parser::*;
+use crate::optimizer::optimizer::optimize;
 use crate::parser::*;
 
 mod error;
 mod interpreter;
 mod lexer;
+mod optimizer;
 mod parser;
 mod util;
 
@@ -29,24 +30,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // -- lexing
     let (tokens, lexer_errors) = tokenize(src);
+    print_errors("lexer", &lexer_errors);
 
     if arg_print_tokens {
         print_tokens(&tokens);
     }
 
-    print_errors("lexer", &lexer_errors);
-
     // -- parsing
-    let (ast, parser_errors) = parse_program(&tokens);
-
+    let (top_stmts, parser_errors) = parse_program(&tokens);
     print_errors("parser", &parser_errors);
 
-    if !lexer_errors.is_empty() || !parser_errors.is_empty() {
+    // -- optimizing
+
+    let (optimized_top_stmts, optimizer_errors) = optimize(top_stmts);
+    print_errors("optimizer", &parser_errors);
+
+    if !lexer_errors.is_empty() || !parser_errors.is_empty() || !optimizer_errors.is_empty() {
         return Err("syntax error".into());
     }
 
     // -- interpreting
-    let res = interpret(&ast);
+    let res = interpret(&optimized_top_stmts);
 
     if let Err(error) = res {
         match error.span {
