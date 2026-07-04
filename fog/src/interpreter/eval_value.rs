@@ -212,7 +212,8 @@ pub fn eval_scope(
                     }
                 }
 
-                _ => return Err(runtime_error!(Some(*span), "invalid type declaration")),
+                // _ => return Err(runtime_error!(Some(*span), "invalid type declaration")),
+                _ => (),
             }
         }
     }
@@ -242,30 +243,8 @@ pub fn eval_scope(
                     items: pattern_items,
                     span,
                 } => {
-                    let DesugaredExpr::Tuple {
-                        items: expr_items,
-                        span,
-                    } = expr
-                    else {
-                        return Err(runtime_error!(
-                            Some(*span),
-                            "cannot declare a non-tuple value to a tuple"
-                        ));
-                    };
-
-                    if pattern_items.len() != expr_items.len() {
-                        return Err(runtime_error!(
-                            Some(*span),
-                            "tuple declaration size mismatch"
-                        ));
-                    }
-
-                    for pattern_item in pattern_items {
-                        match *pattern_item {
-                            DesugaredTupleDeclPattern::Identifier { name, span } => ,
-                            DesugaredTupleDeclPattern::Tuple { items, span } => todo!(),
-                        }
-                    }
+                    let value = eval_value_expr(expr, env)?;
+                    eval_tuple_items_declaration(pattern_items, value, env, span)?;
                 }
             }
         }
@@ -279,6 +258,43 @@ pub fn eval_scope(
     }
 
     Ok(None)
+}
+
+fn eval_tuple_items_declaration(
+    pattern_items: &Vec<DesugaredTupleDeclPattern>,
+    value: Value,
+    env: &mut Environment,
+    span: &Span,
+) -> FogResult<()> {
+    let Value::Tuple(expr_items) = value else {
+        return Err(runtime_error!(
+            Some(*span),
+            "cannot declare a non-tuple value `{value}` to a tuple"
+        ));
+    };
+
+    if pattern_items.len() != expr_items.len() {
+        return Err(runtime_error!(
+            Some(*span),
+            "tuple declaration size mismatch"
+        ));
+    }
+
+    for (pattern_item, value) in pattern_items.iter().zip(expr_items) {
+        match pattern_item {
+            DesugaredTupleDeclPattern::Identifier { name, span } => {
+                // let value = eval_value_expr(expr_item, env)?;
+                env.declare_value(name, value, span)?;
+            }
+
+            DesugaredTupleDeclPattern::Tuple {
+                items: pattern_items,
+                span,
+            } => eval_tuple_items_declaration(pattern_items, value, env, span)?,
+        }
+    }
+
+    Ok(())
 }
 
 fn eval_block(
