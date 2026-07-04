@@ -8,34 +8,34 @@ use crate::interpreter::eval_type::eval_type_annotation_expr;
 use crate::interpreter::eval_type::eval_type_definition_expr;
 use crate::interpreter::r#type::Type;
 use crate::parser::Literal;
-use crate::parser::desugared_expr::DesugaredDeclPattern;
-use crate::parser::desugared_expr::DesugaredExpr;
-use crate::parser::desugared_expr::DesugaredStatement;
-use crate::parser::desugared_expr::DesugaredTupleDeclPattern;
+use crate::parser::core_expr::CoreDeclPattern;
+use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreStatement;
+use crate::parser::core_expr::CoreTupleDeclPattern;
 use crate::runtime_error;
 use crate::type_check_error;
 
-pub fn expr_type_of(expr: &DesugaredExpr, env: &Environment) -> FogResult<Type> {
+pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
-        DesugaredExpr::Block { statements, .. } => block_expr_type_of(env, span, statements),
+        CoreExpr::Block { statements, .. } => block_expr_type_of(env, span, statements),
 
-        DesugaredExpr::Identifier { name, .. } => Ok(env.get_value_var(name, &span)?.r#type),
+        CoreExpr::Identifier { name, .. } => Ok(env.get_value_var(name, &span)?.r#type),
 
-        DesugaredExpr::Literal { literal, .. } => match literal {
+        CoreExpr::Literal { literal, .. } => match literal {
             Literal::Int32(_) => Ok(Type::Int32),
             Literal::Float32(_) => Ok(Type::Float32),
         },
 
-        DesugaredExpr::Lambda {
+        CoreExpr::Lambda {
             param_type, body, ..
         } => Ok(Type::Function(
             eval_type_annotation_expr(param_type, env)?.into(),
             expr_type_of(body, env)?.into(),
         )),
 
-        DesugaredExpr::FunctionAppl { fn_name, args, .. } => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } => {
             let mut curr_type = env.get_value_var(fn_name, &span)?.r#type.clone();
 
             for _ in args {
@@ -54,14 +54,14 @@ pub fn expr_type_of(expr: &DesugaredExpr, env: &Environment) -> FogResult<Type> 
             Ok(curr_type)
         }
 
-        DesugaredExpr::Tuple { items, .. } => Ok(Type::Product(
+        CoreExpr::Tuple { items, .. } => Ok(Type::Product(
             items
                 .iter()
                 .map(|expr| expr_type_of(expr, env))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
 
-        DesugaredExpr::Match { match_arms, .. } => match match_arms.first() {
+        CoreExpr::Match { match_arms, .. } => match match_arms.first() {
             Some(arm) => expr_type_of(&arm.value_expr, env),
             None => Err(runtime_error!(Some(span), "match with no arms")),
         },
@@ -71,26 +71,26 @@ pub fn expr_type_of(expr: &DesugaredExpr, env: &Environment) -> FogResult<Type> 
 fn block_expr_type_of(
     env: &Environment<'_>,
     span: Span,
-    statements: &Vec<DesugaredStatement>,
+    statements: &Vec<CoreStatement>,
 ) -> Result<Type, FogError> {
     let mut block_env = Environment::new(Some(env));
 
     for stmt in statements {
         match stmt {
-            DesugaredStatement::TypeAnnotation { name, expr, span } => {
+            CoreStatement::TypeAnnotation { name, expr, span } => {
                 match eval_annotation_expr(expr, &block_env)? {
                     Annotation::Kind(kind) => block_env.annotate_kind(name, kind, span)?,
                     Annotation::Type(r#type) => block_env.annotate_type(name, r#type, span)?,
                 };
             }
 
-            DesugaredStatement::Declaration {
+            CoreStatement::Declaration {
                 pattern,
                 expr,
                 span,
             } => type_check_declaration(pattern, expr, span, &mut block_env)?,
 
-            DesugaredStatement::Expression { expr, .. } => {
+            CoreStatement::Expression { expr, .. } => {
                 return expr_type_of(expr, &block_env);
             }
         }
@@ -105,13 +105,13 @@ fn block_expr_type_of(
 // validate and sometimes annotate types
 // of declaration statements
 fn type_check_declaration(
-    pattern: &DesugaredDeclPattern,
-    expr: &DesugaredExpr,
+    pattern: &CoreDeclPattern,
+    expr: &CoreExpr,
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
     match pattern {
-        DesugaredDeclPattern::Identifier { name, .. } => {
+        CoreDeclPattern::Identifier { name, .. } => {
             // check if declaration is a type declaration
             if env.types.contains_key(name) {
                 let defined_type = eval_type_definition_expr(expr, env)?;
@@ -141,7 +141,7 @@ fn type_check_declaration(
             env.annotate_type(name, expr_type, span)
         }
 
-        DesugaredDeclPattern::Tuple { items, .. } => {
+        CoreDeclPattern::Tuple { items, .. } => {
             let expr_type = expr_type_of(expr, env)?;
             bind_tuple_decl_pattern(items, &expr_type, pattern, expr, span, env)
         }
@@ -151,10 +151,10 @@ fn type_check_declaration(
 // like type_check_declaration but
 // it iterates through a possibly nested tuple
 fn bind_tuple_decl_pattern(
-    items: &Vec<DesugaredTupleDeclPattern>,
+    items: &Vec<CoreTupleDeclPattern>,
     expr_type: &Type,
-    pattern: &DesugaredDeclPattern,
-    expr: &DesugaredExpr,
+    pattern: &CoreDeclPattern,
+    expr: &CoreExpr,
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
@@ -183,13 +183,13 @@ fn bind_tuple_decl_pattern(
 }
 
 fn bind_tuple_decl_pattern_item(
-    item: &DesugaredTupleDeclPattern,
+    item: &CoreTupleDeclPattern,
     expected_type: &Type,
     span: &Span,
     block_env: &mut Environment,
 ) -> FogResult<()> {
     match item {
-        DesugaredTupleDeclPattern::Identifier { name, .. } => {
+        CoreTupleDeclPattern::Identifier { name, .. } => {
             if let Some(var) = block_env.variables.get(name) {
                 let annotated_type = var.r#type.clone();
 
@@ -208,7 +208,7 @@ fn bind_tuple_decl_pattern_item(
             block_env.annotate_type(name, expected_type.clone(), span)
         }
 
-        DesugaredTupleDeclPattern::Tuple { items, .. } => {
+        CoreTupleDeclPattern::Tuple { items, .. } => {
             let Type::Product(component_types) = expected_type else {
                 return Err(type_check_error!(
                     Some(*span),

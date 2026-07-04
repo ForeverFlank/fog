@@ -8,7 +8,7 @@ use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::TypeVariable;
 use crate::interpreter::variable::ValueVariable;
-use crate::parser::desugared_expr::DesugaredStatement;
+use crate::parser::core_expr::CoreStatement;
 use crate::runtime_error;
 
 fn create_top_env() -> Environment<'static> {
@@ -87,10 +87,10 @@ fn create_top_env() -> Environment<'static> {
     env
 }
 
-pub fn interpret(statements: &Vec<DesugaredStatement>) -> FogResult<()> {
+pub fn interpret(statements: &Vec<CoreStatement>) -> FogResult<()> {
     // Top-level expressions are not allowed.
     for stmt in statements {
-        if let DesugaredStatement::Expression { span, .. } = stmt {
+        if let CoreStatement::Expression { span, .. } = stmt {
             return Err(runtime_error!(
                 Some(*span),
                 "cannot have final operand as a top-level statement"

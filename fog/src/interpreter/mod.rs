@@ -1,5 +1,5 @@
 use crate::error::FogResult;
-use crate::parser::desugared_expr::DesugaredStatement;
+use crate::parser::core_expr::CoreStatement;
 
 pub mod environment;
 pub mod eval_type;
@@ -11,6 +11,6 @@ pub mod type_check;
 pub mod value;
 pub mod variable;
 
-pub fn interpret(statements: &Vec<DesugaredStatement>) -> FogResult<()> {
+pub fn interpret(statements: &Vec<CoreStatement>) -> FogResult<()> {
     interpreter::interpret(statements)
 }

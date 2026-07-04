@@ -3,8 +3,8 @@ use std::fmt::Display;
 use crate::error::FogError;
 use crate::lexer::token::Token;
 
+pub mod core_expr;
 pub mod desugar;
-pub mod desugared_expr;
 mod parsed_expr;
 pub mod parser;
 mod resolved_expr;
@@ -25,9 +25,7 @@ impl Display for Literal {
     }
 }
 
-pub fn parse_program(
-    tokens: &Vec<Token>,
-) -> (Vec<desugared_expr::DesugaredStatement>, Vec<FogError>) {
+pub fn parse_program(tokens: &Vec<Token>) -> (Vec<core_expr::CoreStatement>, Vec<FogError>) {
     let (parsed_stmts, parser_errors) = parser::parse(&tokens);
     let (resolved_stmts, resolver_errors) = resolver::resolve(parsed_stmts);
     let (desugared_stmts, desugar_errors) = desugar::desugar(resolved_stmts);

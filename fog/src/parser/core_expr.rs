@@ -9,35 +9,35 @@ use crate::util::{fmt_parenthesized, format_joined};
 // --- statements ---
 
 #[derive(Clone)]
-pub enum DesugaredStatement {
+pub enum CoreStatement {
     TypeAnnotation {
         name: String,
-        expr: DesugaredExpr,
+        expr: CoreExpr,
         span: Span,
     },
     Declaration {
-        pattern: DesugaredDeclPattern,
-        expr: DesugaredExpr,
+        pattern: CoreDeclPattern,
+        expr: CoreExpr,
         span: Span,
     },
     Expression {
-        expr: DesugaredExpr,
+        expr: CoreExpr,
         span: Span,
     },
 }
 
-impl Display for DesugaredStatement {
+impl Display for CoreStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DesugaredStatement::TypeAnnotation { name, expr, .. } => {
+            CoreStatement::TypeAnnotation { name, expr, .. } => {
                 write!(f, "{} : {}", name, expr)
             }
 
-            DesugaredStatement::Declaration { pattern, expr, .. } => {
+            CoreStatement::Declaration { pattern, expr, .. } => {
                 write!(f, "{} = {}", pattern, expr)
             }
 
-            DesugaredStatement::Expression { expr, .. } => {
+            CoreStatement::Expression { expr, .. } => {
                 write!(f, "{}", expr)
             }
         }
@@ -49,25 +49,25 @@ impl Display for DesugaredStatement {
 // -- declaration statement
 
 #[derive(Clone)]
-pub enum DesugaredDeclPattern {
+pub enum CoreDeclPattern {
     Identifier {
         name: String,
         span: Span,
     },
     Tuple {
-        items: Vec<DesugaredTupleDeclPattern>,
+        items: Vec<CoreTupleDeclPattern>,
         span: Span,
     },
 }
 
-impl Display for DesugaredDeclPattern {
+impl Display for CoreDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DesugaredDeclPattern::Identifier { name, .. } => {
+            CoreDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
 
-            DesugaredDeclPattern::Tuple { items, .. } => {
+            CoreDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
         }
@@ -77,25 +77,25 @@ impl Display for DesugaredDeclPattern {
 // -- tuple declaration
 
 #[derive(Clone)]
-pub enum DesugaredTupleDeclPattern {
+pub enum CoreTupleDeclPattern {
     Identifier {
         name: String,
         span: Span,
     },
     Tuple {
-        items: Vec<DesugaredTupleDeclPattern>,
+        items: Vec<CoreTupleDeclPattern>,
         span: Span,
     },
 }
 
-impl Display for DesugaredTupleDeclPattern {
+impl Display for CoreTupleDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DesugaredTupleDeclPattern::Identifier { name, .. } => {
+            CoreTupleDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
 
-            DesugaredTupleDeclPattern::Tuple { items, .. } => {
+            CoreTupleDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
         }
@@ -105,13 +105,13 @@ impl Display for DesugaredTupleDeclPattern {
 // -- match arm pattern
 
 #[derive(Clone)]
-pub enum DesugaredMatchArmPattern {
+pub enum CoreMatchArmPattern {
     Literal {
         literal: Literal,
         span: Span,
     },
     Tuple {
-        items: Vec<DesugaredMatchArmPattern>,
+        items: Vec<CoreMatchArmPattern>,
         span: Span,
     },
     Identifier {
@@ -120,38 +120,38 @@ pub enum DesugaredMatchArmPattern {
     },
     DataConstructor {
         name: String,
-        args: Vec<DesugaredMatchArmPattern>,
+        args: Vec<CoreMatchArmPattern>,
         span: Span,
     },
 }
 
-impl DesugaredMatchArmPattern {
+impl CoreMatchArmPattern {
     pub fn span(&self) -> Span {
         match *self {
-            DesugaredMatchArmPattern::Literal { span, .. }
-            | DesugaredMatchArmPattern::Tuple { span, .. }
-            | DesugaredMatchArmPattern::Identifier { span, .. }
-            | DesugaredMatchArmPattern::DataConstructor { span, .. } => span,
+            CoreMatchArmPattern::Literal { span, .. }
+            | CoreMatchArmPattern::Tuple { span, .. }
+            | CoreMatchArmPattern::Identifier { span, .. }
+            | CoreMatchArmPattern::DataConstructor { span, .. } => span,
         }
     }
 }
 
-impl Display for DesugaredMatchArmPattern {
+impl Display for CoreMatchArmPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DesugaredMatchArmPattern::Literal { literal, .. } => {
+            CoreMatchArmPattern::Literal { literal, .. } => {
                 write!(f, "{literal}")
             }
 
-            DesugaredMatchArmPattern::Tuple { items, .. } => {
+            CoreMatchArmPattern::Tuple { items, .. } => {
                 write!(f, "({})", format_joined(items, ", "))
             }
 
-            DesugaredMatchArmPattern::Identifier { name, .. } => {
+            CoreMatchArmPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
 
-            DesugaredMatchArmPattern::DataConstructor { name, args, .. } => {
+            CoreMatchArmPattern::DataConstructor { name, args, .. } => {
                 write!(f, "{name}")?;
                 for item in args {
                     write!(f, " ")?;
@@ -166,9 +166,9 @@ impl Display for DesugaredMatchArmPattern {
 // --- expressions ---
 
 #[derive(Clone)]
-pub enum DesugaredExpr {
+pub enum CoreExpr {
     Block {
-        statements: Vec<DesugaredStatement>,
+        statements: Vec<CoreStatement>,
         span: Span,
     },
     Identifier {
@@ -181,50 +181,50 @@ pub enum DesugaredExpr {
     },
     Lambda {
         param_name: String,
-        param_type: Box<DesugaredExpr>,
-        body: Rc<DesugaredExpr>,
+        param_type: Box<CoreExpr>,
+        body: Rc<CoreExpr>,
         span: Span,
     },
     Tuple {
-        items: Vec<DesugaredExpr>,
+        items: Vec<CoreExpr>,
         span: Span,
     },
     FunctionAppl {
         fn_name: String,
-        args: Vec<DesugaredExpr>,
+        args: Vec<CoreExpr>,
         span: Span,
     },
     Match {
-        scrutinee: Box<DesugaredExpr>,
+        scrutinee: Box<CoreExpr>,
         match_arms: Vec<DesugaredMatchArm>,
         span: Span,
     },
 }
 
-impl DesugaredExpr {
+impl CoreExpr {
     pub fn span(&self) -> Span {
         match self {
-            DesugaredExpr::Block { span, .. }
-            | DesugaredExpr::Identifier { span, .. }
-            | DesugaredExpr::Literal { span, .. }
-            | DesugaredExpr::Lambda { span, .. }
-            | DesugaredExpr::Tuple { span, .. }
-            | DesugaredExpr::FunctionAppl { span, .. }
-            | DesugaredExpr::Match { span, .. } => *span,
+            CoreExpr::Block { span, .. }
+            | CoreExpr::Identifier { span, .. }
+            | CoreExpr::Literal { span, .. }
+            | CoreExpr::Lambda { span, .. }
+            | CoreExpr::Tuple { span, .. }
+            | CoreExpr::FunctionAppl { span, .. }
+            | CoreExpr::Match { span, .. } => *span,
         }
     }
 }
 
 #[derive(Clone)]
 pub struct DesugaredMatchArm {
-    pub pattern: DesugaredMatchArmPattern,
-    pub value_expr: DesugaredExpr,
+    pub pattern: CoreMatchArmPattern,
+    pub value_expr: CoreExpr,
 }
 
-impl Display for DesugaredExpr {
+impl Display for CoreExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DesugaredExpr::Block { statements, .. } => {
+            CoreExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
                 for stmt in statements {
                     write!(f, "    {}\n", stmt)?;
@@ -232,25 +232,25 @@ impl Display for DesugaredExpr {
                 write!(f, "}}")
             }
 
-            DesugaredExpr::Identifier { name, .. } => {
+            CoreExpr::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
 
-            DesugaredExpr::Literal { literal, .. } => {
+            CoreExpr::Literal { literal, .. } => {
                 write!(f, "{literal}")
             }
 
-            DesugaredExpr::Tuple { items, .. } => {
+            CoreExpr::Tuple { items, .. } => {
                 write!(f, "({})", format_joined(items, ", "))
             }
 
-            DesugaredExpr::Lambda {
+            CoreExpr::Lambda {
                 param_name, body, ..
             } => {
                 write!(f, "{param_name} => {body}")
             }
 
-            DesugaredExpr::FunctionAppl { fn_name, args, .. } => {
+            CoreExpr::FunctionAppl { fn_name, args, .. } => {
                 write!(f, "{fn_name}")?;
 
                 for arg in args {
@@ -261,7 +261,7 @@ impl Display for DesugaredExpr {
                 Ok(())
             }
 
-            DesugaredExpr::Match {
+            CoreExpr::Match {
                 scrutinee,
                 match_arms,
                 ..

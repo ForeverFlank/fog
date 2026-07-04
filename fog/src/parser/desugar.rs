@@ -5,12 +5,12 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parse_error;
-use crate::parser::desugared_expr::DesugaredDeclPattern;
-use crate::parser::desugared_expr::DesugaredExpr;
-use crate::parser::desugared_expr::DesugaredMatchArm;
-use crate::parser::desugared_expr::DesugaredMatchArmPattern;
-use crate::parser::desugared_expr::DesugaredStatement;
-use crate::parser::desugared_expr::DesugaredTupleDeclPattern;
+use crate::parser::core_expr::CoreDeclPattern;
+use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreMatchArmPattern;
+use crate::parser::core_expr::CoreStatement;
+use crate::parser::core_expr::CoreTupleDeclPattern;
+use crate::parser::core_expr::DesugaredMatchArm;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedMatchArmPattern;
@@ -18,32 +18,32 @@ use crate::parser::resolved_expr::ResolvedStatement;
 use crate::parser::resolved_expr::ResolvedTupleDeclPattern;
 
 enum DesugarResult {
-    Statement(DesugaredStatement),
+    Statement(CoreStatement),
     Declaration {
         pattern: ResolvedDeclPattern,
-        expr: DesugaredExpr,
+        expr: CoreExpr,
         span: Span,
     },
 }
 
-pub fn desugar(resolved_stmts: Vec<ResolvedStatement>) -> (Vec<DesugaredStatement>, Vec<FogError>) {
+pub fn desugar(resolved_stmts: Vec<ResolvedStatement>) -> (Vec<CoreStatement>, Vec<FogError>) {
     desugar_statements(resolved_stmts)
 }
 
 fn desugar_block(
     resolved_stmts: Vec<ResolvedStatement>,
     span: Span,
-) -> (FogResult<DesugaredExpr>, Vec<FogError>) {
+) -> (FogResult<CoreExpr>, Vec<FogError>) {
     let (statements, errors) = desugar_statements(resolved_stmts);
-    let block = DesugaredExpr::Block { statements, span };
+    let block = CoreExpr::Block { statements, span };
 
     (Ok(block), errors)
 }
 
 fn desugar_statements(
     resolved_stmts: Vec<ResolvedStatement>,
-) -> (Vec<DesugaredStatement>, Vec<FogError>) {
-    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<DesugaredMatchArmPattern>, DesugaredExpr)>> =
+) -> (Vec<CoreStatement>, Vec<FogError>) {
+    let mut fn_decl_patterns: HashMap<String, Vec<(Vec<CoreMatchArmPattern>, CoreExpr)>> =
         HashMap::new();
     let mut statements = Vec::new();
     let mut errors = Vec::new();
@@ -69,8 +69,8 @@ fn desugar_statements(
 
         match pattern {
             ResolvedDeclPattern::Identifier { name, span } => {
-                statements.push(DesugaredStatement::Declaration {
-                    pattern: DesugaredDeclPattern::Identifier { name, span },
+                statements.push(CoreStatement::Declaration {
+                    pattern: CoreDeclPattern::Identifier { name, span },
                     expr,
                     span,
                 });
@@ -89,8 +89,8 @@ fn desugar_statements(
                     }
                 };
 
-                statements.push(DesugaredStatement::Declaration {
-                    pattern: DesugaredDeclPattern::Tuple { items, span },
+                statements.push(CoreStatement::Declaration {
+                    pattern: CoreDeclPattern::Tuple { items, span },
                     expr,
                     span,
                 });
@@ -145,7 +145,7 @@ fn desugar_statements(
                 let pattern = if arity == 1 {
                     items.remove(0)
                 } else {
-                    DesugaredMatchArmPattern::Tuple {
+                    CoreMatchArmPattern::Tuple {
                         items: items.clone(),
                         span: items[0].span(),
                     }
@@ -161,15 +161,15 @@ fn desugar_statements(
         let param_names = (0..arity).map(|i| format!("arg{i}")).collect::<Vec<_>>();
 
         let scrutinee = if arity == 1 {
-            DesugaredExpr::Identifier {
+            CoreExpr::Identifier {
                 name: param_names[0].clone(),
                 span,
             }
         } else {
-            DesugaredExpr::Tuple {
+            CoreExpr::Tuple {
                 items: param_names
                     .iter()
-                    .map(|name| DesugaredExpr::Identifier {
+                    .map(|name| CoreExpr::Identifier {
                         name: name.clone(),
                         span,
                     })
@@ -178,7 +178,7 @@ fn desugar_statements(
             }
         };
 
-        let match_expr = DesugaredExpr::Match {
+        let match_expr = CoreExpr::Match {
             scrutinee: scrutinee.into(),
             match_arms,
             span,
@@ -187,7 +187,7 @@ fn desugar_statements(
         // build the chained lambda
         let lambda = param_names.into_iter().zip(param_types).rev().fold(
             match_expr,
-            |body, (param_name, param_type)| DesugaredExpr::Lambda {
+            |body, (param_name, param_type)| CoreExpr::Lambda {
                 param_name,
                 param_type: param_type.into(),
                 body: Rc::new(body),
@@ -195,8 +195,8 @@ fn desugar_statements(
             },
         );
 
-        statements.push(DesugaredStatement::Declaration {
-            pattern: DesugaredDeclPattern::Identifier {
+        statements.push(CoreStatement::Declaration {
+            pattern: CoreDeclPattern::Identifier {
                 name: fn_name,
                 span,
             },
@@ -209,15 +209,15 @@ fn desugar_statements(
 }
 
 fn find_fn_clause_param_types(
-    statements: &Vec<DesugaredStatement>,
+    statements: &Vec<CoreStatement>,
     fn_name: &str,
     arity: usize,
     span: Span,
-) -> FogResult<Vec<DesugaredExpr>> {
+) -> FogResult<Vec<CoreExpr>> {
     let mut remaining_type = statements
         .iter()
         .find_map(|stmt| match stmt {
-            DesugaredStatement::TypeAnnotation { name, expr, .. } if name == fn_name => {
+            CoreStatement::TypeAnnotation { name, expr, .. } if name == fn_name => {
                 Some(expr.clone())
             }
             _ => None,
@@ -233,7 +233,7 @@ fn find_fn_clause_param_types(
 
     for _ in 0..arity {
         match remaining_type {
-            DesugaredExpr::FunctionAppl {
+            CoreExpr::FunctionAppl {
                 fn_name: op,
                 mut args,
                 ..
@@ -258,13 +258,13 @@ fn find_fn_clause_param_types(
 
 fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
     match stmt {
-        ResolvedStatement::TypeAnnotation { name, expr, span } => Ok(DesugarResult::Statement(
-            DesugaredStatement::TypeAnnotation {
+        ResolvedStatement::TypeAnnotation { name, expr, span } => {
+            Ok(DesugarResult::Statement(CoreStatement::TypeAnnotation {
                 name,
                 expr: desugar_expr(expr)?,
                 span,
-            },
-        )),
+            }))
+        }
 
         ResolvedStatement::Declaration {
             pattern,
@@ -277,7 +277,7 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
         }),
 
         ResolvedStatement::Expression { expr, span } => {
-            Ok(DesugarResult::Statement(DesugaredStatement::Expression {
+            Ok(DesugarResult::Statement(CoreStatement::Expression {
                 expr: desugar_expr(expr)?,
                 span,
             }))
@@ -287,13 +287,13 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
 
 fn desugar_tuple_decl_pattern(
     pattern: ResolvedTupleDeclPattern,
-) -> FogResult<DesugaredTupleDeclPattern> {
+) -> FogResult<CoreTupleDeclPattern> {
     match pattern {
         ResolvedTupleDeclPattern::Identifier { name, span } => {
-            Ok(DesugaredTupleDeclPattern::Identifier { name, span })
+            Ok(CoreTupleDeclPattern::Identifier { name, span })
         }
 
-        ResolvedTupleDeclPattern::Tuple { items, span } => Ok(DesugaredTupleDeclPattern::Tuple {
+        ResolvedTupleDeclPattern::Tuple { items, span } => Ok(CoreTupleDeclPattern::Tuple {
             items: items
                 .into_iter()
                 .map(desugar_tuple_decl_pattern)
@@ -303,15 +303,13 @@ fn desugar_tuple_decl_pattern(
     }
 }
 
-fn desugar_match_arm_pattern(
-    pattern: ResolvedMatchArmPattern,
-) -> FogResult<DesugaredMatchArmPattern> {
+fn desugar_match_arm_pattern(pattern: ResolvedMatchArmPattern) -> FogResult<CoreMatchArmPattern> {
     match pattern {
         ResolvedMatchArmPattern::Literal { literal, span } => {
-            Ok(DesugaredMatchArmPattern::Literal { literal, span })
+            Ok(CoreMatchArmPattern::Literal { literal, span })
         }
 
-        ResolvedMatchArmPattern::Tuple { items, span } => Ok(DesugaredMatchArmPattern::Tuple {
+        ResolvedMatchArmPattern::Tuple { items, span } => Ok(CoreMatchArmPattern::Tuple {
             items: items
                 .into_iter()
                 .map(desugar_match_arm_pattern)
@@ -320,11 +318,11 @@ fn desugar_match_arm_pattern(
         }),
 
         ResolvedMatchArmPattern::Identifier { name, span } => {
-            Ok(DesugaredMatchArmPattern::Identifier { name, span })
+            Ok(CoreMatchArmPattern::Identifier { name, span })
         }
 
         ResolvedMatchArmPattern::DataConstructor { name, args, span } => {
-            Ok(DesugaredMatchArmPattern::DataConstructor {
+            Ok(CoreMatchArmPattern::DataConstructor {
                 name,
                 args: args
                     .into_iter()
@@ -336,27 +334,27 @@ fn desugar_match_arm_pattern(
     }
 }
 
-fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<DesugaredExpr> {
+fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
     match resolved_expr {
         ResolvedExpr::Block { statements, span } => Ok(desugar_block(statements, span).0?),
 
-        ResolvedExpr::Identifier { name, span } => Ok(DesugaredExpr::Identifier { name, span }),
+        ResolvedExpr::Identifier { name, span } => Ok(CoreExpr::Identifier { name, span }),
 
-        ResolvedExpr::Literal { literal, span } => Ok(DesugaredExpr::Literal { literal, span }),
+        ResolvedExpr::Literal { literal, span } => Ok(CoreExpr::Literal { literal, span }),
 
         ResolvedExpr::Lambda {
             param_name,
             param_type,
             body,
             span,
-        } => Ok(DesugaredExpr::Lambda {
+        } => Ok(CoreExpr::Lambda {
             param_name,
             param_type: desugar_expr(*param_type)?.into(),
             body: desugar_expr((*body).clone())?.into(),
             span,
         }),
 
-        ResolvedExpr::Tuple { items, span } => Ok(DesugaredExpr::Tuple {
+        ResolvedExpr::Tuple { items, span } => Ok(CoreExpr::Tuple {
             items: items
                 .into_iter()
                 .map(desugar_expr)
@@ -368,7 +366,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<DesugaredExpr> {
             fn_name,
             args,
             span,
-        } => Ok(DesugaredExpr::FunctionAppl {
+        } => Ok(CoreExpr::FunctionAppl {
             fn_name,
             args: args
                 .into_iter()
@@ -381,7 +379,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<DesugaredExpr> {
             scrutinee,
             match_arms,
             span,
-        } => Ok(DesugaredExpr::Match {
+        } => Ok(CoreExpr::Match {
             scrutinee: desugar_expr(*scrutinee)?.into(),
             match_arms: match_arms
                 .into_iter()
