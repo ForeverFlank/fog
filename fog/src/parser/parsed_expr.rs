@@ -72,6 +72,17 @@ pub enum ParsedDeclPattern {
     },
 }
 
+impl ParsedDeclPattern {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedDeclPattern::Identifier { span, .. }
+            | ParsedDeclPattern::Literal { span, .. }
+            | ParsedDeclPattern::Tuple { span, .. }
+            | ParsedDeclPattern::Collection { span, .. } => *span,
+        }
+    }
+}
+
 impl Display for ParsedDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

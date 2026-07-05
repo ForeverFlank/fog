@@ -3,7 +3,8 @@ use std::fmt::Display;
 
 use crate::error::Span;
 use crate::parser::Literal;
-use crate::util::{fmt_parenthesized, format_joined};
+use crate::util::fmt_parenthesized;
+use crate::util::format_joined;
 
 // --- statements ---
 

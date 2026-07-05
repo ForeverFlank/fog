@@ -1,9 +1,28 @@
 use std::fmt;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct Span {
+pub struct Pos {
     pub line: usize,
     pub column: usize,
+}
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct Span {
+    pub start: Pos,
+    pub end: Pos,
+}
+
+impl Span {
+    pub fn new(start: Pos, end: Pos) -> Span {
+        Span { start, end }
+    }
+
+    pub fn merge(start: Span, end: Span) -> Span {
+        Span {
+            start: start.start,
+            end: end.end,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -38,7 +57,7 @@ impl fmt::Display for FogError {
             Some(span) => write!(
                 f,
                 "{} error ({}:{}): {}",
-                self.kind, span.line, span.column, self.message
+                self.kind, span.start.line, span.start.column, self.message
             ),
             None => write!(f, "{} error: {}", self.kind, self.message),
         }

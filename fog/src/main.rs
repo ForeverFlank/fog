@@ -85,8 +85,8 @@ fn print_tokens(tokens: &Vec<Token>) {
     for token in tokens.as_slice() {
         eprintln!(
             " {: >4}:{: >4} | {}",
-            token.line,
-            token.column,
+            token.span.start.line,
+            token.span.start.column,
             token.kind.to_string()
         )
     }

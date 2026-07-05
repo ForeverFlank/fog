@@ -1,5 +1,7 @@
 use crate::error::FogError;
 use crate::error::FogResult;
+use crate::error::Pos;
+use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
 use crate::parser::Literal;
@@ -18,11 +20,16 @@ pub struct Parser<'a> {
 
 impl Parser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
+        let eof_pos = tokens.last().map_or(
+            Pos {
+                line: 1,
+                column: 1,
+            },
+            |t| t.span.end,
+        );
         let eof_token = Token {
             kind: TokenKind::Eof,
-            pos: tokens.last().map_or(0, |t| t.pos + 1),
-            line: tokens.last().map_or(1, |t| t.line),
-            column: tokens.last().map_or(1, |t| t.column + 1),
+            span: Span::new(eof_pos, eof_pos),
         };
         Parser {
             tokens,
@@ -81,7 +88,7 @@ impl Parser<'_> {
     }
 
     fn parse_block_statement(&mut self) -> FogResult<ParsedStatement> {
-        let span = self.peek().span();
+        let start_span = self.peek().span;
 
         let ahead = self.peek_offset(1).clone();
 
@@ -93,6 +100,7 @@ impl Parser<'_> {
                 self.next(); // :
 
                 let expr = self.parse_expression()?;
+                let span = Span::merge(start_span, expr.span());
 
                 Ok(ParsedStatement::TypeAnnotation { name, expr, span })
             }
@@ -109,9 +117,13 @@ impl Parser<'_> {
                 }
 
                 let expr = self.parse_expression()?;
+                let span = Span::merge(start_span, expr.span());
 
                 Ok(ParsedStatement::Declaration {
-                    pattern: ParsedDeclPattern::Identifier { name, span },
+                    pattern: ParsedDeclPattern::Identifier {
+                        name,
+                        span: start_span,
+                    },
                     expr,
                     span,
                 })
@@ -127,6 +139,7 @@ impl Parser<'_> {
 
                     let pattern = expr.into_decl_pattern()?;
                     let expr = self.parse_expression()?;
+                    let span = Span::merge(pattern.span(), expr.span());
 
                     Ok(ParsedStatement::Declaration {
                         pattern,
@@ -134,6 +147,7 @@ impl Parser<'_> {
                         span,
                     })
                 } else {
+                    let span = expr.span();
                     Ok(ParsedStatement::Expression { expr, span })
                 }
             }
@@ -142,7 +156,7 @@ impl Parser<'_> {
 
     fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
         let mut args = Vec::new();
-        let span = self.peek().span();
+        let start_span = self.peek().span;
 
         loop {
             let atom = self.parse_atomic()?;
@@ -151,7 +165,11 @@ impl Parser<'_> {
             let token = self.peek();
 
             if let Some(kind) = OpKind::from_token(token) {
-                args.push(ParsedExpr::Op { kind, span });
+                let op_span = token.span;
+                args.push(ParsedExpr::Op {
+                    kind,
+                    span: op_span,
+                });
                 self.next();
             } else if token.kind.is_primary_starter() {
                 continue;
@@ -163,13 +181,14 @@ impl Parser<'_> {
         if args.len() == 1 {
             Ok(args[0].clone())
         } else {
+            let span = Span::merge(start_span, args.last().unwrap().span());
             Ok(ParsedExpr::Collection { items: args, span })
         }
     }
 
     fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
         let token = self.peek().clone();
-        let span = token.span();
+        let span = token.span;
 
         match token.kind {
             TokenKind::Int32Literal(value) => {
@@ -207,7 +226,7 @@ impl Parser<'_> {
                     let param_type = self.parse_expression()?;
 
                     let TokenKind::FatArrow = self.peek().kind else {
-                        return Err(parse_error!(Some(self.peek().span()), "expected `=>`"));
+                        return Err(parse_error!(Some(self.peek().span), "expected `=>`"));
                     };
                     self.next();
 
@@ -217,6 +236,7 @@ impl Parser<'_> {
                     }
 
                     let body = self.parse_expression()?;
+                    let span = Span::merge(span, body.span());
 
                     return Ok(ParsedExpr::Lambda {
                         param_name: name,
@@ -234,10 +254,11 @@ impl Parser<'_> {
                 self.next();
 
                 if let TokenKind::RightParenthesis = self.peek().kind {
+                    let close_span = self.peek().span;
                     self.next();
                     return Ok(ParsedExpr::Tuple {
                         items: Vec::new(),
-                        span,
+                        span: Span::merge(span, close_span),
                     });
                 }
 
@@ -249,12 +270,16 @@ impl Parser<'_> {
 
                     match self.peek().kind {
                         TokenKind::RightParenthesis => {
+                            let close_span = self.peek().span;
                             self.next();
 
                             if items.len() == 1 {
                                 return Ok(items[0].clone());
                             } else {
-                                return Ok(ParsedExpr::Tuple { items, span });
+                                return Ok(ParsedExpr::Tuple {
+                                    items,
+                                    span: Span::merge(span, close_span),
+                                });
                             }
                         }
 
@@ -264,7 +289,7 @@ impl Parser<'_> {
                         }
 
                         _ => {
-                            return Err(parse_error!(Some(token.span()), "expected `)`"));
+                            return Err(parse_error!(Some(token.span), "expected `)`"));
                         }
                     }
                 }
@@ -273,8 +298,11 @@ impl Parser<'_> {
             // block statement
             TokenKind::LeftBrace => {
                 self.next();
-                let statements = self.parse_block()?;
-                Ok(ParsedExpr::Block { statements, span })
+                let (statements, close_span) = self.parse_block()?;
+                Ok(ParsedExpr::Block {
+                    statements,
+                    span: Span::merge(span, close_span),
+                })
             }
 
             // match
@@ -284,16 +312,16 @@ impl Parser<'_> {
                 let scrutinee = Box::new(self.parse_expression()?);
 
                 let TokenKind::LeftBrace = self.peek().kind else {
-                    return Err(parse_error!(Some(self.peek().span()), "expected `{{`"));
+                    return Err(parse_error!(Some(self.peek().span), "expected `{{`"));
                 };
                 self.next();
 
-                let match_arms = self.parse_match_arms()?;
+                let (match_arms, close_span) = self.parse_match_arms()?;
 
                 Ok(ParsedExpr::Match {
                     scrutinee,
                     match_arms,
-                    span,
+                    span: Span::merge(span, close_span),
                 })
             }
 
@@ -301,7 +329,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_match_arms(&mut self) -> FogResult<Vec<ParsedMatchArm>> {
+    fn parse_match_arms(&mut self) -> FogResult<(Vec<ParsedMatchArm>, Span)> {
         let mut arms = Vec::new();
 
         while let TokenKind::Newline = self.peek().kind {
@@ -314,14 +342,15 @@ impl Parser<'_> {
             }
 
             if let TokenKind::RightBrace = self.peek().kind {
+                let close_span = self.peek().span;
                 self.next();
-                break;
+                return Ok((arms, close_span));
             }
 
             let pattern = self.parse_expression()?;
 
             let TokenKind::FatArrow = self.peek().kind else {
-                return Err(parse_error!(Some(self.peek().span()), "expected `=>`"));
+                return Err(parse_error!(Some(self.peek().span), "expected `=>`"));
             };
             self.next();
 
@@ -341,11 +370,9 @@ impl Parser<'_> {
                 self.next();
             }
         }
-
-        Ok(arms)
     }
 
-    fn parse_block(&mut self) -> FogResult<Vec<ParsedStatement>> {
+    fn parse_block(&mut self) -> FogResult<(Vec<ParsedStatement>, Span)> {
         let mut statements = Vec::new();
 
         while let TokenKind::Newline = self.peek().kind {
@@ -354,8 +381,9 @@ impl Parser<'_> {
 
         loop {
             if let TokenKind::RightBrace = self.peek().kind {
+                let close_span = self.peek().span;
                 self.next();
-                break;
+                return Ok((statements, close_span));
             }
             if let TokenKind::Eof = self.peek().kind {
                 return Err(parse_error!(None, "unclosed block"));
@@ -368,7 +396,5 @@ impl Parser<'_> {
                 self.next();
             }
         }
-
-        Ok(statements)
     }
 }

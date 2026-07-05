@@ -1,5 +1,7 @@
+use crate::error::FogError;
+use crate::error::FogResult;
+use crate::error::Pos;
 use crate::error::Span;
-use crate::error::{FogError, FogResult};
 use crate::lex_error;
 use crate::lexer::token::*;
 
@@ -24,6 +26,13 @@ impl Lexer {
         self.chars.get(self.pos).copied()
     }
 
+    fn current_pos(&self) -> Pos {
+        Pos {
+            line: self.line,
+            column: self.column,
+        }
+    }
+
     fn next(&mut self) {
         if let Some(ch) = self.peek() {
             if ch == '\n' {
@@ -46,15 +55,14 @@ impl Lexer {
                 continue;
             }
 
-            let start_line = lexer.line;
-            let start_column = lexer.column;
+            let start = lexer.current_pos();
 
             let result: Option<FogResult<Token>> = lexer
-                .parse_newline(start_line, start_column)
-                .or_else(|| lexer.parse_word(start_line, start_column))
-                .or_else(|| lexer.parse_number(start_line, start_column))
-                .or_else(|| lexer.parse_two_char_symbol(start_line, start_column))
-                .or_else(|| lexer.parse_one_char_symbol(start_line, start_column));
+                .parse_newline(start)
+                .or_else(|| lexer.parse_word(start))
+                .or_else(|| lexer.parse_number(start))
+                .or_else(|| lexer.parse_two_char_symbol(start))
+                .or_else(|| lexer.parse_one_char_symbol(start));
 
             match result {
                 Some(Ok(token)) => tokens.push(token),
@@ -88,8 +96,7 @@ impl Lexer {
         false
     }
 
-    fn parse_word(&mut self, start_line: usize, start_column: usize) -> Option<FogResult<Token>> {
-        let pos = self.pos;
+    fn parse_word(&mut self, start: Pos) -> Option<FogResult<Token>> {
         let ch = self.peek()?;
 
         if !(ch.is_alphabetic() || ch == '_') {
@@ -111,18 +118,12 @@ impl Lexer {
 
         Some(Ok(Token {
             kind,
-            pos,
-            line: start_line,
-            column: start_column,
+            span: Span::new(start, self.current_pos()),
         }))
     }
 
-    fn parse_number(&mut self, start_line: usize, start_column: usize) -> Option<FogResult<Token>> {
-        let pos = self.pos;
-        let span = Span {
-            line: start_line,
-            column: start_column,
-        };
+    fn parse_number(&mut self, start: Pos) -> Option<FogResult<Token>> {
+        let span = Span::new(start, start);
 
         let ch = self.peek()?;
 
@@ -150,6 +151,8 @@ impl Lexer {
             }
         }
 
+        let span = Span::new(start, self.current_pos());
+
         let kind = if decimal {
             match num.parse::<f32>() {
                 Ok(v) => TokenKind::Float32Literal(v),
@@ -161,35 +164,19 @@ impl Lexer {
             match num.parse::<i32>() {
                 Ok(v) => TokenKind::Int32Literal(v),
                 Err(_) => {
-                    return Some(Err(lex_error!(
-                        Some(Span {
-                            line: start_line,
-                            column: start_column
-                        }),
-                        "Integer parse error"
-                    )));
+                    return Some(Err(lex_error!(Some(span), "Integer parse error")));
                 }
             }
         };
 
-        Some(Ok(Token {
-            kind,
-            pos,
-            line: start_line,
-            column: start_column,
-        }))
+        Some(Ok(Token { kind, span }))
     }
 
-    fn parse_two_char_symbol(
-        &mut self,
-        start_line: usize,
-        start_column: usize,
-    ) -> Option<FogResult<Token>> {
+    fn parse_two_char_symbol(&mut self, start: Pos) -> Option<FogResult<Token>> {
         if self.pos + 1 >= self.chars.len() {
             return None;
         }
 
-        let pos = self.pos;
         let sym = self.chars[self.pos..self.pos + 2]
             .iter()
             .collect::<String>();
@@ -201,18 +188,11 @@ impl Lexer {
 
         Some(Ok(Token {
             kind,
-            pos,
-            line: start_line,
-            column: start_column,
+            span: Span::new(start, self.current_pos()),
         }))
     }
 
-    fn parse_one_char_symbol(
-        &mut self,
-        start_line: usize,
-        start_column: usize,
-    ) -> Option<FogResult<Token>> {
-        let pos = self.pos;
+    fn parse_one_char_symbol(&mut self, start: Pos) -> Option<FogResult<Token>> {
         let sym = self.peek()?;
 
         let token_type = match_one_char_token(sym)?;
@@ -221,18 +201,11 @@ impl Lexer {
 
         Some(Ok(Token {
             kind: token_type,
-            pos,
-            line: start_line,
-            column: start_column,
+            span: Span::new(start, self.current_pos()),
         }))
     }
 
-    fn parse_newline(
-        &mut self,
-        start_line: usize,
-        start_column: usize,
-    ) -> Option<FogResult<Token>> {
-        let pos = self.pos;
+    fn parse_newline(&mut self, start: Pos) -> Option<FogResult<Token>> {
         let ch = self.peek()?;
 
         if ch != '\n' {
@@ -243,9 +216,7 @@ impl Lexer {
 
         Some(Ok(Token {
             kind: TokenKind::Newline,
-            pos,
-            line: start_line,
-            column: start_column,
+            span: Span::new(start, self.current_pos()),
         }))
     }
 }

@@ -141,16 +141,5 @@ impl fmt::Display for TokenKind {
 #[derive(Clone)]
 pub struct Token {
     pub kind: TokenKind,
-    pub pos: usize,
-    pub line: usize,
-    pub column: usize,
-}
-
-impl Token {
-    pub fn span(&self) -> Span {
-        Span {
-            line: self.line,
-            column: self.column,
-        }
-    }
+    pub span: Span,
 }

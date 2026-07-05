@@ -484,6 +484,7 @@ impl Resolver {
             let op_prec = op.precedence;
             let op_assoc = op.associativity.clone();
             let lhs_span = lhs.span();
+            let op_span = items[*index].span();
 
             *index += 1;
 
@@ -493,18 +494,19 @@ impl Resolver {
             };
 
             let rhs = self.resolve_collection(items, next_min_prec, index)?;
+            let rhs_span = rhs.span();
 
             lhs = ResolvedExpr::FunctionAppl {
                 callee: Box::new(ResolvedExpr::FunctionAppl {
                     callee: Box::new(ResolvedExpr::Identifier {
                         name: op_name,
-                        span: lhs_span,
+                        span: op_span,
                     }),
                     arg: Box::new(lhs),
-                    span: lhs_span,
+                    span: Span::merge(lhs_span, op_span),
                 }),
                 arg: Box::new(rhs),
-                span: lhs_span,
+                span: Span::merge(lhs_span, rhs_span),
             };
         }
 
@@ -517,10 +519,11 @@ impl Resolver {
         index: &mut usize,
     ) -> FogResult<ResolvedExpr> {
         let mut result = self.resolve_atomic(exprs, index)?;
-        let span = result.span();
+        let start_span = result.span();
 
         while *index < exprs.len() && exprs[*index].is_primary_starter() {
             let arg = self.resolve_atomic(exprs, index)?;
+            let span = Span::merge(start_span, arg.span());
 
             result = ResolvedExpr::FunctionAppl {
                 callee: Box::new(result),
@@ -552,6 +555,7 @@ impl Resolver {
                 span,
             } => {
                 let operand = self.resolve_atomic(exprs, index)?;
+                let full_span = Span::merge(span, operand.span());
 
                 Ok(ResolvedExpr::FunctionAppl {
                     callee: Box::new(ResolvedExpr::Identifier {
@@ -559,7 +563,7 @@ impl Resolver {
                         span,
                     }),
                     arg: Box::new(operand),
-                    span,
+                    span: full_span,
                 })
             }
 
