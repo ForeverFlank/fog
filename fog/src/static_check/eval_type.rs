@@ -2,6 +2,10 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::parser::core_expr::CoreExpr;
 use crate::runtime_error;
+use crate::static_check::environment::Environment;
+use crate::static_check::kind::Kind;
+use crate::static_check::r#type::DataConstructor;
+use crate::static_check::r#type::Type;
 use crate::type_check_error;
 
 // --- annotation (kind or type) ---

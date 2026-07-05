@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::error::FogError;
 use crate::error::FogResult;
@@ -24,11 +23,6 @@ enum DesugarResult {
         expr: CoreExpr,
         span: Span,
     },
-}
-struct FunctionClause {
-    arg_patterns: Vec<ResolvedDeclPattern>,
-    body: DesugaredExpr,
-    span: Span,
 }
 
 pub fn desugar(resolved_stmts: Vec<ResolvedStatement>) -> (Vec<CoreStatement>, Vec<FogError>) {

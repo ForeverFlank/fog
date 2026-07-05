@@ -4,15 +4,15 @@ use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
 
 #[derive(Clone)]
-pub struct VarVariable {
+pub struct ValueVariable {
     pub name: String,
     pub r#type: Type,
     pub declared: bool,
 }
 
-impl VarVariable {
+impl ValueVariable {
     pub fn new(name: &str, r#type: Type, declared: bool) -> Self {
-        VarVariable {
+        ValueVariable {
             name: name.to_string(),
             r#type,
             declared,

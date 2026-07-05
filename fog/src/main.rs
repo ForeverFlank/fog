@@ -2,10 +2,8 @@ use std::env;
 use std::fs;
 
 use crate::error::*;
-use crate::interpreter::*;
 use crate::lexer::token::*;
 use crate::lexer::*;
-use crate::optimizer::optimizer::optimize;
 use crate::parser::*;
 
 mod error;
@@ -41,27 +39,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (top_stmts, parser_errors) = parse_program(&tokens);
     print_errors("parser", &parser_errors);
 
+    // -- static check
+
     // -- optimizing
 
-    let optimize_res = optimize(top_stmts);
-    print_errors("optimizer", &parser_errors);
+    // let  = optimize(top_stmts);
+    // print_errors("optimizer", &parser_errors);
 
-    if !lexer_errors.is_empty() || !parser_errors.is_empty() || !optimizer_errors.is_empty() {
+    if !lexer_errors.is_empty() || !parser_errors.is_empty()
+    /* || !optimizer_errors.is_empty() */
+    {
         return Err("syntax error".into());
     }
 
     // -- interpreting
-    let res = interpret(&optimized_top_stmts);
+    // let res = interpret(&optimized_top_stmts);
 
-    if let Err(error) = res {
-        match error.span {
-            Some(span) => println!(
-                "runtime error ({}:{}): {}",
-                span.line, span.column, error.message
-            ),
-            None => println!("runtime error: {}", error.message),
-        }
-    }
+    // if let Err(error) = res {
+    //     match error.span {
+    //         Some(span) => println!(
+    //             "runtime error ({}:{}): {}",
+    //             span.line, span.column, error.message
+    //         ),
+    //         None => println!("runtime error: {}", error.message),
+    //     }
+    // }
 
     Ok(())
 }

@@ -256,7 +256,7 @@ impl<'a> Scope<'a> {
 
 // --- optimizer ---
 
-pub fn optimize(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<FogError>> {
+pub fn optimize(stmts: Vec<CoreStatement>) -> (Vec<CoreStatement>, Vec<FogError>) {
     optimize_block(stmts)
 }
 
@@ -264,11 +264,10 @@ fn optimize_expr(expr: &mut CoreExpr, errors: &mut Vec<FogError>) {
     match expr {
         CoreExpr::Block { statements, .. } => {
             let taken = std::mem::take(statements);
+            let (optimized, res_errors) = optimize_block(taken);
 
-            match optimize_block(taken) {
-                Ok(optimized) => *statements = optimized,
-                Err(mut errs) => errors.append(&mut errs),
-            }
+            *statements = optimized;
+            errors.extend(res_errors);
         }
 
         CoreExpr::Lambda { body, .. } => {
@@ -303,7 +302,7 @@ fn optimize_expr(expr: &mut CoreExpr, errors: &mut Vec<FogError>) {
     }
 }
 
-fn optimize_block(mut stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<FogError>> {
+fn optimize_block(mut stmts: Vec<CoreStatement>) -> (Vec<CoreStatement>, Vec<FogError>) {
     let optimized_stmts = Vec::new();
     let mut errors = Vec::new();
 
@@ -332,11 +331,7 @@ fn optimize_block(mut stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, V
         .flatten()
         .collect::<Vec<_>>();
 
-    if errors.is_empty() {
-        Ok(optimized_stmts)
-    } else {
-        Err(errors)
-    }
+    (optimized_stmts, errors)
 }
 
 fn visit_stmt(graph: &mut DependencyGraph, scope: &Scope, index: usize, stmt: &CoreStatement) {
