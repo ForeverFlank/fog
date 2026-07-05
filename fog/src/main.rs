@@ -40,13 +40,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     print_errors("parser", &parser_errors);
 
     // -- static check
+    let static_check_errors = static_check::static_check(&top_stmts);
+    print_errors("static check", &static_check_errors);
 
     // -- optimizing
 
     // let  = optimize(top_stmts);
     // print_errors("optimizer", &parser_errors);
 
-    if !lexer_errors.is_empty() || !parser_errors.is_empty()
+    if !lexer_errors.is_empty() || !parser_errors.is_empty() || !static_check_errors.is_empty()
     /* || !optimizer_errors.is_empty() */
     {
         return Err("syntax error".into());

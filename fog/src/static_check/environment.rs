@@ -7,12 +7,12 @@ use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
 use crate::static_check::variable::TypeVariable;
-use crate::static_check::variable::VarVariable;
+use crate::static_check::variable::ValueVariable;
 use crate::type_check_error;
 
 #[derive(Clone)]
 pub struct Environment<'a> {
-    pub variables: HashMap<String, VarVariable>,
+    pub variables: HashMap<String, ValueVariable>,
     pub types: HashMap<String, TypeVariable>,
     pub parent: Option<&'a Environment<'a>>,
 }
@@ -48,7 +48,7 @@ impl<'a> Environment<'a> {
 
     // --- getters ---
 
-    pub fn get_value_var(&self, name: &str, span: &Span) -> FogResult<VarVariable> {
+    pub fn get_value_var(&self, name: &str, span: &Span) -> FogResult<ValueVariable> {
         if let Some(var) = self.variables.get(name) {
             return Ok(var.clone());
         }
@@ -109,7 +109,7 @@ impl<'a> Environment<'a> {
         }
 
         self.variables
-            .insert(name.to_string(), VarVariable::new(name, r#type, false));
+            .insert(name.to_string(), ValueVariable::new(name, r#type, false));
 
         Ok(())
     }
@@ -169,7 +169,7 @@ impl<'a> Environment<'a> {
             // infer type from the declaration
 
             self.variables
-                .insert(name.to_string(), VarVariable::new(name, r#type, true));
+                .insert(name.to_string(), ValueVariable::new(name, r#type, true));
         }
 
         Ok(())

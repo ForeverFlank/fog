@@ -18,9 +18,13 @@ use crate::type_check_error;
 
 // --- type check ---
 
-fn check(stmts: &Vec<CoreStatement>) {
+pub fn check(stmts: &Vec<CoreStatement>) -> Vec<FogError> {
     let mut top_env = create_top_env();
-    check_scope(stmts, &mut top_env);
+    let mut all_errors = Vec::new();
+
+    check_scope(stmts, &mut top_env, &mut all_errors);
+
+    all_errors
 }
 
 fn create_top_env() -> Environment<'static> {
@@ -39,23 +43,25 @@ fn create_top_env() -> Environment<'static> {
     );
 
     vec![var_add_int32, var_subtract_int32]
-        .iter()
+        .into_iter()
         .for_each(|var| {
-            env.variables.insert(var.name.clone(), var.clone());
+            env.variables.insert(var.name.clone(), var);
         });
 
     env
 }
 
-fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment) {
+fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &mut Vec<FogError>) {
     for stmt in stmts {
-        check_statement(stmt, env);
+        check_statement(stmt, env, all_errors);
     }
 }
 
-fn check_statement(stmt: &CoreStatement, env: &mut Environment) {
-    match stmt {
-        CoreStatement::TypeAnnotation { name, expr, span } => todo!(),
+fn check_statement(stmt: &CoreStatement, env: &mut Environment, all_errors: &mut Vec<FogError>) {
+    let result = match stmt {
+        CoreStatement::TypeAnnotation { name, expr, span } => {
+            check_type_annotation(name, expr, span, env)
+        }
 
         CoreStatement::Declaration {
             pattern,
@@ -63,7 +69,23 @@ fn check_statement(stmt: &CoreStatement, env: &mut Environment) {
             span,
         } => check_declaration(pattern, expr, span, env),
 
-        CoreStatement::Expression { expr, span } => todo!(),
+        CoreStatement::Expression { expr, .. } => expr_type_of(expr, env).map(|_| ()),
+    };
+
+    if let Err(error) = result {
+        all_errors.push(error);
+    }
+}
+
+fn check_type_annotation(
+    name: &str,
+    expr: &CoreExpr,
+    span: &Span,
+    env: &mut Environment,
+) -> FogResult<()> {
+    match eval_annotation_expr(expr, env)? {
+        Annotation::Kind(kind) => env.annotate_kind(name, kind, span),
+        Annotation::Type(r#type) => env.annotate_type(name, r#type, span),
     }
 }
 
@@ -96,7 +118,7 @@ fn check_declaration(
     }
 }
 
-// like type_check_declaration but
+// like check_declaration but
 // it iterates through a possibly nested tuple
 fn bind_tuple_decl_pattern(
     items: &Vec<CoreTupleDeclPattern>,
@@ -225,16 +247,13 @@ fn block_expr_type_of(
     env: &Environment<'_>,
     span: Span,
     statements: &Vec<CoreStatement>,
-) -> Result<Type, FogError> {
+) -> FogResult<Type> {
     let mut block_env = Environment::new(Some(env));
 
     for stmt in statements {
         match stmt {
             CoreStatement::TypeAnnotation { name, expr, span } => {
-                match eval_annotation_expr(expr, &block_env)? {
-                    Annotation::Kind(kind) => block_env.annotate_kind(name, kind, span)?,
-                    Annotation::Type(r#type) => block_env.annotate_type(name, r#type, span)?,
-                };
+                check_type_annotation(name, expr, span, &mut block_env)?;
             }
 
             CoreStatement::Declaration {
