@@ -1,196 +1,119 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::rc::Rc;
 
 use crate::error::FogError;
-use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::DesugaredMatchArm;
 
 // --- node ---
 
-#[derive(Clone)]
-enum Node<'a> {
-    TypeAnnotation {
-        name: String,
-        expr: &'a CoreExpr,
-    },
-    Declaration {
-        names: Vec<String>,
-        pattern: &'a CoreDeclPattern,
-        expr: &'a CoreExpr,
-    },
-    Expression {
-        expr: &'a CoreExpr,
-    },
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum Node {
+    Stmt(usize),  // a top-level statement, by index in its block
+    Name(String), // a bound variable/type name
+    Expr(u32),    // an expression
 }
 
-impl<'a> Node<'a> {
-    fn new(stmt: &'a CoreStatement) -> Node<'a> {
-        match stmt {
-            CoreStatement::TypeAnnotation { name, expr, .. } => Node::TypeAnnotation {
-                name: name.to_string(),
-                expr,
-            },
-            CoreStatement::Declaration { pattern, expr, .. } => Node::Declaration {
-                names: pattern.all_identifiers().map(|s| s.to_string()).collect(),
-                pattern,
-                expr,
-            },
-            CoreStatement::Expression { expr, .. } => Node::Expression { expr },
+// --- union-find ---
+
+struct DisjointSet {
+    parent: Vec<usize>,
+    rank: Vec<usize>,
+}
+
+impl DisjointSet {
+    fn new() -> DisjointSet {
+        DisjointSet {
+            parent: Vec::new(),
+            rank: Vec::new(),
+        }
+    }
+
+    fn make_set(&mut self) -> usize {
+        let id = self.parent.len();
+        self.parent.push(id);
+        self.rank.push(0);
+        id
+    }
+
+    fn find(&mut self, x: usize) -> usize {
+        if self.parent[x] != x {
+            self.parent[x] = self.find(self.parent[x]);
+        }
+
+        self.parent[x]
+    }
+
+    fn union(&mut self, a: usize, b: usize) {
+        let (a, b) = (self.find(a), self.find(b));
+
+        if a == b {
+            return;
+        }
+
+        match self.rank[a].cmp(&self.rank[b]) {
+            Ordering::Less => self.parent[a] = b,
+            Ordering::Greater => self.parent[b] = a,
+            Ordering::Equal => {
+                self.parent[b] = a;
+                self.rank[a] += 1;
+            }
         }
     }
 }
 
 // --- dependency graph ---
 
-struct DependencyGraph {
-    adj_list: HashMap<String, Vec<String>>,
+struct GraphBuilder {
+    dsu: DisjointSet,
+    id_by_key: HashMap<Node, usize>,
+    edges: Vec<(usize, usize)>,
+    expr_id_counter: u32,
 }
 
-impl DependencyGraph {
-    fn new() -> DependencyGraph {
-        DependencyGraph {
-            adj_list: HashMap::new(),
+impl GraphBuilder {
+    fn new() -> GraphBuilder {
+        GraphBuilder {
+            dsu: DisjointSet::new(),
+            id_by_key: HashMap::new(),
+            expr_id_counter: 0,
+            edges: Vec::new(),
         }
     }
 
-    fn add_edge(&mut self, scope: &Scope, from_names: &[&str], to_name: String) {
+    fn node(&mut self, key: Node) -> usize {
+        if let Some(&id) = self.id_by_key.get(&key) {
+            return id;
+        }
+
+        let id = self.dsu.make_set();
+        self.id_by_key.insert(key, id);
+
+        id
+    }
+
+    fn fresh_expr_node(&mut self) -> usize {
+        let id = self.expr_id_counter;
+        self.expr_id_counter += 1;
+
+        self.node(Node::Expr(id))
+    }
+
+    fn union(&mut self, a: usize, b: usize) {
+        self.dsu.union(a, b);
+    }
+
+    fn add_edge(&mut self, scope: &Scope, from: usize, to_name: String) {
         if scope.is_unbound(&to_name) {
             return;
         }
 
-        for from_name in from_names {
-            self.adj_list
-                .entry(from_name.to_string())
-                .or_insert_with(Vec::new)
-                .push(to_name.clone());
-        }
-
-        self.adj_list.entry(to_name).or_insert_with(Vec::new);
+        let to = self.node(Node::Name(to_name));
+        self.edges.push((from, to));
     }
 }
-
-/*
-impl DependencyGraph {
-    fn new() -> DependencyGraph {
-        DependencyGraph {
-            adj_list: HashMap::new(),
-        }
-    }
-
-    fn node_index(&mut self, name: String) -> usize {
-        if let Some(index) = self.index_by_name.get(&name) {
-            *index
-        } else {
-            let index = self.node_count;
-            self.index_by_name.insert(name.clone(), index);
-            self.name_by_index.push(name);
-            self.node_count += 1;
-
-            index
-        }
-    }
-
-    fn add_dep(&mut self, decl_name: String, ref_name: String) {
-        let from_index = self.node_index(ref_name);
-        let to_index = self.node_index(decl_name);
-
-        self.adj_list
-            .entry(from_index)
-            .or_insert_with(Vec::new)
-            .push(to_index);
-
-        self.adj_list.entry(to_index).or_insert_with(Vec::new);
-    }
-
-    // Tarjan's SCC algorithm
-    // from_names https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-
-    fn toposort(&self) -> FogResult<Vec<Vec<String>>> {
-        let mut index = 0;
-        let mut indices = vec![usize::MAX; self.node_count];
-        let mut lowlinks = vec![usize::MAX; self.node_count];
-
-        let mut stack = Vec::new();
-        let mut on_stack = vec![false; self.node_count];
-
-        let mut all_sccs = Vec::new();
-
-        for v in 0..self.node_count {
-            if indices[v] == usize::MAX {
-                Self::strong_connect(
-                    v,
-                    &self.adj_list,
-                    &mut index,
-                    &mut indices,
-                    &mut lowlinks,
-                    &mut stack,
-                    &mut on_stack,
-                    &mut all_sccs,
-                );
-            }
-        }
-
-        all_sccs.reverse();
-
-        Ok(all_sccs
-            .iter()
-            .map(|scc| {
-                scc.iter()
-                    .map(|idx| self.name_by_index[*idx].clone())
-                    .collect()
-            })
-            .collect())
-    }
-
-    fn strong_connect(
-        v: usize,
-        adj_list: &HashMap<usize, Vec<usize>>,
-        index: &mut usize,
-        indices: &mut Vec<usize>,
-        lowlinks: &mut Vec<usize>,
-        stack: &mut Vec<usize>,
-        on_stack: &mut Vec<bool>,
-        all_sccs: &mut Vec<Vec<usize>>,
-    ) {
-        indices[v] = *index;
-        lowlinks[v] = *index;
-        *index += 1;
-
-        stack.push(v);
-        on_stack[v] = true;
-
-        for w in adj_list[&v].as_slice() {
-            if indices[*w] == usize::MAX {
-                Self::strong_connect(
-                    *w, adj_list, index, indices, lowlinks, stack, on_stack, all_sccs,
-                );
-                lowlinks[v] = min(lowlinks[v], lowlinks[*w]);
-            } else if on_stack[*w] {
-                lowlinks[v] = min(lowlinks[v], indices[*w]);
-            }
-        }
-
-        if lowlinks[v] == indices[v] {
-            let mut scc = Vec::new();
-
-            loop {
-                let w = stack.pop().unwrap();
-                on_stack[w] = false;
-                scc.push(w);
-
-                if v == w {
-                    break;
-                }
-            }
-
-            all_sccs.push(scc);
-        }
-    }
-}
-*/
 
 struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
@@ -218,7 +141,6 @@ impl<'a> Scope<'a> {
 }
 
 // --- optimizer ---
-// currently it just does code sinking
 
 pub fn optimize(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<FogError>> {
     optimize_block(stmts)
@@ -282,51 +204,16 @@ fn optimize_block(mut stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, V
         optimize_expr(expr, &mut errors);
     }
 
-    // collect bound variable names
-    let mut nodes = Vec::new();
-    let mut node_by_name = HashMap::new();
-    let mut bound_names = HashSet::new();
-
-    for stmt in &stmts {
-        let node = Rc::new(Node::new(stmt));
-        nodes.push(node.clone());
-
-        match stmt {
-            CoreStatement::TypeAnnotation { name, .. } => {
-                node_by_name.insert(name.to_string(), node.clone());
-                bound_names.insert(name.to_string());
-            }
-
-            CoreStatement::Declaration { pattern, .. } => {
-                for name in pattern.all_identifiers() {
-                    node_by_name.insert(name.to_string(), node.clone());
-                    bound_names.insert(name.to_string());
-                }
-            }
-
-            CoreStatement::Expression { .. } => {}
-        }
-    }
-
     // build a graph
     let scope = Scope::root();
-    let mut graph = DependencyGraph::new();
+    let mut graph_builder = GraphBuilder::new();
 
-    for stmt in stmts {
-        match stmt {
-            CoreStatement::TypeAnnotation { name, expr, .. } => {
-                let from_names = &vec![name.as_str()];
-                build_dep_from_expr(&mut graph, &scope, from_names, expr)
-            }
-
-            CoreStatement::Declaration { pattern, expr, .. } => {
-                let from_names = &pattern.all_identifiers().collect::<Vec<_>>();
-                build_dep_from_expr(&mut graph, &scope, from_names, expr);
-            }
-
-            CoreStatement::Expression { .. } => {}
-        }
+    for (index, stmt) in stmts.iter().enumerate() {
+        visit_stmt(&mut graph_builder, &scope, index, stmt);
     }
+
+    // toposort
+    // etc
 
     if errors.is_empty() {
         Ok(optimized_stmts)
@@ -335,35 +222,59 @@ fn optimize_block(mut stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, V
     }
 }
 
-fn build_dep_from_stmt(
-    graph: &mut DependencyGraph,
-    scope: &Scope,
-    from_names: &Vec<&str>,
-    stmt: CoreStatement,
-) {
+fn visit_stmt(builder: &mut GraphBuilder, scope: &Scope, index: usize, stmt: &CoreStatement) {
+    let stmt_node = builder.node(Node::Stmt(index));
+
     match stmt {
-        CoreStatement::TypeAnnotation { expr, .. }
-        | CoreStatement::Declaration { expr, .. }
-        | CoreStatement::Expression { expr, .. } => {
-            build_dep_from_expr(graph, scope, from_names, expr)
+        CoreStatement::TypeAnnotation { name, expr, .. } => {
+            let name_node = builder.node(Node::Name(name.clone()));
+            builder.union(stmt_node, name_node);
+
+            visit_expr(builder, scope, stmt_node, expr);
+        }
+
+        CoreStatement::Declaration { pattern, expr, .. } => {
+            for name in pattern.all_identifiers() {
+                let name_node = builder.node(Node::Name(name.to_string()));
+                builder.union(stmt_node, name_node);
+            }
+
+            visit_expr(builder, scope, stmt_node, expr);
+        }
+
+        CoreStatement::Expression { expr, .. } => {
+            visit_expr(builder, scope, stmt_node, expr);
         }
     }
 }
 
-fn build_dep_from_expr<'a>(
-    graph: &mut DependencyGraph,
+fn visit_stmt_expr(builder: &mut GraphBuilder, scope: &Scope, parent: usize, stmt: &CoreStatement) {
+    let expr = match stmt {
+        CoreStatement::TypeAnnotation { expr, .. }
+        | CoreStatement::Declaration { expr, .. }
+        | CoreStatement::Expression { expr, .. } => expr,
+    };
+
+    visit_expr(builder, scope, parent, expr);
+}
+
+fn visit_expr<'a>(
+    builder: &mut GraphBuilder,
     scope: &'a Scope<'a>,
-    from_names: &Vec<&str>,
-    expr: CoreExpr,
+    parent: usize,
+    expr: &CoreExpr,
 ) {
+    let this = builder.fresh_expr_node();
+    builder.union(parent, this);
+
     match expr {
         CoreExpr::Block { statements, .. } => {
             for stmt in statements {
-                build_dep_from_stmt(graph, scope, from_names, stmt);
+                visit_stmt_expr(builder, scope, this, stmt);
             }
         }
 
-        CoreExpr::Identifier { name, .. } => graph.add_edge(scope, from_names, name),
+        CoreExpr::Identifier { name, .. } => builder.add_edge(scope, this, name.clone()),
 
         CoreExpr::Literal { .. } => {}
 
@@ -373,24 +284,24 @@ fn build_dep_from_expr<'a>(
             body,
             ..
         } => {
-            build_dep_from_expr(graph, scope, from_names, *param_type);
+            visit_expr(builder, scope, this, param_type);
 
-            let unbound = HashSet::from([param_name]);
+            let unbound = HashSet::from([param_name.clone()]);
             let inner_scope = scope.child(unbound);
-            build_dep_from_expr(graph, &inner_scope, from_names, *body);
+            visit_expr(builder, &inner_scope, this, body);
         }
 
         CoreExpr::Tuple { items, .. } => {
             for item in items {
-                build_dep_from_expr(graph, scope, from_names, item);
+                visit_expr(builder, scope, this, item);
             }
         }
 
         CoreExpr::FunctionAppl { fn_name, args, .. } => {
-            graph.add_edge(scope, from_names, fn_name);
+            builder.add_edge(scope, this, fn_name.clone());
 
             for arg in args {
-                build_dep_from_expr(graph, scope, from_names, arg);
+                visit_expr(builder, scope, this, arg);
             }
         }
 
@@ -399,27 +310,27 @@ fn build_dep_from_expr<'a>(
             match_arms,
             ..
         } => {
-            build_dep_from_expr(graph, scope, from_names, *scrutinee);
+            visit_expr(builder, scope, this, scrutinee);
 
             for match_arm in match_arms {
-                build_dep_from_match_arm(graph, scope, from_names, match_arm);
+                visit_match_arm(builder, scope, this, match_arm);
             }
         }
     }
 }
 
-fn build_dep_from_match_arm<'a>(
-    graph: &mut DependencyGraph,
+fn visit_match_arm<'a>(
+    builder: &mut GraphBuilder,
     scope: &'a Scope<'a>,
-    from_names: &Vec<&str>,
-    match_arm: DesugaredMatchArm,
+    parent: usize,
+    match_arm: &DesugaredMatchArm,
 ) {
     let unbound: HashSet<String> = match_arm
         .pattern
         .all_identifiers()
-        .map(|s| s.to_string())
+        .map(|name| name.to_string())
         .collect();
 
     let inner_scope = scope.child(unbound);
-    build_dep_from_expr(graph, &inner_scope, from_names, match_arm.value_expr);
+    visit_expr(builder, &inner_scope, parent, &match_arm.value_expr);
 }
