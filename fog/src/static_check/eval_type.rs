@@ -5,7 +5,7 @@ use crate::static_check::environment::Environment;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Type;
-use crate::type_check_error;
+use crate::static_check_error;
 
 // --- annotation (kind or type) ---
 
@@ -24,7 +24,7 @@ pub fn eval_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Ann
             Ok(Annotation::Type(env.get_type(name, &span)?))
         }
 
-        CoreExpr::Identifier { name, .. } => Err(type_check_error!(
+        CoreExpr::Identifier { name, .. } => Err(static_check_error!(
             Some(span),
             "unknown type or kind `{}`",
             name
@@ -45,7 +45,7 @@ pub fn eval_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Ann
                         (Annotation::Type(t1), Annotation::Type(t2)) => {
                             Ok(Annotation::Type(Type::Function(t1.into(), t2.into())))
                         }
-                        _ => Err(type_check_error!(
+                        _ => Err(static_check_error!(
                             Some(span),
                             "mixed kind and type levels in `{}`",
                             expr.to_string()
@@ -68,13 +68,13 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
         CoreExpr::Identifier { name, .. } => env
             .get_type_var(name, &span)?
             .r#type
-            .ok_or_else(|| type_check_error!(Some(span), "undeclared type `{}`", name)),
+            .ok_or_else(|| static_check_error!(Some(span), "undeclared type `{}`", name)),
 
         CoreExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
             let CoreExpr::Identifier { name, .. } = head else {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(span),
                     "cannot type annotate a value with data constructor `{}`",
                     expr.to_string()
@@ -85,14 +85,14 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
                 ("->", &[lhs, rhs]) => eval_function_type(lhs, rhs, env),
                 ("*", &[lhs, rhs]) => eval_product_type(lhs, rhs, env),
 
-                ("+", _) => Err(type_check_error!(
+                ("+", _) => Err(static_check_error!(
                     Some(span),
                     "cannot type annotate a value with sum types"
                 )),
 
                 _ if env.contains_type(name) => apply_type_level_function(name, &args, env, &span),
 
-                _ => Err(type_check_error!(
+                _ => Err(static_check_error!(
                     Some(span),
                     "cannot type annotate a value with data constructor `{}`",
                     expr.to_string()
@@ -100,7 +100,7 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             }
         }
 
-        _ => Err(type_check_error!(
+        _ => Err(static_check_error!(
             Some(span),
             "`{}` is not a type",
             expr.to_string()
@@ -115,7 +115,7 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
         CoreExpr::Identifier { name, .. } if env.contains_type(name) => env
             .get_type_var(name, &span)?
             .r#type
-            .ok_or_else(|| type_check_error!(Some(span), "undeclared type `{}`", name)),
+            .ok_or_else(|| static_check_error!(Some(span), "undeclared type `{}`", name)),
 
         CoreExpr::Identifier { name, .. } => Ok(Type::Sum(vec![DataConstructor {
             tag: name.clone(),
@@ -126,7 +126,7 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             let (head, args) = expr.uncurry();
 
             let CoreExpr::Identifier { name, .. } = head else {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(span),
                     "`{}` is not a valid type definition",
                     expr.to_string()
@@ -155,7 +155,7 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             }
         }
 
-        _ => Err(type_check_error!(
+        _ => Err(static_check_error!(
             Some(span),
             "`{}` is not a valid type definition",
             expr.to_string()
@@ -193,14 +193,14 @@ fn eval_sum_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogRes
     let right = eval_type_definition_expr(right, env)?;
 
     let Type::Sum(ctors1) = left else {
-        return Err(type_check_error!(
+        return Err(static_check_error!(
             None,
             "`{}` is not a data constructor or a sum type",
             left.to_string()
         ));
     };
     let Type::Sum(ctors2) = right else {
-        return Err(type_check_error!(
+        return Err(static_check_error!(
             None,
             "`{}` is not a data constructor or a sum type",
             right.to_string()
@@ -220,7 +220,7 @@ pub fn apply_type_level_function(
 
     for &arg in args {
         let Type::Function(param_type, return_type) = current else {
-            return Err(type_check_error!(
+            return Err(static_check_error!(
                 Some(*span),
                 "`{}` is not a valid type constructor",
                 current.to_string()
@@ -230,7 +230,7 @@ pub fn apply_type_level_function(
         let arg_kind = eval_type_annotation_expr(arg, env)?;
 
         if arg_kind != *param_type {
-            return Err(type_check_error!(
+            return Err(static_check_error!(
                 Some(*span),
                 "type mismatch applying `{}`\n\
                  expected `{}`, found `{}`",
@@ -244,4 +244,37 @@ pub fn apply_type_level_function(
     }
 
     Ok(current)
+}
+
+// --- data constructors ---
+
+pub fn register_data_constructors(
+    env: &mut Environment,
+    parent_sum_type: &Type,
+    span: &Span,
+) -> FogResult<()> {
+    let Type::Sum(ctors) = parent_sum_type else {
+        return Err(static_check_error!(
+            Some(*span),
+            "cannot register data constructors from a non-sum type `{}`",
+            parent_sum_type.to_string()
+        ));
+    };
+
+    for ctor in ctors {
+        let ctor_type = nest_function_types(&ctor.types, parent_sum_type.clone());
+
+        println!("{}", ctor.tag);
+
+        env.annotate_type(&ctor.tag, ctor_type.clone(), span)?;
+        env.declare_var(&ctor.tag, ctor_type, span)?;
+    }
+
+    Ok(())
+}
+
+pub fn nest_function_types(field_types: &Vec<Type>, return_type: Type) -> Type {
+    field_types.iter().rev().fold(return_type, |ret, ft| {
+        Type::Function(ft.clone().into(), ret.into())
+    })
 }

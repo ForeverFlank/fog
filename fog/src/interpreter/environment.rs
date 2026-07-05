@@ -7,7 +7,7 @@ use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::TypeVariable;
 use crate::interpreter::variable::ValueVariable;
 use crate::runtime_error;
-use crate::type_check_error;
+use crate::static_check_error;
 
 #[derive(Clone)]
 pub struct Environment<'a> {
@@ -157,7 +157,7 @@ impl<'a> Environment<'a> {
             let type_of_var = var.r#type.clone();
 
             if type_of_value != type_of_var {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(*span),
                     "type mismatch when assigning variable `{name}` with `{value}`\n\
                      expected `{type_of_var}`, found `{type_of_value}`"

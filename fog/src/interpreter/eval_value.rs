@@ -178,26 +178,24 @@ pub fn eval_scope(
         }
     }
 
-    // type definitions (only a bare name can define a type; a tuple pattern
-    // can only ever be a value destructuring assignment)
+    // type definitions
     for stmt in statements {
-        // if let CoreStatement::Declaration { pattern, expr, .. } = stmt {
-        //     match pattern {
-        //         CoreDeclPattern::Identifier { name, span } => {
-        //             if env.types.contains_key(name) {
-        //                 let defined_type = eval_type_definition_expr(expr, env)?;
-        //                 env.declare_type(name, defined_type.clone(), span)?;
-        //             }
+        if let CoreStatement::Declaration { pattern, expr, .. } = stmt {
+            match pattern {
+                CoreDeclPattern::Identifier { name, span } => {
+                    // if env.types.contains_key(name) {
+                    let defined_type = eval_type_definition_expr(expr, env)?;
+                    env.declare_type(name, defined_type.clone(), span)?;
 
-        //         if let Type::Sum(_) = &defined_type {
-        //             register_data_constructors(env, &defined_type, span)?;
-        //         }
+                    if let Type::Sum(_) = &defined_type {
+                        register_data_constructors(env, &defined_type, span)?;
+                    }
+                    // }
+                }
 
-        //         // _ => return Err(runtime_error!(Some(*span), "invalid type declaration")),
-        //         _ => (),
-        //         }
-        //     }
-        // }
+                _ => return Err(runtime_error!(Some(*span), "invalid type declaration")),
+            }
+        }
     }
 
     // variable's type annotations

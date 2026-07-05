@@ -11,11 +11,12 @@ use crate::static_check::eval_type::Annotation;
 use crate::static_check::eval_type::eval_annotation_expr;
 use crate::static_check::eval_type::eval_type_annotation_expr;
 use crate::static_check::eval_type::eval_type_definition_expr;
+use crate::static_check::eval_type::register_data_constructors;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
 use crate::static_check::variable::TypeVariable;
 use crate::static_check::variable::ValueVariable;
-use crate::type_check_error;
+use crate::static_check_error;
 
 // --- type check ---
 
@@ -71,29 +72,99 @@ fn create_top_env() -> Environment<'static> {
 }
 
 fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &mut Vec<FogError>) {
+    // type kind annotations
     for stmt in stmts {
-        check_statement(stmt, env, all_errors);
-    }
-}
-
-fn check_statement(stmt: &CoreStatement, env: &mut Environment, all_errors: &mut Vec<FogError>) {
-    let result = match stmt {
-        CoreStatement::TypeAnnotation { name, expr, span } => {
-            check_type_annotation(name, expr, span, env)
+        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
+            if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
+                if let Err(error) = env.annotate_kind(&name, kind, &span) {
+                    all_errors.push(error);
+                }
+            }
         }
+    }
 
-        CoreStatement::Declaration {
+    // type declarations
+    for stmt in stmts {
+        if let CoreStatement::Declaration {
             pattern,
             expr,
             span,
-        } => check_declaration(pattern, expr, span, env),
+        } = stmt
+        {
+            if let Err(error) = check_type_declaration(pattern, expr, span, env) {
+                all_errors.push(error);
+            }
+        }
+    }
 
-        CoreStatement::Expression { expr, .. } => expr_type_of(expr, env).map(|_| ()),
+    // variable type annotations
+    for stmt in stmts {
+        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
+            match eval_annotation_expr(expr, env) {
+                Ok(Annotation::Type(r#type)) => {
+                    if let Err(error) = env.annotate_type(&name, r#type, &span) {
+                        all_errors.push(error);
+                    }
+                }
+                Ok(Annotation::Kind(_)) => {}
+                Err(error) => all_errors.push(error),
+            }
+        }
+    }
+
+    // variable declarations
+    for stmt in stmts {
+        if let CoreStatement::Declaration {
+            pattern,
+            expr,
+            span,
+        } = stmt
+        {
+            let is_type_decl = matches!(
+                pattern,
+                CoreDeclPattern::Identifier { name, .. } if env.types.contains_key(name)
+            );
+
+            if !is_type_decl {
+                if let Err(error) = check_declaration(pattern, expr, span, env) {
+                    all_errors.push(error);
+                }
+            }
+        }
+    }
+
+    // expressions (e.g. top-level statements without a binding)
+    for stmt in stmts {
+        if let CoreStatement::Expression { expr, .. } = stmt {
+            if let Err(error) = expr_type_of(expr, env) {
+                all_errors.push(error);
+            }
+        }
+    }
+}
+
+fn check_type_declaration(
+    pattern: &CoreDeclPattern,
+    expr: &CoreExpr,
+    _span: &Span,
+    env: &mut Environment,
+) -> FogResult<()> {
+    let CoreDeclPattern::Identifier { name, span } = pattern else {
+        return Ok(());
     };
 
-    if let Err(error) = result {
-        all_errors.push(error);
+    if !env.types.contains_key(name) {
+        return Ok(());
     }
+
+    let defined_type = eval_type_definition_expr(expr, env)?;
+    env.declare_type(name, defined_type.clone(), span)?;
+
+    if let Type::Sum(_) = &defined_type {
+        register_data_constructors(env, &defined_type, span)?;
+    }
+
+    Ok(())
 }
 
 fn check_type_annotation(
@@ -127,7 +198,7 @@ fn check_declaration(
             // if not, it's a variable declaration
             let expr_type = expr_type_of(expr, env)?;
 
-            env.declare(name, expr_type, span)
+            env.declare_var(name, expr_type, span)
         }
 
         CoreDeclPattern::Tuple { items, .. } => {
@@ -148,7 +219,7 @@ fn bind_tuple_decl_pattern(
     env: &mut Environment,
 ) -> FogResult<()> {
     let Type::Product(component_types) = expr_type else {
-        return Err(type_check_error!(
+        return Err(static_check_error!(
             Some(*span),
             "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
              expected a tuple type, found `{expr_type}`"
@@ -156,7 +227,7 @@ fn bind_tuple_decl_pattern(
     };
 
     if items.len() != component_types.len() {
-        return Err(type_check_error!(
+        return Err(static_check_error!(
             Some(*span),
             "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
              expected a tuple of {} element(s), found `{expr_type}`",
@@ -179,19 +250,19 @@ fn bind_tuple_decl_pattern_item(
 ) -> FogResult<()> {
     match item {
         CoreTupleDeclPattern::Identifier { name, .. } => {
-            block_env.declare(name, expected_type.clone(), span)
+            block_env.declare_var(name, expected_type.clone(), span)
         }
 
         CoreTupleDeclPattern::Tuple { items, .. } => {
             let Type::Product(component_types) = expected_type else {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple type, found `{expected_type}`"
                 ));
             };
 
             if items.len() != component_types.len() {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple of {} element(s), found `{expected_type}`",
                     items.len()
@@ -234,7 +305,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
 
             match callee_type {
                 Type::Function(_, return_type) => Ok(*return_type),
-                _ => Err(type_check_error!(
+                _ => Err(static_check_error!(
                     Some(span),
                     "{} is not a function type",
                     callee_type.to_string()
@@ -251,7 +322,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
 
         CoreExpr::Match { arms, .. } => match arms.first() {
             Some(arm) => expr_type_of(&arm.value_expr, env),
-            None => Err(type_check_error!(Some(span), "match with no arms")),
+            None => Err(static_check_error!(Some(span), "match with no arms")),
         },
     }
 }
@@ -281,7 +352,7 @@ fn block_expr_type_of(
         }
     }
 
-    Err(type_check_error!(
+    Err(static_check_error!(
         Some(span),
         "final operand not found in block statement"
     ))

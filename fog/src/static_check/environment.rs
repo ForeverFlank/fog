@@ -7,7 +7,7 @@ use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
 use crate::static_check::variable::TypeVariable;
 use crate::static_check::variable::ValueVariable;
-use crate::type_check_error;
+use crate::static_check_error;
 
 #[derive(Clone)]
 pub struct Environment<'a> {
@@ -56,7 +56,7 @@ impl<'a> Environment<'a> {
             return parent.get_value_var(name, span);
         }
 
-        Err(type_check_error!(
+        Err(static_check_error!(
             Some(*span),
             "variable `{}` not found in the current scope",
             name
@@ -72,7 +72,7 @@ impl<'a> Environment<'a> {
             return parent.get_type_var(name, span);
         }
 
-        Err(type_check_error!(
+        Err(static_check_error!(
             Some(*span),
             "type `{}` not found in the current scope",
             name
@@ -100,7 +100,7 @@ impl<'a> Environment<'a> {
 
     pub fn annotate_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
         if self.variables.contains_key(name) {
-            return Err(type_check_error!(
+            return Err(static_check_error!(
                 Some(*span),
                 "variable `{}` already annotated its type in the current scope",
                 name
@@ -115,7 +115,7 @@ impl<'a> Environment<'a> {
 
     pub fn annotate_kind(&mut self, name: &str, kind: Kind, span: &Span) -> FogResult<()> {
         if self.types.contains_key(name) {
-            return Err(type_check_error!(
+            return Err(static_check_error!(
                 Some(*span),
                 "type `{}` already annotated its kind in the scope",
                 name
@@ -136,7 +136,7 @@ impl<'a> Environment<'a> {
 
     // -- declare
 
-    pub fn declare(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
+    pub fn declare_var(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
         if name == "_" {
             return Ok(());
         }
@@ -145,7 +145,7 @@ impl<'a> Environment<'a> {
             // variable has been type-annotated
 
             if var.declared {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(*span),
                     "variable `{}` already declared in the current scope",
                     name
@@ -153,7 +153,7 @@ impl<'a> Environment<'a> {
             }
 
             if var.r#type != r#type {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(*span),
                     "type mismatch when declaring variable `{name}`\n\
                      expected `{}`, found `{}`",
@@ -179,7 +179,7 @@ impl<'a> Environment<'a> {
             let r#type = self.get_type_var(name, span)?;
 
             if r#type.r#type.is_some() {
-                return Err(type_check_error!(
+                return Err(static_check_error!(
                     Some(*span),
                     "type `{}` already declared",
                     name
@@ -192,7 +192,7 @@ impl<'a> Environment<'a> {
         let kind_of_type = kind_of(&r#type);
 
         if kind_of_type != kind_of_declared_type {
-            return Err(type_check_error!(
+            return Err(static_check_error!(
                 Some(*span),
                 "kind mismatch when assigning to type `{}`\n\
                  expected `{}`, found `{}`",

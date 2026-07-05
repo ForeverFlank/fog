@@ -10,7 +10,7 @@ pub struct Span {
 pub enum ErrorKind {
     Lex,
     Parse,
-    TypeCheck,
+    StaticCheck,
     Runtime,
 }
 
@@ -19,7 +19,7 @@ impl fmt::Display for ErrorKind {
         match self {
             ErrorKind::Lex => write!(f, "lexer"),
             ErrorKind::Parse => write!(f, "parser"),
-            ErrorKind::TypeCheck => write!(f, "static check"),
+            ErrorKind::StaticCheck => write!(f, "static check"),
             ErrorKind::Runtime => write!(f, "runtime"),
         }
     }
@@ -68,10 +68,10 @@ macro_rules! parse_error {
 }
 
 #[macro_export]
-macro_rules! type_check_error {
+macro_rules! static_check_error {
     ($span:expr, $($arg:tt)*) => {
         $crate::error::FogError {
-            kind: $crate::error::ErrorKind::TypeCheck,
+            kind: $crate::error::ErrorKind::StaticCheck,
             message: format!($($arg)*),
             span: $span,
         }
