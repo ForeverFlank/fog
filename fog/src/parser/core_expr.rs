@@ -12,17 +12,17 @@ use crate::util::format_joined;
 pub enum CoreStatement {
     KindAnnotation {
         name: String,
-        expr: CoreExpr,
+        expr: CoreKindExpr,
         span: Span,
     },
     TypeDeclaration {
         name: String,
-        expr: CoreExpr,
+        expr: CoreAtomicTypeExpr,
         span: Span,
     },
     TypeAnnotation {
         name: String,
-        expr: CoreExpr,
+        expr: CoreTypeExpr,
         span: Span,
     },
     VarDeclaration {
@@ -226,6 +226,83 @@ impl Display for CoreMatchArmPattern {
 }
 
 // --- expressions ---
+
+#[derive(Clone)]
+pub enum CoreKindExpr {
+    Type {
+        span: Span,
+    },
+    Constraint {
+        span: Span,
+    },
+    Function {
+        param_kind: Box<CoreKindExpr>,
+        return_kind: Box<CoreKindExpr>,
+        span: Span,
+    },
+}
+
+impl Display for CoreKindExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CoreKindExpr::Type { .. } => {
+                write!(f, "Type")
+            }
+
+            CoreKindExpr::Constraint { .. } => {
+                write!(f, "Constraint")
+            }
+
+            CoreKindExpr::Function {
+                param_kind,
+                return_kind,
+                ..
+            } => {
+                write!(f, "{} -> {}", param_kind, return_kind)
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum CoreTypeExpr {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    FunctionAppl {
+        // arrow types also belong here
+        callee: Box<CoreAtomicTypeExpr>,
+        arg: Box<CoreAtomicTypeExpr>,
+        span: Span,
+    },
+    Product {
+        // exists because (a * b) * c != a * (b * c)
+        types: Vec<CoreAtomicTypeExpr>,
+        span: Span,
+    },
+    Sum {
+        // ,,,
+        span: Span,
+    },
+}
+
+#[derive(Clone)]
+pub enum CoreAtomicTypeExpr {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Product {
+        types: Vec<CoreAtomicTypeExpr>,
+        span: Span,
+    },
+    FunctionAppl {
+        callee: Box<CoreAtomicTypeExpr>,
+        arg: Box<CoreAtomicTypeExpr>,
+        span: Span,
+    },
+}
 
 #[derive(Clone)]
 pub enum CoreExpr {

@@ -170,7 +170,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
+    fn parse_expression(&mut self) -> FogResult<ParsedValueExpr> {
         let mut args = Vec::new();
         let start_span = self.peek().span;
 
@@ -182,7 +182,7 @@ impl Parser<'_> {
 
             if let Some(kind) = OpKind::from_token(token) {
                 let op_span = token.span;
-                args.push(ParsedExpr::Op {
+                args.push(ParsedValueExpr::Op {
                     kind,
                     span: op_span,
                 });
@@ -198,18 +198,18 @@ impl Parser<'_> {
             Ok(args[0].clone())
         } else {
             let span = Span::merge(start_span, args.last().unwrap().span());
-            Ok(ParsedExpr::Collection { items: args, span })
+            Ok(ParsedValueExpr::Collection { items: args, span })
         }
     }
 
-    fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
+    fn parse_atomic(&mut self) -> FogResult<ParsedValueExpr> {
         let token = self.peek().clone();
         let span = token.span;
 
         match token.kind {
             TokenKind::Int32Literal(value) => {
                 self.next();
-                Ok(ParsedExpr::Literal {
+                Ok(ParsedValueExpr::Literal {
                     literal: Literal::Int32(value),
                     span,
                 })
@@ -217,7 +217,7 @@ impl Parser<'_> {
 
             TokenKind::Float32Literal(value) => {
                 self.next();
-                Ok(ParsedExpr::Literal {
+                Ok(ParsedValueExpr::Literal {
                     literal: Literal::Float32(value),
                     span,
                 })
@@ -226,7 +226,7 @@ impl Parser<'_> {
             // unary minus (negation)
             TokenKind::Minus => {
                 self.next();
-                Ok(ParsedExpr::Op {
+                Ok(ParsedValueExpr::Op {
                     kind: OpKind::Minus,
                     span,
                 })
@@ -254,7 +254,7 @@ impl Parser<'_> {
                     let body = self.parse_expression()?;
                     let span = Span::merge(span, body.span());
 
-                    return Ok(ParsedExpr::Lambda {
+                    return Ok(ParsedValueExpr::Lambda {
                         param_name: name,
                         param_type: param_type.into(),
                         body: body.into(),
@@ -262,7 +262,7 @@ impl Parser<'_> {
                     });
                 }
 
-                Ok(ParsedExpr::Identifier { name, span })
+                Ok(ParsedValueExpr::Identifier { name, span })
             }
 
             // tuple
@@ -272,13 +272,13 @@ impl Parser<'_> {
                 if let TokenKind::RightParenthesis = self.peek().kind {
                     let close_span = self.peek().span;
                     self.next();
-                    return Ok(ParsedExpr::Tuple {
+                    return Ok(ParsedValueExpr::Tuple {
                         items: Vec::new(),
                         span: Span::merge(span, close_span),
                     });
                 }
 
-                let mut items: Vec<ParsedExpr> = Vec::new();
+                let mut items: Vec<ParsedValueExpr> = Vec::new();
 
                 loop {
                     let expr = self.parse_expression()?;
@@ -292,7 +292,7 @@ impl Parser<'_> {
                             if items.len() == 1 {
                                 return Ok(items[0].clone());
                             } else {
-                                return Ok(ParsedExpr::Tuple {
+                                return Ok(ParsedValueExpr::Tuple {
                                     items,
                                     span: Span::merge(span, close_span),
                                 });
@@ -315,7 +315,7 @@ impl Parser<'_> {
             TokenKind::LeftBrace => {
                 self.next();
                 let (statements, close_span) = self.parse_block()?;
-                Ok(ParsedExpr::Block {
+                Ok(ParsedValueExpr::Block {
                     statements,
                     span: Span::merge(span, close_span),
                 })
@@ -334,7 +334,7 @@ impl Parser<'_> {
 
                 let (match_arms, close_span) = self.parse_match_arms()?;
 
-                Ok(ParsedExpr::Match {
+                Ok(ParsedValueExpr::Match {
                     scrutinee,
                     match_arms,
                     span: Span::merge(span, close_span),

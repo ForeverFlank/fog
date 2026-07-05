@@ -16,28 +16,28 @@ use crate::util::format_joined;
 pub enum ParsedStatement {
     KindAnnotation {
         name: String,
-        expr: ParsedExpr,
+        expr: ParsedKindExpr,
         span: Span,
     },
     TypeDeclaration {
         name: String,
-        expr: ParsedExpr,
+        expr: ParsedTypeExpr,
         span: Span,
     },
 
     TypeAnnotation {
         pattern: ParsedDeclPattern,
-        expr: ParsedExpr,
+        expr: ParsedValueExpr,
         span: Span,
     },
     VarDeclaration {
         pattern: ParsedDeclPattern,
-        expr: ParsedExpr,
+        expr: ParsedValueExpr,
         span: Span,
     },
 
     Expression {
-        expr: ParsedExpr,
+        expr: ParsedValueExpr,
         span: Span,
     },
 }
@@ -168,10 +168,72 @@ impl OpKind {
     }
 }
 
-// --- parsed expression ---
+// --- expressions ---
 
 #[derive(Clone)]
-pub enum ParsedExpr {
+pub enum ParsedKindExpr {
+    Type {
+        span: Span,
+    },
+    Constraint {
+        span: Span,
+    },
+    Function {
+        param_kind: Box<ParsedKindExpr>,
+        return_kind: Box<ParsedKindExpr>,
+        span: Span,
+    },
+}
+
+impl Display for ParsedKindExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParsedKindExpr::Type { .. } => {
+                write!(f, "Type")
+            }
+
+            ParsedKindExpr::Constraint { .. } => {
+                write!(f, "Constraint")
+            }
+
+            ParsedKindExpr::Function {
+                param_kind,
+                return_kind,
+                ..
+            } => {
+                write!(f, "{} -> {}", param_kind, return_kind)
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum ParsedTypeExpr {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Function {
+        param_type: Box<ParsedAtomicTypeExpr>,
+        return_type: Box<ParsedAtomicTypeExpr>,
+    },
+    Sum {},
+}
+
+#[derive(Clone)]
+pub enum ParsedAtomicTypeExpr {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Function {
+        param_type: Box<ParsedAtomicTypeExpr>,
+        return_type: Box<ParsedAtomicTypeExpr>,
+    },
+}
+
+#[derive(Clone)]
+pub enum ParsedValueExpr {
     Block {
         statements: Vec<ParsedStatement>,
         span: Span,
@@ -190,47 +252,47 @@ pub enum ParsedExpr {
     },
     Lambda {
         param_name: String,
-        param_type: Box<ParsedExpr>,
-        body: Box<ParsedExpr>,
+        param_type: Box<ParsedValueExpr>,
+        body: Box<ParsedValueExpr>,
         span: Span,
     },
     Tuple {
-        items: Vec<ParsedExpr>,
+        items: Vec<ParsedValueExpr>,
         span: Span,
     },
     Collection {
-        items: Vec<ParsedExpr>,
+        items: Vec<ParsedValueExpr>,
         span: Span,
     },
     Match {
-        scrutinee: Box<ParsedExpr>,
+        scrutinee: Box<ParsedValueExpr>,
         match_arms: Vec<ParsedMatchArm>,
         span: Span,
     },
 }
 
-impl ParsedExpr {
+impl ParsedValueExpr {
     pub fn span(&self) -> Span {
         match self {
-            ParsedExpr::Block { span, .. }
-            | ParsedExpr::Identifier { span, .. }
-            | ParsedExpr::Op { span, .. }
-            | ParsedExpr::Literal { span, .. }
-            | ParsedExpr::Lambda { span, .. }
-            | ParsedExpr::Tuple { span, .. }
-            | ParsedExpr::Collection { span, .. }
-            | ParsedExpr::Match { span, .. } => *span,
+            ParsedValueExpr::Block { span, .. }
+            | ParsedValueExpr::Identifier { span, .. }
+            | ParsedValueExpr::Op { span, .. }
+            | ParsedValueExpr::Literal { span, .. }
+            | ParsedValueExpr::Lambda { span, .. }
+            | ParsedValueExpr::Tuple { span, .. }
+            | ParsedValueExpr::Collection { span, .. }
+            | ParsedValueExpr::Match { span, .. } => *span,
         }
     }
 
     pub fn is_primary_starter(&self) -> bool {
         match self {
-            ParsedExpr::Identifier { .. }
-            | ParsedExpr::Literal { .. }
-            | ParsedExpr::Tuple { .. }
-            | ParsedExpr::Collection { .. } => true,
+            ParsedValueExpr::Identifier { .. }
+            | ParsedValueExpr::Literal { .. }
+            | ParsedValueExpr::Tuple { .. }
+            | ParsedValueExpr::Collection { .. } => true,
 
-            ParsedExpr::Op { kind, .. } => matches!(kind, OpKind::Minus),
+            ParsedValueExpr::Op { kind, .. } => matches!(kind, OpKind::Minus),
 
             _ => false,
         }
@@ -238,34 +300,34 @@ impl ParsedExpr {
 
     pub fn into_decl_pattern(self) -> FogResult<ParsedDeclPattern> {
         match self {
-            ParsedExpr::Identifier { name, span } => {
+            ParsedValueExpr::Identifier { name, span } => {
                 Ok(ParsedDeclPattern::Identifier { name, span })
             }
 
-            ParsedExpr::Literal { literal, span } => {
+            ParsedValueExpr::Literal { literal, span } => {
                 Ok(ParsedDeclPattern::Literal { literal, span })
             }
 
-            ParsedExpr::Tuple { items, span } => Ok(ParsedDeclPattern::Tuple {
+            ParsedValueExpr::Tuple { items, span } => Ok(ParsedDeclPattern::Tuple {
                 items: items
                     .into_iter()
-                    .map(ParsedExpr::into_decl_pattern)
+                    .map(ParsedValueExpr::into_decl_pattern)
                     .collect::<Result<Vec<_>, _>>()?,
                 span,
             }),
 
-            ParsedExpr::Collection { items, span } => Ok(ParsedDeclPattern::Collection {
+            ParsedValueExpr::Collection { items, span } => Ok(ParsedDeclPattern::Collection {
                 items: items
                     .into_iter()
-                    .map(ParsedExpr::into_decl_pattern)
+                    .map(ParsedValueExpr::into_decl_pattern)
                     .collect::<Result<Vec<_>, _>>()?,
                 span,
             }),
 
-            ParsedExpr::Block { .. }
-            | ParsedExpr::Op { .. }
-            | ParsedExpr::Lambda { .. }
-            | ParsedExpr::Match { .. } => Err(parse_error!(
+            ParsedValueExpr::Block { .. }
+            | ParsedValueExpr::Op { .. }
+            | ParsedValueExpr::Lambda { .. }
+            | ParsedValueExpr::Match { .. } => Err(parse_error!(
                 Some(self.span()),
                 "invalid declaration pattern"
             )),
@@ -273,10 +335,10 @@ impl ParsedExpr {
     }
 }
 
-impl Display for ParsedExpr {
+impl Display for ParsedValueExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParsedExpr::Block { statements, .. } => {
+            ParsedValueExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
                 for stmt in statements {
                     write!(f, "    {}\n", stmt)?;
@@ -284,20 +346,20 @@ impl Display for ParsedExpr {
                 write!(f, "}}")
             }
 
-            ParsedExpr::Identifier { name, .. } => write!(f, "{name}"),
-            ParsedExpr::Op { kind, .. } => write!(f, "{kind}"),
+            ParsedValueExpr::Identifier { name, .. } => write!(f, "{name}"),
+            ParsedValueExpr::Op { kind, .. } => write!(f, "{kind}"),
 
-            ParsedExpr::Literal { literal, .. } => write!(f, "{literal}"),
+            ParsedValueExpr::Literal { literal, .. } => write!(f, "{literal}"),
 
-            ParsedExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
+            ParsedValueExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
 
-            ParsedExpr::Lambda {
+            ParsedValueExpr::Lambda {
                 param_name, body, ..
             } => {
                 write!(f, "{param_name} => {body}")
             }
 
-            ParsedExpr::Collection { items: args, .. } => {
+            ParsedValueExpr::Collection { items: args, .. } => {
                 for (i, expr) in args.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;
@@ -307,7 +369,7 @@ impl Display for ParsedExpr {
                 Ok(())
             }
 
-            ParsedExpr::Match {
+            ParsedValueExpr::Match {
                 scrutinee,
                 match_arms,
                 ..
@@ -324,6 +386,6 @@ impl Display for ParsedExpr {
 
 #[derive(Clone)]
 pub struct ParsedMatchArm {
-    pub pattern: ParsedExpr,
-    pub value_expr: ParsedExpr,
+    pub pattern: ParsedValueExpr,
+    pub value_expr: ParsedValueExpr,
 }
