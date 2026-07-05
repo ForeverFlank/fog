@@ -5,6 +5,7 @@ use std::rc::Rc;
 use crate::error::FogError;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 
 // --- node ---
@@ -46,16 +47,15 @@ impl<'a> Node<'a> {
 
 struct DependencyGraph {
     adj_list: HashMap<String, Vec<String>>,
+    bound_names: HashSet<String>,
 }
 
 impl DependencyGraph {
-    fn add_edge(&mut self, from: &str, to: String) {
-        self.adj_list
-            .entry(from.to_string())
-            .or_insert_with(Vec::new)
-            .push(to.clone());
-
-        self.adj_list.entry(to).or_insert_with(Vec::new);
+    fn new(bound_names: HashSet<String>) -> DependencyGraph {
+        DependencyGraph {
+            adj_list: HashMap::new(),
+            bound_names,
+        }
     }
 }
 
@@ -93,7 +93,7 @@ impl DependencyGraph {
     }
 
     // Tarjan's SCC algorithm
-    // from https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
+    // from_names https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
 
     fn toposort(&self) -> FogResult<Vec<Vec<String>>> {
         let mut index = 0;
@@ -179,6 +179,39 @@ impl DependencyGraph {
 }
 */
 
+struct Scope<'a> {
+    parent: Option<&'a Scope<'a>>,
+    bounded_names: HashSet<String>,
+    unbounded_names: HashSet<String>,
+    adj_list: HashMap<String, Vec<String>>,
+}
+
+impl<'a> Scope<'a> {
+    fn new(parent: Option<&'a Scope<'a>>, bounded_names: HashSet<String>) -> Scope<'a> {
+        Scope {
+            parent,
+            bounded_names,
+            unbounded_names: HashSet::new(),
+            adj_list: HashMap::new(),
+        }
+    }
+
+    fn add_edge(&mut self, from_names: &Vec<&str>, to_name: String) {
+        if self.unbounded_names.contains(&to_name) {
+            return;
+        }
+
+        for from_name in from_names {
+            self.adj_list
+                .entry(from_name.to_string())
+                .or_insert_with(Vec::new)
+                .push(to_name.clone());
+        }
+
+        self.adj_list.entry(to_name).or_insert_with(Vec::new);
+    }
+}
+
 // --- optimizer ---
 // currently it just does code sinking
 
@@ -206,7 +239,7 @@ fn optimize_block(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<F
     // collect bound variable names
     let mut nodes = Vec::new();
     let mut node_by_name = HashMap::new();
-    let mut bound_vars = HashSet::new();
+    let mut bound_names = HashSet::new();
 
     for stmt in &stmts {
         let node = Rc::new(Node::new(stmt));
@@ -215,13 +248,13 @@ fn optimize_block(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<F
         match stmt {
             CoreStatement::TypeAnnotation { name, .. } => {
                 node_by_name.insert(name.to_string(), node.clone());
-                bound_vars.insert(name.to_string());
+                bound_names.insert(name.to_string());
             }
 
             CoreStatement::Declaration { pattern, .. } => {
                 for name in pattern.all_identifiers() {
                     node_by_name.insert(name.to_string(), node.clone());
-                    bound_vars.insert(name.to_string());
+                    bound_names.insert(name.to_string());
                 }
             }
 
@@ -230,21 +263,23 @@ fn optimize_block(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<F
     }
 
     // build a graph
-    let mut dep_graph = DependencyGraph {
-        adj_list: HashMap::new(),
-    };
+    let mut scope = Scope::new(None, bound_names);
 
     for stmt in stmts {
         match stmt {
-            CoreStatement::TypeAnnotation { name, expr, span } => {
-                build_dep_from_expr(&mut dep_graph, name, expr)
+            CoreStatement::TypeAnnotation { name, expr, .. } => {
+                let from_names = &vec![name.as_str()];
+
+                build_dep_from_expr(&mut scope, from_names, expr)
             }
-            CoreStatement::Declaration {
-                pattern,
-                expr,
-                span,
-            } => todo!(),
-            CoreStatement::Expression { expr, span } => todo!(),
+
+            CoreStatement::Declaration { pattern, expr, .. } => {
+                let from_names = &pattern.all_identifiers().collect::<Vec<_>>();
+
+                build_dep_from_expr(&mut scope, from_names, expr);
+            }
+
+            CoreStatement::Expression { expr, .. } => todo!(),
         }
     }
 
@@ -255,23 +290,23 @@ fn optimize_block(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<F
     }
 }
 
-fn build_dep_from_stmt(dep_graph: &mut DependencyGraph, from: &str, stmt: CoreStatement) {
+fn build_dep_from_stmt(scope: &mut Scope, from_names: &Vec<&str>, stmt: CoreStatement) {
     match stmt {
         CoreStatement::TypeAnnotation { expr, .. }
         | CoreStatement::Declaration { expr, .. }
-        | CoreStatement::Expression { expr, .. } => build_dep_from_expr(dep_graph, from, expr),
+        | CoreStatement::Expression { expr, .. } => build_dep_from_expr(scope, from_names, expr),
     }
 }
 
-fn build_dep_from_expr(dep_graph: &mut DependencyGraph, from: &str, expr: CoreExpr) {
+fn build_dep_from_expr(scope: &mut Scope, from_names: &Vec<&str>, expr: CoreExpr) {
     match expr {
         CoreExpr::Block { statements, .. } => {
             for stmt in statements {
-                build_dep_from_stmt(dep_graph, from, stmt);
+                build_dep_from_stmt(scope, from_names, stmt);
             }
         }
 
-        CoreExpr::Identifier { name, .. } => dep_graph.add_edge(from, name),
+        CoreExpr::Identifier { name, .. } => scope.add_edge(from_names, name),
 
         CoreExpr::Literal { .. } => {}
 
@@ -280,13 +315,54 @@ fn build_dep_from_expr(dep_graph: &mut DependencyGraph, from: &str, expr: CoreEx
             param_type,
             body,
             ..
-        } => todo!(),
-        CoreExpr::Tuple { items, .. } => todo!(),
-        CoreExpr::FunctionAppl { fn_name, args, .. } => todo!(),
+        } => {
+            build_dep_from_expr(scope, from_names, *param_type);
+
+            scope.unbounded_names.insert(param_name.clone());
+            build_dep_from_expr(scope, from_names, *body);
+            scope.unbounded_names.remove(&param_name);
+        }
+
+        CoreExpr::Tuple { items, .. } => {
+            for item in items {
+                build_dep_from_expr(scope, from_names, item);
+            }
+        }
+
+        CoreExpr::FunctionAppl { fn_name, args, .. } => {
+            scope.add_edge(from_names, fn_name);
+
+            for arg in args {
+                build_dep_from_expr(scope, from_names, arg);
+            }
+        }
+
         CoreExpr::Match {
             scrutinee,
             match_arms,
             ..
-        } => todo!(),
+        } => {
+            build_dep_from_expr(scope, from_names, *scrutinee);
+
+            for match_arm in match_arms {
+                match match_arm.pattern {
+                    CoreMatchArmPattern::Tuple { items, span } => {
+                        scope.unbounded_names.remove(&items); // or smth like that
+                        build_dep_from_expr(scope, from_names, *body);
+                        scope.unbounded_names.remove(&items);
+                    }
+
+                    CoreMatchArmPattern::Identifier { name, span } => {
+                        scope.unbounded_names.insert(name.clone());
+                        build_dep_from_expr(scope, from_names, *body);
+                        scope.unbounded_names.remove(&name);
+                    }
+
+                    CoreMatchArmPattern::DataConstructor { name, args, span } => {}
+
+                    CoreMatchArmPattern::Literal { literal, span } => {}
+                }
+            }
+        }
     }
 }

@@ -190,7 +190,7 @@ fn desugar_statements(
             |body, (param_name, param_type)| CoreExpr::Lambda {
                 param_name,
                 param_type: param_type.into(),
-                body: Rc::new(body),
+                body: body.into(),
                 span,
             },
         );

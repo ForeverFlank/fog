@@ -121,7 +121,7 @@ pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
                 param_name: param_name.clone(),
                 param_type,
                 return_type,
-                body: Rc::clone(body),
+                body: Rc::new((**body).clone()),
                 captured_env: env.flatten().into(),
             })
         }
@@ -194,12 +194,7 @@ pub fn eval_scope(
 
     // type definitions
     for stmt in statements {
-        if let CoreStatement::Declaration {
-            pattern,
-            expr,
-            span,
-        } = stmt
-        {
+        if let CoreStatement::Declaration { pattern, expr, .. } = stmt {
             match pattern {
                 CoreDeclPattern::Identifier { name, span } => {
                     if env.types.contains_key(name) {

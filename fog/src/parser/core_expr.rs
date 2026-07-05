@@ -208,7 +208,7 @@ pub enum CoreExpr {
     Lambda {
         param_name: String,
         param_type: Box<CoreExpr>,
-        body: Rc<CoreExpr>,
+        body: Box<CoreExpr>,
         span: Span,
     },
     Tuple {
