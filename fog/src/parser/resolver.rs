@@ -41,22 +41,6 @@ pub struct InfixFunctionInfo {
     pub precedence: i32,
 }
 
-fn is_primary_starter(parsed_expr: &ParsedExpr) -> bool {
-    match parsed_expr {
-        ParsedExpr::Identifier { .. }
-        | ParsedExpr::Literal { .. }
-        | ParsedExpr::Tuple { .. }
-        | ParsedExpr::Collection { .. } => true,
-
-        ParsedExpr::Op { kind, .. } => match kind {
-            OpKind::Minus => true,
-            _ => false,
-        },
-
-        _ => false,
-    }
-}
-
 impl Resolver {
     fn new() -> Self {
         Self {
@@ -533,7 +517,7 @@ impl Resolver {
 
         let mut args = Vec::new();
 
-        while *index < exprs.len() && is_primary_starter(&exprs[*index]) {
+        while *index < exprs.len() && exprs[*index].is_primary_starter() {
             args.push(self.resolve_atomic(exprs, index)?);
         }
 

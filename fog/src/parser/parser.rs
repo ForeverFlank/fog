@@ -1,6 +1,5 @@
 use crate::error::FogError;
 use crate::error::FogResult;
-use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
 use crate::parser::Literal;
@@ -15,35 +14,6 @@ pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     pos: usize,
     eof_token: Token,
-}
-
-fn get_op_kind(token: &Token) -> Option<OpKind> {
-    match &token.kind {
-        TokenKind::Plus => Some(OpKind::Plus),
-        TokenKind::Minus => Some(OpKind::Minus),
-        TokenKind::Star => Some(OpKind::Star),
-        TokenKind::Slash => Some(OpKind::Slash),
-        TokenKind::Arrow => Some(OpKind::Arrow),
-        _ => None,
-    }
-}
-
-fn is_primary_starter(token: &Token) -> bool {
-    match token.kind {
-        TokenKind::Identifier(_)
-        | TokenKind::Int32Literal(_)
-        | TokenKind::Float32Literal(_)
-        | TokenKind::LeftParenthesis
-        | TokenKind::Minus => true,
-        _ => false,
-    }
-}
-
-fn token_span(token: &Token) -> Span {
-    Span {
-        line: token.line,
-        column: token.column,
-    }
 }
 
 impl Parser<'_> {
@@ -111,7 +81,7 @@ impl Parser<'_> {
     }
 
     fn parse_block_statement(&mut self) -> FogResult<ParsedStatement> {
-        let span = token_span(self.peek());
+        let span = self.peek().span();
 
         let ahead = self.peek_offset(1).clone();
 
@@ -155,7 +125,7 @@ impl Parser<'_> {
                 if let TokenKind::Equal = self.peek().kind {
                     self.next();
 
-                    let pattern = Self::expr_to_decl_pattern(expr)?;
+                    let pattern = expr.into_decl_pattern()?;
                     let expr = self.parse_expression()?;
 
                     Ok(ParsedStatement::Declaration {
@@ -170,45 +140,9 @@ impl Parser<'_> {
         }
     }
 
-    fn expr_to_decl_pattern(expr: ParsedExpr) -> FogResult<ParsedDeclPattern> {
-        match expr {
-            ParsedExpr::Identifier { name, span } => {
-                Ok(ParsedDeclPattern::Identifier { name, span })
-            }
-
-            ParsedExpr::Literal { literal, span } => {
-                Ok(ParsedDeclPattern::Literal { literal, span })
-            }
-
-            ParsedExpr::Tuple { items, span } => Ok(ParsedDeclPattern::Tuple {
-                items: items
-                    .into_iter()
-                    .map(|item| Self::expr_to_decl_pattern(item))
-                    .collect::<Result<Vec<_>, _>>()?,
-                span,
-            }),
-
-            ParsedExpr::Collection { items: args, span } => Ok(ParsedDeclPattern::Collection {
-                items: args
-                    .into_iter()
-                    .map(|item| Self::expr_to_decl_pattern(item))
-                    .collect::<Result<Vec<_>, _>>()?,
-                span,
-            }),
-
-            ParsedExpr::Block { .. }
-            | ParsedExpr::Op { .. }
-            | ParsedExpr::Lambda { .. }
-            | ParsedExpr::Match { .. } => Err(parse_error!(
-                Some(expr.span()),
-                "invalid declaration pattern"
-            )),
-        }
-    }
-
     fn parse_expression(&mut self) -> FogResult<ParsedExpr> {
         let mut args = Vec::new();
-        let span = token_span(self.peek());
+        let span = self.peek().span();
 
         loop {
             let atom = self.parse_atomic()?;
@@ -216,10 +150,10 @@ impl Parser<'_> {
 
             let token = self.peek();
 
-            if let Some(kind) = get_op_kind(token) {
+            if let Some(kind) = OpKind::from_token(token) {
                 args.push(ParsedExpr::Op { kind, span });
                 self.next();
-            } else if is_primary_starter(token) {
+            } else if token.kind.is_primary_starter() {
                 continue;
             } else {
                 break;
@@ -235,7 +169,7 @@ impl Parser<'_> {
 
     fn parse_atomic(&mut self) -> FogResult<ParsedExpr> {
         let token = self.peek().clone();
-        let span = token_span(&token);
+        let span = token.span();
 
         match token.kind {
             TokenKind::Int32Literal(value) => {
@@ -273,7 +207,7 @@ impl Parser<'_> {
                     let param_type = self.parse_expression()?;
 
                     let TokenKind::FatArrow = self.peek().kind else {
-                        return Err(parse_error!(Some(token_span(self.peek())), "expected `=>`"));
+                        return Err(parse_error!(Some(self.peek().span()), "expected `=>`"));
                     };
                     self.next();
 
@@ -330,7 +264,7 @@ impl Parser<'_> {
                         }
 
                         _ => {
-                            return Err(parse_error!(Some(token_span(&token)), "expected `)`"));
+                            return Err(parse_error!(Some(token.span()), "expected `)`"));
                         }
                     }
                 }
@@ -350,7 +284,7 @@ impl Parser<'_> {
                 let scrutinee = Box::new(self.parse_expression()?);
 
                 let TokenKind::LeftBrace = self.peek().kind else {
-                    return Err(parse_error!(Some(token_span(self.peek())), "expected `{{`"));
+                    return Err(parse_error!(Some(self.peek().span()), "expected `{{`"));
                 };
                 self.next();
 
@@ -387,7 +321,7 @@ impl Parser<'_> {
             let pattern = self.parse_expression()?;
 
             let TokenKind::FatArrow = self.peek().kind else {
-                return Err(parse_error!(Some(token_span(self.peek())), "expected `=>`"));
+                return Err(parse_error!(Some(self.peek().span()), "expected `=>`"));
             };
             self.next();
 

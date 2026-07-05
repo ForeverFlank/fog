@@ -1,7 +1,11 @@
 use std::fmt;
 use std::fmt::Display;
 
+use crate::error::FogResult;
 use crate::error::Span;
+use crate::lexer::token::Token;
+use crate::lexer::token::TokenKind;
+use crate::parse_error;
 use crate::parser::Literal;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
@@ -120,6 +124,19 @@ impl Display for OpKind {
     }
 }
 
+impl OpKind {
+    pub fn from_token(token: &Token) -> Option<OpKind> {
+        match &token.kind {
+            TokenKind::Plus => Some(OpKind::Plus),
+            TokenKind::Minus => Some(OpKind::Minus),
+            TokenKind::Star => Some(OpKind::Star),
+            TokenKind::Slash => Some(OpKind::Slash),
+            TokenKind::Arrow => Some(OpKind::Arrow),
+            _ => None,
+        }
+    }
+}
+
 // --- parsed expression ---
 
 #[derive(Clone)]
@@ -172,6 +189,55 @@ impl ParsedExpr {
             | ParsedExpr::Tuple { span, .. }
             | ParsedExpr::Collection { span, .. }
             | ParsedExpr::Match { span, .. } => *span,
+        }
+    }
+
+    pub fn is_primary_starter(&self) -> bool {
+        match self {
+            ParsedExpr::Identifier { .. }
+            | ParsedExpr::Literal { .. }
+            | ParsedExpr::Tuple { .. }
+            | ParsedExpr::Collection { .. } => true,
+
+            ParsedExpr::Op { kind, .. } => matches!(kind, OpKind::Minus),
+
+            _ => false,
+        }
+    }
+
+    pub fn into_decl_pattern(self) -> FogResult<ParsedDeclPattern> {
+        match self {
+            ParsedExpr::Identifier { name, span } => {
+                Ok(ParsedDeclPattern::Identifier { name, span })
+            }
+
+            ParsedExpr::Literal { literal, span } => {
+                Ok(ParsedDeclPattern::Literal { literal, span })
+            }
+
+            ParsedExpr::Tuple { items, span } => Ok(ParsedDeclPattern::Tuple {
+                items: items
+                    .into_iter()
+                    .map(ParsedExpr::into_decl_pattern)
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            }),
+
+            ParsedExpr::Collection { items, span } => Ok(ParsedDeclPattern::Collection {
+                items: items
+                    .into_iter()
+                    .map(ParsedExpr::into_decl_pattern)
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            }),
+
+            ParsedExpr::Block { .. }
+            | ParsedExpr::Op { .. }
+            | ParsedExpr::Lambda { .. }
+            | ParsedExpr::Match { .. } => Err(parse_error!(
+                Some(self.span()),
+                "invalid declaration pattern"
+            )),
         }
     }
 }

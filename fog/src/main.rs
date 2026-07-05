@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // -- lexing
     let (tokens, lexer_errors) = tokenize(src);
-    print_errors("lexer", &lexer_errors);
+    print_errors(&lexer_errors);
 
     if arg_print_tokens {
         print_tokens(&tokens);
@@ -37,11 +37,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // -- parsing
     let (top_stmts, parser_errors) = parse_program(&tokens);
-    print_errors("parser", &parser_errors);
+    print_errors(&parser_errors);
 
     // -- static check
     let static_check_errors = static_check::static_check(&top_stmts);
-    print_errors("static check", &static_check_errors);
+    print_errors(&static_check_errors);
 
     // -- optimizing
 
@@ -83,14 +83,8 @@ fn print_tokens(tokens: &Vec<Token>) {
     }
 }
 
-fn print_errors(label: &str, errors: &Vec<FogError>) {
+fn print_errors(errors: &Vec<FogError>) {
     for error in errors {
-        match error.span.as_ref() {
-            Some(span) => eprintln!(
-                "{label} error ({}:{}): {}",
-                span.line, span.column, error.message
-            ),
-            None => eprintln!("{label} error: {}", error.message),
-        }
+        eprintln!("{error}");
     }
 }

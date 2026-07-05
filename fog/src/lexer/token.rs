@@ -1,6 +1,8 @@
 use std::char;
 use std::fmt;
 
+use crate::error::Span;
+
 #[derive(Clone)]
 pub enum TokenKind {
     Eof,
@@ -85,6 +87,19 @@ pub fn match_keyword(str: &str) -> Option<TokenKind> {
     }
 }
 
+impl TokenKind {
+    pub fn is_primary_starter(&self) -> bool {
+        match self {
+            TokenKind::Identifier(_)
+            | TokenKind::Int32Literal(_)
+            | TokenKind::Float32Literal(_)
+            | TokenKind::LeftParenthesis
+            | TokenKind::Minus => true,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -129,4 +144,13 @@ pub struct Token {
     pub pos: usize,
     pub line: usize,
     pub column: usize,
+}
+
+impl Token {
+    pub fn span(&self) -> Span {
+        Span {
+            line: self.line,
+            column: self.column,
+        }
+    }
 }
