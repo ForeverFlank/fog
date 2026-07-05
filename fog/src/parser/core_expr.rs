@@ -160,6 +160,24 @@ impl CoreMatchArmPattern {
             | CoreMatchArmPattern::DataConstructor { span, .. } => span,
         }
     }
+
+    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        match self {
+            CoreMatchArmPattern::Literal { .. } => Box::new(std::iter::empty()),
+
+            CoreMatchArmPattern::Tuple { items, .. } => {
+                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
+            }
+
+            CoreMatchArmPattern::Identifier { name, .. } => {
+                Box::new(std::iter::once(name.as_str()))
+            }
+
+            CoreMatchArmPattern::DataConstructor { args, .. } => {
+                Box::new(args.iter().flat_map(|item| item.all_identifiers()))
+            }
+        }
+    }
 }
 
 impl Display for CoreMatchArmPattern {

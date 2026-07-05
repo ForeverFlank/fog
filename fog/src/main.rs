@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // -- optimizing
 
-    let (optimized_top_stmts, optimizer_errors) = optimize(top_stmts);
+    let optimize_res = optimize(top_stmts);
     print_errors("optimizer", &parser_errors);
 
     if !lexer_errors.is_empty() || !parser_errors.is_empty() || !optimizer_errors.is_empty() {
