@@ -40,6 +40,15 @@ fn create_top_env() -> Environment<'static> {
         },
     );
 
+    env.types.insert(
+        "Unit".to_string(),
+        TypeVariable {
+            name: "Unit".to_string(),
+            r#type: Some(Type::Product(Vec::new())),
+            kind: Kind::Type,
+        },
+    );
+
     let var_add_int32 = ValueVariable::new(
         "addInt32",
         Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),

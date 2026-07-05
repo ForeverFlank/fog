@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- read file ---
     let src = &fs::read_to_string(path)?;
 
-    // -- lexing
+    // -- lex
     let (tokens, lexer_errors) = tokenize(src);
     print_errors(&lexer_errors);
 
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         print_tokens(&tokens);
     }
 
-    // -- parsing
+    // -- parse
     let (top_stmts, parser_errors) = parse_program(&tokens);
     print_errors(&parser_errors);
 
@@ -44,7 +44,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let static_check_errors = static_check::static_check(&top_stmts);
     print_errors(&static_check_errors);
 
-    // -- optimizing
+    // -- ANF normalize
+
+    let anfs = anf::anf_parser::parse_anf(&top_stmts);
+
+    for anf in anfs {
+        println!("{anf}");
+    }
+
+    // -- optimize
 
     // let  = optimize(top_stmts);
     // print_errors("optimizer", &parser_errors);
@@ -55,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("syntax error".into());
     }
 
-    // -- interpreting
+    // -- interpret
     // let res = interpret(&optimized_top_stmts);
 
     // if let Err(error) = res {
