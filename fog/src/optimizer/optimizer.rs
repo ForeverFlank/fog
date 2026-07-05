@@ -1,115 +1,44 @@
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
-use std::io::ErrorKind::StaleNetworkFileHandle;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::rc::Rc;
 
 use crate::error::FogError;
-use crate::parser::core_expr::{CoreExpr, CoreStatement};
+use crate::parser::core_expr::CoreDeclPattern;
+use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreStatement;
 
 // --- node ---
 
+#[derive(Clone)]
 enum Node<'a> {
     TypeAnnotation {
         name: String,
-        statement: &'a CoreStatement,
+        expr: &'a CoreExpr,
     },
     Declaration {
-        name: String,
-        statement: &'a CoreStatement,
+        names: Vec<String>,
+        pattern: &'a CoreDeclPattern,
+        expr: &'a CoreExpr,
     },
-    ExprResult {
-        statement: &'a CoreStatement,
+    Expression {
+        expr: &'a CoreExpr,
     },
 }
 
-// --- scope ---
-
-struct Scope<'a> {
-    parent: Option<&'a Scope<'a>>,
-    var_names: HashSet<String>,
-    nodes: Vec<Node<'a>>,
-}
-
-impl<'a> Scope<'a> {
-    fn new() -> Scope<'a> {
-        Scope {
-            parent: None,
-            var_names: HashSet::new(),
-            nodes: Vec::new(),
-        }
-    }
-
-    fn with_parent(parent: &'a Scope<'a>) -> Scope<'a> {
-        Scope {
-            parent: Some(parent),
-            var_names: HashSet::new(),
-            nodes: Vec::new(),
-        }
-    }
-
-    fn from_statements(parent: Option<&'a Scope<'a>>, stmts: &Vec<&'a CoreStatement>) -> Scope<'a> {
-        let mut scope = Scope {
-            parent,
-            var_names: HashSet::new(),
-            nodes: Vec::new(),
-        };
-
-        for &stmt in stmts {
-            scope.add_statement(stmt);
-        }
-
-        let bound_vars = scope
-            .nodes
-            .iter()
-            .filter_map(|node| match node {
-                Node::TypeAnnotation { name, .. } => Some(name.to_string()),
-                Node::Declaration { name, .. } => Some(name.to_string()),
-                Node::ExprResult { .. } => None,
-            })
-            .collect::<HashSet<String>>();
-
-        let mut dep_graph = DependencyGraph {
-            adj_list: HashMap::new(),
-        };
-
-        for &stmt in stmts {
-            match stmt {
-                CoreStatement::TypeAnnotation { name, expr, span } => {
-                    dep_graph.add_dep_by_expr(name, expr);
-                }
-
-                CoreStatement::Declaration {
-                    pattern,
-                    expr,
-                    span,
-                } => todo!(),
-
-                CoreStatement::Expression { expr, span } => todo!(),
-            }
-        }
-
-        scope
-    }
-
-    fn add_statement(&mut self, stmt: &'a CoreStatement) {
-        let nodes = match stmt {
-            CoreStatement::TypeAnnotation { name, .. } => vec![Node::TypeAnnotation {
+impl<'a> Node<'a> {
+    fn new(stmt: &'a CoreStatement) -> Node<'a> {
+        match stmt {
+            CoreStatement::TypeAnnotation { name, expr, .. } => Node::TypeAnnotation {
                 name: name.to_string(),
-                statement: stmt,
-            }],
-
-            CoreStatement::Declaration { pattern, .. } => pattern
-                .get_all_identifiers()
-                .iter()
-                .map(|name| Node::Declaration {
-                    name: name.to_string(),
-                    statement: stmt,
-                })
-                .collect(),
-
-            CoreStatement::Expression { .. } => vec![Node::ExprResult { statement: stmt }],
-        };
-
-        self.nodes.extend(nodes);
+                expr,
+            },
+            CoreStatement::Declaration { pattern, expr, .. } => Node::Declaration {
+                names: pattern.all_identifiers().map(|s| s.to_string()).collect(),
+                pattern,
+                expr,
+            },
+            CoreStatement::Expression { expr, .. } => Node::Expression { expr },
+        }
     }
 }
 
@@ -120,40 +49,13 @@ struct DependencyGraph {
 }
 
 impl DependencyGraph {
-    fn add_dep_by_name(&mut self, decl_name: &str, depending_on_name: &str) {
+    fn add_edge(&mut self, from: &str, to: String) {
         self.adj_list
-            .entry(decl_name.to_string())
+            .entry(from.to_string())
             .or_insert_with(Vec::new)
-            .push(depending_on_name.to_string());
+            .push(to.clone());
 
-        self.adj_list
-            .entry(depending_on_name.to_string())
-            .or_insert_with(Vec::new);
-    }
-
-    fn add_dep_by_expr(&mut self, decl_name: &str, depending_on_expr: &CoreExpr) {
-        match depending_on_expr {
-            CoreExpr::Block { statements, span } => todo!(),
-            CoreExpr::Identifier { name, span } => todo!(),
-            CoreExpr::Literal { literal, span } => todo!(),
-            CoreExpr::Lambda {
-                param_name,
-                param_type,
-                body,
-                span,
-            } => todo!(),
-            CoreExpr::Tuple { items, span } => todo!(),
-            CoreExpr::FunctionAppl {
-                fn_name,
-                args,
-                span,
-            } => todo!(),
-            CoreExpr::Match {
-                scrutinee,
-                match_arms,
-                span,
-            } => todo!(),
-        }
+        self.adj_list.entry(to).or_insert_with(Vec::new);
     }
 }
 
@@ -280,13 +182,111 @@ impl DependencyGraph {
 // --- optimizer ---
 // currently it just does code sinking
 
-pub fn optimize(stmts: Vec<CoreStatement>) -> (Vec<CoreStatement>, Vec<FogError>) {
+pub fn optimize(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<FogError>> {
     optimize_block(stmts)
 }
 
-fn optimize_block(stmts: Vec<CoreStatement>) -> (Vec<CoreStatement>, Vec<FogError>) {
+fn optimize_block(stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, Vec<FogError>> {
     let mut optimized_stmts = Vec::new();
     let mut errors = Vec::new();
 
-    (optimized_stmts, errors)
+    // optimize children block statements
+    for stmt in &stmts {
+        match stmt {
+            CoreStatement::Declaration { expr, .. } | CoreStatement::Expression { expr, .. } => {
+                if let CoreExpr::Block { statements, .. } = expr {
+                    // optimize_block(statements); // TODO replace stmt in place
+                }
+            }
+
+            CoreStatement::TypeAnnotation { .. } => {}
+        }
+    }
+
+    // collect bound variable names
+    let mut nodes = Vec::new();
+    let mut node_by_name = HashMap::new();
+    let mut bound_vars = HashSet::new();
+
+    for stmt in &stmts {
+        let node = Rc::new(Node::new(stmt));
+        nodes.push(node.clone());
+
+        match stmt {
+            CoreStatement::TypeAnnotation { name, .. } => {
+                node_by_name.insert(name.to_string(), node.clone());
+                bound_vars.insert(name.to_string());
+            }
+
+            CoreStatement::Declaration { pattern, .. } => {
+                for name in pattern.all_identifiers() {
+                    node_by_name.insert(name.to_string(), node.clone());
+                    bound_vars.insert(name.to_string());
+                }
+            }
+
+            CoreStatement::Expression { .. } => {}
+        }
+    }
+
+    // build a graph
+    let mut dep_graph = DependencyGraph {
+        adj_list: HashMap::new(),
+    };
+
+    for stmt in stmts {
+        match stmt {
+            CoreStatement::TypeAnnotation { name, expr, span } => {
+                build_dep_from_expr(&mut dep_graph, name, expr)
+            }
+            CoreStatement::Declaration {
+                pattern,
+                expr,
+                span,
+            } => todo!(),
+            CoreStatement::Expression { expr, span } => todo!(),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(optimized_stmts)
+    } else {
+        Err(errors)
+    }
+}
+
+fn build_dep_from_stmt(dep_graph: &mut DependencyGraph, from: &str, stmt: CoreStatement) {
+    match stmt {
+        CoreStatement::TypeAnnotation { expr, .. }
+        | CoreStatement::Declaration { expr, .. }
+        | CoreStatement::Expression { expr, .. } => build_dep_from_expr(dep_graph, from, expr),
+    }
+}
+
+fn build_dep_from_expr(dep_graph: &mut DependencyGraph, from: &str, expr: CoreExpr) {
+    match expr {
+        CoreExpr::Block { statements, .. } => {
+            for stmt in statements {
+                build_dep_from_stmt(dep_graph, from, stmt);
+            }
+        }
+
+        CoreExpr::Identifier { name, .. } => dep_graph.add_edge(from, name),
+
+        CoreExpr::Literal { .. } => {}
+
+        CoreExpr::Lambda {
+            param_name,
+            param_type,
+            body,
+            ..
+        } => todo!(),
+        CoreExpr::Tuple { items, .. } => todo!(),
+        CoreExpr::FunctionAppl { fn_name, args, .. } => todo!(),
+        CoreExpr::Match {
+            scrutinee,
+            match_arms,
+            ..
+        } => todo!(),
+    }
 }

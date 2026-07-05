@@ -61,18 +61,14 @@ pub enum CoreDeclPattern {
 }
 
 impl CoreDeclPattern {
-    pub fn get_all_identifiers(&self) -> Vec<&str> {
-        let mut res = Vec::new();
-
+    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
         match self {
-            CoreDeclPattern::Identifier { name, .. } => res.push(name.as_str()),
+            CoreDeclPattern::Identifier { name, .. } => Box::new(std::iter::once(name.as_str())),
 
-            CoreDeclPattern::Tuple { items, .. } => items
-                .iter()
-                .for_each(|item| res.extend(item.get_all_identifiers())),
+            CoreDeclPattern::Tuple { items, .. } => {
+                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
+            }
         }
-
-        res
     }
 }
 
@@ -105,18 +101,16 @@ pub enum CoreTupleDeclPattern {
 }
 
 impl CoreTupleDeclPattern {
-    pub fn get_all_identifiers(&self) -> Vec<&str> {
-        let mut res = Vec::new();
-
+    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
         match self {
-            CoreTupleDeclPattern::Identifier { name, .. } => res.push(name.as_str()),
+            CoreTupleDeclPattern::Identifier { name, .. } => {
+                Box::new(std::iter::once(name.as_str()))
+            }
 
-            CoreTupleDeclPattern::Tuple { items, .. } => items
-                .iter()
-                .for_each(|item| res.extend(item.get_all_identifiers())),
+            CoreTupleDeclPattern::Tuple { items, .. } => {
+                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
+            }
         }
-
-        res
     }
 }
 
