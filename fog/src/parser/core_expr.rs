@@ -1,6 +1,5 @@
 use std::fmt;
 use std::fmt::Display;
-use std::rc::Rc;
 
 use crate::error::Span;
 use crate::parser::Literal;

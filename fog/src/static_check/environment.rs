@@ -2,16 +2,17 @@ use std::collections::HashMap;
 
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::interpreter::value::Value;
-use crate::interpreter::value::value_type_of;
-use crate::interpreter::variable::TypeVariable;
-use crate::interpreter::variable::ValueVariable;
 use crate::runtime_error;
+use crate::static_check::kind::Kind;
+use crate::static_check::r#type::Type;
+use crate::static_check::r#type::kind_of;
+use crate::static_check::variable::TypeVariable;
+use crate::static_check::variable::VarVariable;
 use crate::type_check_error;
 
 #[derive(Clone)]
 pub struct Environment<'a> {
-    pub variables: HashMap<String, ValueVariable>,
+    pub variables: HashMap<String, VarVariable>,
     pub types: HashMap<String, TypeVariable>,
     pub parent: Option<&'a Environment<'a>>,
 }
@@ -47,7 +48,7 @@ impl<'a> Environment<'a> {
 
     // --- getters ---
 
-    pub fn get_value_var(&self, name: &str, span: &Span) -> FogResult<ValueVariable> {
+    pub fn get_value_var(&self, name: &str, span: &Span) -> FogResult<VarVariable> {
         if let Some(var) = self.variables.get(name) {
             return Ok(var.clone());
         }
@@ -108,7 +109,7 @@ impl<'a> Environment<'a> {
         }
 
         self.variables
-            .insert(name.to_string(), ValueVariable::without_value(name, r#type));
+            .insert(name.to_string(), VarVariable::new(name, r#type, false));
 
         Ok(())
     }
@@ -136,17 +137,15 @@ impl<'a> Environment<'a> {
 
     // -- declare
 
-    pub fn declare_value(&mut self, name: &str, value: Value, span: &Span) -> FogResult<()> {
+    pub fn declare(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
         if name == "_" {
             return Ok(());
         }
 
-        let type_of_value = value_type_of(&value);
-
-        if let Some(var) = self.variables.get(name) {
+        if let Some(var) = self.variables.get_mut(name) {
             // variable has been type-annotated
 
-            if var.value.borrow().is_some() {
+            if var.declared {
                 return Err(runtime_error!(
                     Some(*span),
                     "variable `{}` already declared in the current scope",
@@ -154,25 +153,23 @@ impl<'a> Environment<'a> {
                 ));
             }
 
-            let type_of_var = var.r#type.clone();
-
-            if type_of_value != type_of_var {
+            if var.r#type != r#type {
                 return Err(type_check_error!(
                     Some(*span),
-                    "type mismatch when assigning variable `{name}` with `{value}`\n\
-                     expected `{type_of_var}`, found `{type_of_value}`"
+                    "type mismatch when declaring variable `{name}`\n\
+                     expected `{}`, found `{}`",
+                    var.r#type,
+                    r#type
                 ));
             }
 
-            *var.value.borrow_mut() = Some(value);
+            var.declared = true;
         } else {
             // variable hasn't been type-annotated;
-            // infer type from value
+            // infer type from the declaration
 
-            self.variables.insert(
-                name.to_string(),
-                ValueVariable::with_value(name, value, type_of_value),
-            );
+            self.variables
+                .insert(name.to_string(), VarVariable::new(name, r#type, true));
         }
 
         Ok(())

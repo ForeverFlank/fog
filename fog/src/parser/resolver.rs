@@ -329,7 +329,10 @@ impl Resolver {
 
             ParsedExpr::Tuple { items, span } => self.resolve_tuple(items, span),
 
-            ParsedExpr::Collection { args, span: _ } => {
+            ParsedExpr::Collection {
+                items: args,
+                span: _,
+            } => {
                 let mut resolver = Resolver::new();
                 let mut index = 0;
                 resolver.resolve_collection(&args, i32::MIN, &mut index)
@@ -424,7 +427,7 @@ impl Resolver {
             }),
 
             // data constructors
-            ParsedExpr::Collection { args, span } => {
+            ParsedExpr::Collection { items: args, span } => {
                 let first = args.first().ok_or_else(|| {
                     parse_error!(Some(span), "collection pattern items cannot be empty")
                 })?;
@@ -583,7 +586,7 @@ impl Resolver {
 
             ParsedExpr::Tuple { items, span } => self.resolve_tuple(items, span),
 
-            ParsedExpr::Collection { args, .. } => {
+            ParsedExpr::Collection { items: args, .. } => {
                 let mut inner_index = 0;
                 self.resolve_collection(&args, i32::MIN, &mut inner_index)
             }

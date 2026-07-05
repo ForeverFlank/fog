@@ -93,9 +93,6 @@ impl Display for ParsedDeclPattern {
 
                 Ok(())
             }
-            ParsedDeclPattern::Op { kind } => write!(f, "{kind}"),
-            ParsedDeclPattern::Int32Literal { value, .. } => write!(f, "{value}"),
-            ParsedDeclPattern::Float32Literal { value, .. } => write!(f, "{value}"),
         }
     }
 }
@@ -154,7 +151,7 @@ pub enum ParsedExpr {
         span: Span,
     },
     Collection {
-        args: Vec<ParsedExpr>,
+        items: Vec<ParsedExpr>,
         span: Span,
     },
     Match {
@@ -203,7 +200,7 @@ impl Display for ParsedExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            ParsedExpr::Collection { args, .. } => {
+            ParsedExpr::Collection { items: args, .. } => {
                 for (i, expr) in args.iter().enumerate() {
                     if i > 0 {
                         write!(f, " ")?;

@@ -3,8 +3,6 @@ use std::rc::Rc;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::eval_scope;
-use crate::interpreter::kind::Kind;
-use crate::interpreter::r#type::Type;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::TypeVariable;
 use crate::interpreter::variable::ValueVariable;
@@ -13,24 +11,6 @@ use crate::runtime_error;
 
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
-
-    let t_int32 = TypeVariable {
-        name: "Int32".to_string(),
-        r#type: Type::Int32.into(),
-        kind: Kind::Type,
-    };
-
-    let t_float32 = TypeVariable {
-        name: "Float32".to_string(),
-        r#type: Type::Float32.into(),
-        kind: Kind::Type,
-    };
-
-    let t_unit = TypeVariable {
-        name: "Unit".to_string(),
-        r#type: Type::Product(Vec::new()).into(),
-        kind: Kind::Type,
-    };
 
     let var_add_int32 = ValueVariable::with_value(
         "addInt32",

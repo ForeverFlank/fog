@@ -1,9 +1,5 @@
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::interpreter::environment::Environment;
-use crate::interpreter::kind::Kind;
-use crate::interpreter::r#type::DataConstructor;
-use crate::interpreter::r#type::Type;
 use crate::parser::core_expr::CoreExpr;
 use crate::runtime_error;
 use crate::type_check_error;

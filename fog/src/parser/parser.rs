@@ -66,15 +66,6 @@ fn expr_to_decl_pattern(expr: ParsedExpr) -> FogResult<ParsedDeclPattern> {
             span,
         }),
 
-        ParsedExpr::Op { kind } => Ok(ParsedDeclPattern::Op { kind }),
-
-        ParsedExpr::Int32Literal { value, span } => {
-            Ok(ParsedDeclPattern::Int32Literal { value, span })
-        }
-        ParsedExpr::Float32Literal { value, span } => {
-            Ok(ParsedDeclPattern::Float32Literal { value, span })
-        }
-
         _ => Err(parse_error!(Some(expr.span()), "invalid pattern")),
     }
 }
@@ -221,7 +212,7 @@ impl Parser<'_> {
                 span,
             }),
 
-            ParsedExpr::Collection { args, span } => Ok(ParsedDeclPattern::Collection {
+            ParsedExpr::Collection { items: args, span } => Ok(ParsedDeclPattern::Collection {
                 items: args
                     .into_iter()
                     .map(|item| Self::expr_to_decl_pattern(item))
@@ -262,7 +253,7 @@ impl Parser<'_> {
         if args.len() == 1 {
             Ok(args[0].clone())
         } else {
-            Ok(ParsedExpr::Collection { args, span })
+            Ok(ParsedExpr::Collection { items: args, span })
         }
     }
 

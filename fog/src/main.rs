@@ -9,10 +9,11 @@ use crate::optimizer::optimizer::optimize;
 use crate::parser::*;
 
 mod error;
-mod interpreter;
+// mod interpreter;
 mod lexer;
 mod optimizer;
 mod parser;
+mod static_check;
 mod util;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

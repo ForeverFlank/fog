@@ -86,8 +86,6 @@ impl Display for ResolvedDeclPattern {
 
                 Ok(())
             }
-            ResolvedDeclPattern::Int32Literal { value, .. } => write!(f, "{value}"),
-            ResolvedDeclPattern::Float32Literal { value, .. } => write!(f, "{value}"),
         }
     }
 }

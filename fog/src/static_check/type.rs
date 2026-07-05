@@ -3,7 +3,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use crate::interpreter::kind::Kind;
+use crate::static_check::kind::Kind;
 use crate::util::format_joined;
 
 // --- type ---

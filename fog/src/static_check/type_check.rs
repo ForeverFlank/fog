@@ -1,17 +1,7 @@
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::interpreter::environment::Environment;
-use crate::interpreter::eval_type::Annotation;
-use crate::interpreter::eval_type::eval_annotation_expr;
-use crate::interpreter::eval_type::eval_type_annotation_expr;
-use crate::interpreter::eval_type::eval_type_definition_expr;
-use crate::interpreter::r#type::Type;
 use crate::parser::Literal;
-use crate::parser::desugared_expr::DesugaredDeclPattern;
-use crate::parser::desugared_expr::DesugaredExpr;
-use crate::parser::desugared_expr::DesugaredStatement;
-use crate::parser::desugared_expr::DesugaredTupleDeclPattern;
 use crate::runtime_error;
 use crate::type_check_error;
 
@@ -121,24 +111,7 @@ fn type_check_declaration(
             // if not, it's a variable declaration
             let expr_type = expr_type_of(expr, env)?;
 
-            // check if variable have its type annotated before
-            if let Some(var) = env.variables.get(name) {
-                // if so, check if declaration is actually type-valid
-                let annotated_type = var.r#type.clone();
-
-                if expr_type != annotated_type {
-                    return Err(type_check_error!(
-                        Some(*span),
-                        "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
-                         expected `{annotated_type}`, found `{expr_type}`"
-                    ));
-                }
-
-                return Ok(());
-            }
-
-            // otherwise, infer the type
-            env.annotate_type(name, expr_type, span)
+            env.declare(name, expr_type, span)
         }
 
         DesugaredDeclPattern::Tuple { items, .. } => {
@@ -190,22 +163,7 @@ fn bind_tuple_decl_pattern_item(
 ) -> FogResult<()> {
     match item {
         DesugaredTupleDeclPattern::Identifier { name, .. } => {
-            if let Some(var) = block_env.variables.get(name) {
-                let annotated_type = var.r#type.clone();
-
-                if annotated_type != *expected_type {
-                    return Err(type_check_error!(
-                        Some(*span),
-                        "type mismatch when binding variable `{name}`\n\
-                         expected `{annotated_type}`, found `{expected_type}`"
-                    ));
-                }
-
-                return Ok(());
-            }
-
-            // infer type
-            block_env.annotate_type(name, expected_type.clone(), span)
+            block_env.declare(name, expected_type.clone(), span)
         }
 
         DesugaredTupleDeclPattern::Tuple { items, .. } => {
