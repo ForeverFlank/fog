@@ -119,7 +119,23 @@ impl Resolver {
 
     fn resolve_statement(&self, parsed_statement: ParsedStatement) -> FogResult<ResolvedStatement> {
         match parsed_statement {
-            ParsedStatement::TypeAnnotation { name, expr, span } => {
+            ParsedStatement::KindAnnotation { name, expr, span } => {
+                Ok(ResolvedStatement::KindAnnotation {
+                    name,
+                    expr: self.resolve_expr(expr)?,
+                    span,
+                })
+            }
+
+            ParsedStatement::TypeAnnotation {
+                pattern,
+                expr,
+                span,
+            } => {
+                let ParsedDeclPattern::Identifier { name, .. } = pattern else {
+                    return Err(parse_error!(Some(span), "invalid type annotation"));
+                };
+
                 Ok(ResolvedStatement::TypeAnnotation {
                     name,
                     expr: self.resolve_expr(expr)?,
@@ -127,11 +143,19 @@ impl Resolver {
                 })
             }
 
-            ParsedStatement::Declaration {
+            ParsedStatement::TypeDeclaration { name, expr, span } => {
+                Ok(ResolvedStatement::TypeDeclaration {
+                    name,
+                    expr: self.resolve_expr(expr)?,
+                    span,
+                })
+            }
+
+            ParsedStatement::VarDeclaration {
                 pattern,
                 expr,
                 span,
-            } => Ok(ResolvedStatement::Declaration {
+            } => Ok(ResolvedStatement::VarDeclaration {
                 pattern: self.resolve_decl_pattern(pattern)?,
                 expr: self.resolve_expr(expr)?,
                 span,

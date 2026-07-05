@@ -12,6 +12,10 @@ pub fn parse(tokens: &Vec<Token>) -> (Vec<ParsedStatement>, Vec<FogError>) {
     Parser::parse(tokens)
 }
 
+fn is_type_name(name: &str) -> bool {
+    name.chars().next().is_some_and(|c| c.is_uppercase())
+}
+
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     pos: usize,
@@ -20,13 +24,10 @@ pub struct Parser<'a> {
 
 impl Parser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
-        let eof_pos = tokens.last().map_or(
-            Pos {
-                line: 1,
-                column: 1,
-            },
-            |t| t.span.end,
-        );
+        let eof_pos = tokens
+            .last()
+            .map_or(Pos { line: 1, column: 1 }, |t| t.span.end);
+
         let eof_token = Token {
             kind: TokenKind::Eof,
             span: Span::new(eof_pos, eof_pos),
@@ -102,7 +103,18 @@ impl Parser<'_> {
                 let expr = self.parse_expression()?;
                 let span = Span::merge(start_span, expr.span());
 
-                Ok(ParsedStatement::TypeAnnotation { name, expr, span })
+                if is_type_name(&name) {
+                    Ok(ParsedStatement::KindAnnotation { name, expr, span })
+                } else {
+                    Ok(ParsedStatement::TypeAnnotation {
+                        pattern: ParsedDeclPattern::Identifier {
+                            name,
+                            span: start_span,
+                        },
+                        expr,
+                        span,
+                    })
+                }
             }
 
             (TokenKind::Identifier(name), TokenKind::Equal) => {
@@ -119,14 +131,18 @@ impl Parser<'_> {
                 let expr = self.parse_expression()?;
                 let span = Span::merge(start_span, expr.span());
 
-                Ok(ParsedStatement::Declaration {
-                    pattern: ParsedDeclPattern::Identifier {
-                        name,
-                        span: start_span,
-                    },
-                    expr,
-                    span,
-                })
+                if is_type_name(&name) {
+                    Ok(ParsedStatement::TypeDeclaration { name, expr, span })
+                } else {
+                    Ok(ParsedStatement::VarDeclaration {
+                        pattern: ParsedDeclPattern::Identifier {
+                            name,
+                            span: start_span,
+                        },
+                        expr,
+                        span,
+                    })
+                }
             }
 
             // either a tuple assignemt, a function clause,
@@ -141,7 +157,7 @@ impl Parser<'_> {
                     let expr = self.parse_expression()?;
                     let span = Span::merge(pattern.span(), expr.span());
 
-                    Ok(ParsedStatement::Declaration {
+                    Ok(ParsedStatement::VarDeclaration {
                         pattern,
                         expr,
                         span,

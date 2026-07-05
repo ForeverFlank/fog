@@ -68,7 +68,7 @@ fn desugar_statements(
 
         match pattern {
             ResolvedDeclPattern::Identifier { name, span } => {
-                statements.push(CoreStatement::Declaration {
+                statements.push(CoreStatement::VarDeclaration {
                     pattern: CoreDeclPattern::Identifier { name, span },
                     expr,
                     span,
@@ -88,7 +88,7 @@ fn desugar_statements(
                     }
                 };
 
-                statements.push(CoreStatement::Declaration {
+                statements.push(CoreStatement::VarDeclaration {
                     pattern: CoreDeclPattern::Tuple { items, span },
                     expr,
                     span,
@@ -194,7 +194,7 @@ fn desugar_statements(
             },
         );
 
-        statements.push(CoreStatement::Declaration {
+        statements.push(CoreStatement::VarDeclaration {
             pattern: CoreDeclPattern::Identifier {
                 name: fn_name,
                 span,
@@ -275,6 +275,22 @@ fn find_fn_clause_param_types(
 
 fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
     match stmt {
+        ResolvedStatement::KindAnnotation { name, expr, span } => {
+            Ok(DesugarResult::Statement(CoreStatement::KindAnnotation {
+                name,
+                expr: desugar_expr(expr)?,
+                span,
+            }))
+        }
+
+        ResolvedStatement::TypeDeclaration { name, expr, span } => {
+            Ok(DesugarResult::Statement(CoreStatement::TypeDeclaration {
+                name,
+                expr: desugar_expr(expr)?,
+                span,
+            }))
+        }
+
         ResolvedStatement::TypeAnnotation { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::TypeAnnotation {
                 name,
@@ -283,7 +299,7 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
             }))
         }
 
-        ResolvedStatement::Declaration {
+        ResolvedStatement::VarDeclaration {
             pattern,
             expr,
             span,

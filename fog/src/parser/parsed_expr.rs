@@ -14,16 +14,28 @@ use crate::util::format_joined;
 
 #[derive(Clone)]
 pub enum ParsedStatement {
-    TypeAnnotation {
+    KindAnnotation {
         name: String,
         expr: ParsedExpr,
         span: Span,
     },
-    Declaration {
+    TypeDeclaration {
+        name: String,
+        expr: ParsedExpr,
+        span: Span,
+    },
+
+    TypeAnnotation {
         pattern: ParsedDeclPattern,
         expr: ParsedExpr,
         span: Span,
     },
+    VarDeclaration {
+        pattern: ParsedDeclPattern,
+        expr: ParsedExpr,
+        span: Span,
+    },
+
     Expression {
         expr: ParsedExpr,
         span: Span,
@@ -33,11 +45,19 @@ pub enum ParsedStatement {
 impl Display for ParsedStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParsedStatement::TypeAnnotation { name, expr, .. } => {
+            ParsedStatement::KindAnnotation { name, expr, .. } => {
                 write!(f, "{} : {}", name, expr)
             }
 
-            ParsedStatement::Declaration { pattern, expr, .. } => {
+            ParsedStatement::TypeDeclaration { name, expr, .. } => {
+                write!(f, "{} = {}", name, expr)
+            }
+
+            ParsedStatement::TypeAnnotation { pattern, expr, .. } => {
+                write!(f, "{} : {}", pattern, expr)
+            }
+
+            ParsedStatement::VarDeclaration { pattern, expr, .. } => {
                 write!(f, "{} = {}", pattern, expr)
             }
 

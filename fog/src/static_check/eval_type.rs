@@ -7,57 +7,48 @@ use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Type;
 use crate::static_check_error;
 
-// --- annotation (kind or type) ---
+// --- kind ---
 
-pub enum Annotation {
-    Kind(Kind),
-    Type(Type),
-}
-
-pub fn eval_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Annotation> {
+pub fn eval_kind_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Kind> {
     let span = expr.span();
 
     match expr {
-        CoreExpr::Identifier { name, .. } if name == "Type" => Ok(Annotation::Kind(Kind::Type)),
+        CoreExpr::Identifier { name, .. } if name == "Type" => Ok(Kind::Type),
 
-        CoreExpr::Identifier { name, .. } if env.contains_type(name) => {
-            Ok(Annotation::Type(env.get_type(name, &span)?))
+        CoreExpr::Identifier { name, .. } => {
+            Err(static_check_error!(Some(span), "unknown kind `{}`", name))
         }
-
-        CoreExpr::Identifier { name, .. } => Err(static_check_error!(
-            Some(span),
-            "unknown type or kind `{}`",
-            name
-        )),
 
         CoreExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
-            if let (CoreExpr::Identifier { name, .. }, &[lhs, rhs]) = (head, args.as_slice()) {
-                if name == "->" {
-                    return match (
-                        eval_annotation_expr(lhs, env)?,
-                        eval_annotation_expr(rhs, env)?,
-                    ) {
-                        (Annotation::Kind(k1), Annotation::Kind(k2)) => {
-                            Ok(Annotation::Kind(Kind::Function(k1.into(), k2.into())))
-                        }
-                        (Annotation::Type(t1), Annotation::Type(t2)) => {
-                            Ok(Annotation::Type(Type::Function(t1.into(), t2.into())))
-                        }
-                        _ => Err(static_check_error!(
-                            Some(span),
-                            "mixed kind and type levels in `{}`",
-                            expr.to_string()
-                        )),
-                    };
-                }
+            let (CoreExpr::Identifier { name, .. }, &[lhs, rhs]) = (head, args.as_slice()) else {
+                return Err(static_check_error!(
+                    Some(span),
+                    "`{}` is not a valid kind",
+                    expr.to_string()
+                ));
+            };
+
+            if name != "->" {
+                return Err(static_check_error!(
+                    Some(span),
+                    "`{}` is not a valid kind",
+                    expr.to_string()
+                ));
             }
 
-            Ok(Annotation::Type(eval_type_annotation_expr(expr, env)?))
+            Ok(Kind::Function(
+                eval_kind_expr(lhs, env)?.into(),
+                eval_kind_expr(rhs, env)?.into(),
+            ))
         }
 
-        _ => Ok(Annotation::Type(eval_type_annotation_expr(expr, env)?)),
+        _ => Err(static_check_error!(
+            Some(span),
+            "`{}` is not a valid kind",
+            expr.to_string()
+        )),
     }
 }
 

@@ -7,13 +7,13 @@ use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
 use crate::static_check::environment::Environment;
-use crate::static_check::eval_type::Annotation;
-use crate::static_check::eval_type::eval_annotation_expr;
+use crate::static_check::eval_type::eval_kind_expr;
 use crate::static_check::eval_type::eval_type_annotation_expr;
 use crate::static_check::eval_type::eval_type_definition_expr;
 use crate::static_check::eval_type::register_data_constructors;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
+use crate::static_check::r#type::kind_of;
 use crate::static_check::variable::TypeVariable;
 use crate::static_check::variable::ValueVariable;
 use crate::static_check_error;
@@ -74,24 +74,22 @@ fn create_top_env() -> Environment<'static> {
 fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &mut Vec<FogError>) {
     // type kind annotations
     for stmt in stmts {
-        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
-            if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
-                if let Err(error) = env.annotate_kind(&name, kind, &span) {
-                    all_errors.push(error);
+        if let CoreStatement::KindAnnotation { name, expr, span } = stmt {
+            match eval_kind_expr(expr, env) {
+                Ok(kind) => {
+                    if let Err(error) = env.annotate_kind(name, kind, span) {
+                        all_errors.push(error);
+                    }
                 }
+                Err(error) => all_errors.push(error),
             }
         }
     }
 
     // type declarations
     for stmt in stmts {
-        if let CoreStatement::Declaration {
-            pattern,
-            expr,
-            span,
-        } = stmt
-        {
-            if let Err(error) = check_type_declaration(pattern, expr, span, env) {
+        if let CoreStatement::TypeDeclaration { name, expr, span } = stmt {
+            if let Err(error) = check_type_declaration(name, expr, span, env) {
                 all_errors.push(error);
             }
         }
@@ -100,35 +98,22 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     // variable type annotations
     for stmt in stmts {
         if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
-            match eval_annotation_expr(expr, env) {
-                Ok(Annotation::Type(r#type)) => {
-                    if let Err(error) = env.annotate_type(&name, r#type, &span) {
-                        all_errors.push(error);
-                    }
-                }
-                Ok(Annotation::Kind(_)) => {}
-                Err(error) => all_errors.push(error),
+            if let Err(error) = check_type_annotation(name, expr, span, env) {
+                all_errors.push(error);
             }
         }
     }
 
     // variable declarations
     for stmt in stmts {
-        if let CoreStatement::Declaration {
+        if let CoreStatement::VarDeclaration {
             pattern,
             expr,
             span,
         } = stmt
         {
-            let is_type_decl = matches!(
-                pattern,
-                CoreDeclPattern::Identifier { name, .. } if env.types.contains_key(name)
-            );
-
-            if !is_type_decl {
-                if let Err(error) = check_declaration(pattern, expr, span, env) {
-                    all_errors.push(error);
-                }
+            if let Err(error) = check_declaration(pattern, expr, span, env) {
+                all_errors.push(error);
             }
         }
     }
@@ -144,20 +129,17 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
 }
 
 fn check_type_declaration(
-    pattern: &CoreDeclPattern,
+    name: &str,
     expr: &CoreExpr,
-    _span: &Span,
+    span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
-    let CoreDeclPattern::Identifier { name, span } = pattern else {
-        return Ok(());
-    };
+    let defined_type = eval_type_definition_expr(expr, env)?;
 
     if !env.types.contains_key(name) {
-        return Ok(());
+        env.annotate_kind(name, kind_of(&defined_type), span)?;
     }
 
-    let defined_type = eval_type_definition_expr(expr, env)?;
     env.declare_type(name, defined_type.clone(), span)?;
 
     if let Type::Sum(_) = &defined_type {
@@ -173,10 +155,8 @@ fn check_type_annotation(
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
-    match eval_annotation_expr(expr, env)? {
-        Annotation::Kind(kind) => env.annotate_kind(name, kind, span),
-        Annotation::Type(r#type) => env.annotate_type(name, r#type, span),
-    }
+    let r#type = eval_type_annotation_expr(expr, env)?;
+    env.annotate_type(name, r#type, span)
 }
 
 // validate and sometimes annotate types
@@ -189,15 +169,7 @@ fn check_declaration(
 ) -> FogResult<()> {
     match pattern {
         CoreDeclPattern::Identifier { name, .. } => {
-            // check if declaration is a type declaration
-            if env.types.contains_key(name) {
-                let defined_type = eval_type_definition_expr(expr, env)?;
-                return env.declare_type(name, defined_type, span);
-            }
-
-            // if not, it's a variable declaration
             let expr_type = expr_type_of(expr, env)?;
-
             env.declare_var(name, expr_type, span)
         }
 
@@ -336,11 +308,20 @@ fn block_expr_type_of(
 
     for stmt in statements {
         match stmt {
+            CoreStatement::KindAnnotation { name, expr, span } => {
+                let kind = eval_kind_expr(expr, &block_env)?;
+                block_env.annotate_kind(name, kind, span)?;
+            }
+
+            CoreStatement::TypeDeclaration { name, expr, span } => {
+                check_type_declaration(name, expr, span, &mut block_env)?;
+            }
+
             CoreStatement::TypeAnnotation { name, expr, span } => {
                 check_type_annotation(name, expr, span, &mut block_env)?;
             }
 
-            CoreStatement::Declaration {
+            CoreStatement::VarDeclaration {
                 pattern,
                 expr,
                 span,

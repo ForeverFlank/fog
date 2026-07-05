@@ -306,8 +306,10 @@ fn optimize_block(mut stmts: Vec<CoreStatement>) -> (Vec<CoreStatement>, Vec<Fog
     // recursive optimize all nested expressions
     for stmt in &mut stmts {
         let expr = match stmt {
-            CoreStatement::TypeAnnotation { expr, .. }
-            | CoreStatement::Declaration { expr, .. }
+            CoreStatement::KindAnnotation { expr, .. }
+            | CoreStatement::TypeDeclaration { expr, .. }
+            | CoreStatement::TypeAnnotation { expr, .. }
+            | CoreStatement::VarDeclaration { expr, .. }
             | CoreStatement::Expression { expr, .. } => expr,
         };
 
@@ -335,14 +337,16 @@ fn visit_stmt(graph: &mut DependencyGraph, scope: &Scope, index: usize, stmt: &C
     let stmt_node = graph.add_node(Node::Statement(index));
 
     match stmt {
-        CoreStatement::TypeAnnotation { name, expr, .. } => {
+        CoreStatement::KindAnnotation { name, expr, .. }
+        | CoreStatement::TypeDeclaration { name, expr, .. }
+        | CoreStatement::TypeAnnotation { name, expr, .. } => {
             let name_node = graph.add_name_node(name.clone());
             graph.union(stmt_node, name_node);
 
             visit_expr(graph, scope, stmt_node, expr);
         }
 
-        CoreStatement::Declaration { pattern, expr, .. } => {
+        CoreStatement::VarDeclaration { pattern, expr, .. } => {
             for name in pattern.all_identifiers() {
                 let name_node = graph.add_name_node(name.to_string());
                 graph.union(stmt_node, name_node);
@@ -364,8 +368,10 @@ fn visit_stmt_expr(
     stmt: &CoreStatement,
 ) {
     let expr = match stmt {
-        CoreStatement::TypeAnnotation { expr, .. }
-        | CoreStatement::Declaration { expr, .. }
+        CoreStatement::KindAnnotation { expr, .. }
+        | CoreStatement::TypeDeclaration { expr, .. }
+        | CoreStatement::TypeAnnotation { expr, .. }
+        | CoreStatement::VarDeclaration { expr, .. }
         | CoreStatement::Expression { expr, .. } => expr,
     };
 

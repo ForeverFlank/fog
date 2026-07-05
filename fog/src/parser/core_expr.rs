@@ -10,12 +10,22 @@ use crate::util::format_joined;
 
 #[derive(Clone)]
 pub enum CoreStatement {
+    KindAnnotation {
+        name: String,
+        expr: CoreExpr,
+        span: Span,
+    },
+    TypeDeclaration {
+        name: String,
+        expr: CoreExpr,
+        span: Span,
+    },
     TypeAnnotation {
         name: String,
         expr: CoreExpr,
         span: Span,
     },
-    Declaration {
+    VarDeclaration {
         pattern: CoreDeclPattern,
         expr: CoreExpr,
         span: Span,
@@ -29,11 +39,19 @@ pub enum CoreStatement {
 impl Display for CoreStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            CoreStatement::KindAnnotation { name, expr, .. } => {
+                write!(f, "{} : {}", name, expr)
+            }
+
+            CoreStatement::TypeDeclaration { name, expr, .. } => {
+                write!(f, "{} = {}", name, expr)
+            }
+
             CoreStatement::TypeAnnotation { name, expr, .. } => {
                 write!(f, "{} : {}", name, expr)
             }
 
-            CoreStatement::Declaration { pattern, expr, .. } => {
+            CoreStatement::VarDeclaration { pattern, expr, .. } => {
                 write!(f, "{} = {}", pattern, expr)
             }
 

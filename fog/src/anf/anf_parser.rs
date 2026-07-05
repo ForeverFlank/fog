@@ -20,7 +20,7 @@ fn collect_stmt_to_anf(
     var_counter: &mut i32,
 ) {
     match stmt {
-        CoreStatement::Declaration { pattern, expr, .. } => {
+        CoreStatement::VarDeclaration { pattern, expr, .. } => {
             let expr = parse_expr_to_anf(expr, collected_anf, var_counter);
             let anf = ANFExpr::Declaration(pattern.clone(), expr.into());
             collected_anf.push(anf);
@@ -30,7 +30,9 @@ fn collect_stmt_to_anf(
             parse_expr_to_anf(expr, collected_anf, var_counter);
         }
 
-        CoreStatement::TypeAnnotation { .. } => {}
+        CoreStatement::KindAnnotation { .. }
+        | CoreStatement::TypeDeclaration { .. }
+        | CoreStatement::TypeAnnotation { .. } => {}
     };
 }
 

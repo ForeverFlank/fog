@@ -10,12 +10,22 @@ use crate::util::{fmt_parenthesized, format_joined};
 
 #[derive(Clone)]
 pub enum ResolvedStatement {
+    KindAnnotation {
+        name: String,
+        expr: ResolvedExpr,
+        span: Span,
+    },
+    TypeDeclaration {
+        name: String,
+        expr: ResolvedExpr,
+        span: Span,
+    },
     TypeAnnotation {
         name: String,
         expr: ResolvedExpr,
         span: Span,
     },
-    Declaration {
+    VarDeclaration {
         pattern: ResolvedDeclPattern,
         expr: ResolvedExpr,
         span: Span,
@@ -29,11 +39,19 @@ pub enum ResolvedStatement {
 impl Display for ResolvedStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ResolvedStatement::KindAnnotation { name, expr, .. } => {
+                write!(f, "{} : {}", name, expr)
+            }
+
+            ResolvedStatement::TypeDeclaration { name, expr, .. } => {
+                write!(f, "{} = {}", name, expr)
+            }
+
             ResolvedStatement::TypeAnnotation { name, expr, .. } => {
                 write!(f, "{} : {}", name, expr)
             }
 
-            ResolvedStatement::Declaration { pattern, expr, .. } => {
+            ResolvedStatement::VarDeclaration { pattern, expr, .. } => {
                 write!(f, "{} = {}", pattern, expr)
             }
 
