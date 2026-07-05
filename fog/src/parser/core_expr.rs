@@ -239,7 +239,7 @@ pub enum CoreExpr {
     },
     Match {
         scrutinee: Box<CoreExpr>,
-        match_arms: Vec<DesugaredMatchArm>,
+        match_arms: Vec<CoreMatchArm>,
         span: Span,
     },
 }
@@ -259,7 +259,7 @@ impl CoreExpr {
 }
 
 #[derive(Clone)]
-pub struct DesugaredMatchArm {
+pub struct CoreMatchArm {
     pub pattern: CoreMatchArmPattern,
     pub value_expr: CoreExpr,
 }

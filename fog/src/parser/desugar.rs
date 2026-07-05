@@ -9,7 +9,7 @@ use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
-use crate::parser::core_expr::DesugaredMatchArm;
+use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedMatchArmPattern;
@@ -150,7 +150,7 @@ fn desugar_statements(
                     }
                 };
 
-                DesugaredMatchArm {
+                CoreMatchArm {
                     pattern,
                     value_expr,
                 }
@@ -383,7 +383,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
             match_arms: match_arms
                 .into_iter()
                 .map(|arm| {
-                    Ok(DesugaredMatchArm {
+                    Ok(CoreMatchArm {
                         pattern: desugar_match_arm_pattern(arm.pattern)?,
                         value_expr: desugar_expr(arm.value_expr)?,
                     })

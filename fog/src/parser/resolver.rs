@@ -268,7 +268,7 @@ impl Resolver {
                     ));
                 };
 
-                let first_char = name.chars().nth(0).unwrap();
+                let first_char = name.chars().next().unwrap();
 
                 if !first_char.is_uppercase() {
                     return Err(parse_error!(
@@ -333,9 +333,8 @@ impl Resolver {
                 items: args,
                 span: _,
             } => {
-                let mut resolver = Resolver::new();
                 let mut index = 0;
-                resolver.resolve_collection(&args, i32::MIN, &mut index)
+                self.resolve_collection(&args, i32::MIN, &mut index)
             }
 
             ParsedExpr::Match {
@@ -439,7 +438,7 @@ impl Resolver {
                     ));
                 };
 
-                let Some(first_char) = name.chars().nth(0) else {
+                let Some(first_char) = name.chars().next() else {
                     return Err(parse_error!(
                         Some(span),
                         "data constructor's name cannot be empty"
@@ -475,7 +474,7 @@ impl Resolver {
     }
 
     fn resolve_collection(
-        &mut self,
+        &self,
         items: &Vec<ParsedExpr>,
         min_prec: i32,
         index: &mut usize,
@@ -521,7 +520,7 @@ impl Resolver {
     }
 
     fn resolve_primary(
-        &mut self,
+        &self,
         exprs: &Vec<ParsedExpr>,
         index: &mut usize,
     ) -> FogResult<ResolvedExpr> {
@@ -550,7 +549,7 @@ impl Resolver {
     }
 
     fn resolve_atomic(
-        &mut self,
+        &self,
         exprs: &Vec<ParsedExpr>,
         index: &mut usize,
     ) -> FogResult<ResolvedExpr> {

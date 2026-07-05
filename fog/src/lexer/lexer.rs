@@ -8,8 +8,6 @@ pub struct Lexer {
     pos: usize,
     line: usize,
     column: usize,
-    paren_depth: i32,
-    brace_depth: i32,
 }
 
 impl Lexer {
@@ -19,8 +17,6 @@ impl Lexer {
             pos: 0,
             line: 1,
             column: 1,
-            paren_depth: 0,
-            brace_depth: 0,
         }
     }
 
@@ -222,19 +218,6 @@ impl Lexer {
         let token_type = match_one_char_token(sym)?;
 
         self.next();
-
-        if sym == '(' {
-            self.paren_depth += 1;
-        }
-        if sym == ')' {
-            self.paren_depth -= 1;
-        }
-        if sym == '{' {
-            self.brace_depth += 1;
-        }
-        if sym == '}' {
-            self.brace_depth -= 1;
-        }
 
         Some(Ok(Token {
             kind: token_type,

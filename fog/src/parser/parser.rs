@@ -46,30 +46,6 @@ fn token_span(token: &Token) -> Span {
     }
 }
 
-fn expr_to_decl_pattern(expr: ParsedExpr) -> FogResult<ParsedDeclPattern> {
-    match expr {
-        ParsedExpr::Identifier { name, span } => Ok(ParsedDeclPattern::Identifier { name, span }),
-
-        ParsedExpr::Tuple { items, span } => Ok(ParsedDeclPattern::Tuple {
-            items: items
-                .into_iter()
-                .map(expr_to_decl_pattern)
-                .collect::<Result<Vec<_>, _>>()?,
-            span,
-        }),
-
-        ParsedExpr::Collection { items, span } => Ok(ParsedDeclPattern::Collection {
-            items: items
-                .into_iter()
-                .map(expr_to_decl_pattern)
-                .collect::<Result<Vec<_>, _>>()?,
-            span,
-        }),
-
-        _ => Err(parse_error!(Some(expr.span()), "invalid pattern")),
-    }
-}
-
 impl Parser<'_> {
     fn new(tokens: &'_ Vec<Token>) -> Parser<'_> {
         let eof_token = Token {
@@ -165,7 +141,7 @@ impl Parser<'_> {
                 let expr = self.parse_expression()?;
 
                 Ok(ParsedStatement::Declaration {
-                    pattern: ParsedDeclPattern::Identifier { name, span: span },
+                    pattern: ParsedDeclPattern::Identifier { name, span },
                     expr,
                     span,
                 })
@@ -241,7 +217,7 @@ impl Parser<'_> {
             let token = self.peek();
 
             if let Some(kind) = get_op_kind(token) {
-                args.push(ParsedExpr::Op { kind, span: span });
+                args.push(ParsedExpr::Op { kind, span });
                 self.next();
             } else if is_primary_starter(token) {
                 continue;

@@ -1,7 +1,7 @@
 use crate::error::FogResult;
-use crate::runtime_error;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
+use crate::type_check_error;
 
 #[derive(Clone)]
 pub struct ValueVariable {
@@ -31,6 +31,6 @@ impl TypeVariable {
     pub fn get_type(&self) -> FogResult<Type> {
         self.r#type
             .clone()
-            .ok_or_else(|| runtime_error!(None, "unassigned type `{}`", self.name))
+            .ok_or_else(|| type_check_error!(None, "unassigned type `{}`", self.name))
     }
 }

@@ -6,7 +6,6 @@ use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
-use crate::runtime_error;
 use crate::static_check::environment::Environment;
 use crate::static_check::eval_type::Annotation;
 use crate::static_check::eval_type::eval_annotation_expr;
@@ -217,7 +216,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
                 curr_type = match curr_type {
                     Type::Function(_, return_type) => *return_type,
                     _ => {
-                        return Err(runtime_error!(
+                        return Err(type_check_error!(
                             Some(span),
                             "{} is not a function type",
                             curr_type.to_string()
@@ -238,7 +237,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
 
         CoreExpr::Match { match_arms, .. } => match match_arms.first() {
             Some(arm) => expr_type_of(&arm.value_expr, env),
-            None => Err(runtime_error!(Some(span), "match with no arms")),
+            None => Err(type_check_error!(Some(span), "match with no arms")),
         },
     }
 }
@@ -268,7 +267,7 @@ fn block_expr_type_of(
         }
     }
 
-    Err(runtime_error!(
+    Err(type_check_error!(
         Some(span),
         "final operand not found in block statement"
     ))

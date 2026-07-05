@@ -42,8 +42,8 @@ pub enum TokenKind {
     // If,
 }
 
-pub fn match_one_char_token(char: char) -> Option<TokenKind> {
-    match char {
+pub fn match_one_char_token(ch: char) -> Option<TokenKind> {
+    match ch {
         ':' => Some(TokenKind::Colon),
         '=' => Some(TokenKind::Equal),
         ',' => Some(TokenKind::Comma),
@@ -62,8 +62,8 @@ pub fn match_one_char_token(char: char) -> Option<TokenKind> {
     }
 }
 
-pub fn match_two_char_token(str: &str) -> Option<TokenKind> {
-    match str {
+pub fn match_two_char_token(s: &str) -> Option<TokenKind> {
+    match s {
         "->" => Some(TokenKind::Arrow),
         "=>" => Some(TokenKind::FatArrow),
 

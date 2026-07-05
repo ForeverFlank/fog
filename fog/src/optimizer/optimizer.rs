@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use crate::error::FogError;
 use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreStatement;
-use crate::parser::core_expr::DesugaredMatchArm;
+use crate::parser::core_expr::CoreMatchArm;
 
 // --- node ---
 
@@ -441,7 +441,7 @@ fn visit_match_arm<'a>(
     graph: &mut DependencyGraph,
     scope: &'a Scope<'a>,
     parent: NodeId,
-    match_arm: &DesugaredMatchArm,
+    match_arm: &CoreMatchArm,
 ) {
     let unbound: HashSet<String> = match_arm
         .pattern

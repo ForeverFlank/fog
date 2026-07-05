@@ -1,7 +1,6 @@
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parser::core_expr::CoreExpr;
-use crate::runtime_error;
 use crate::static_check::environment::Environment;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::DataConstructor;
@@ -25,7 +24,7 @@ pub fn eval_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Ann
             Ok(Annotation::Type(env.get_type(name, &span)?))
         }
 
-        CoreExpr::Identifier { name, .. } => Err(runtime_error!(
+        CoreExpr::Identifier { name, .. } => Err(type_check_error!(
             Some(span),
             "unknown type or kind `{}`",
             name
@@ -42,7 +41,7 @@ pub fn eval_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Ann
                 (Annotation::Type(t1), Annotation::Type(t2)) => {
                     Ok(Annotation::Type(Type::Function(t1.into(), t2.into())))
                 }
-                _ => Err(runtime_error!(
+                _ => Err(type_check_error!(
                     Some(span),
                     "mixed kind and type levels in `{}`",
                     expr.to_string()
@@ -61,7 +60,7 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
         CoreExpr::Identifier { name, .. } => env
             .get_type_var(name, &span)?
             .r#type
-            .ok_or_else(|| runtime_error!(Some(span), "undeclared type `{}`", name)),
+            .ok_or_else(|| type_check_error!(Some(span), "undeclared type `{}`", name)),
 
         CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
             eval_function_type(&args[0], &args[1], env)
@@ -71,7 +70,7 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             eval_product_type(&args[0], &args[1], env)
         }
 
-        CoreExpr::FunctionAppl { fn_name, .. } if fn_name == "+" => Err(runtime_error!(
+        CoreExpr::FunctionAppl { fn_name, .. } if fn_name == "+" => Err(type_check_error!(
             Some(span),
             "cannot type annotate a value with sum types"
         )),
@@ -80,13 +79,13 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             apply_type_level_function(fn_name, args, env, &span)
         }
 
-        CoreExpr::FunctionAppl { .. } => Err(runtime_error!(
+        CoreExpr::FunctionAppl { .. } => Err(type_check_error!(
             Some(span),
             "cannot type annotate a value with data constructor `{}`",
             expr.to_string()
         )),
 
-        _ => Err(runtime_error!(
+        _ => Err(type_check_error!(
             Some(span),
             "`{}` is not a type",
             expr.to_string()
@@ -101,7 +100,7 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
         CoreExpr::Identifier { name, .. } if env.contains_type(name) => env
             .get_type_var(name, &span)?
             .r#type
-            .ok_or_else(|| runtime_error!(Some(span), "undeclared type `{}`", name)),
+            .ok_or_else(|| type_check_error!(Some(span), "undeclared type `{}`", name)),
 
         CoreExpr::Identifier { name, .. } => Ok(Type::Sum(vec![DataConstructor {
             tag: name.clone(),
@@ -137,7 +136,7 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             }]))
         }
 
-        _ => Err(runtime_error!(
+        _ => Err(type_check_error!(
             Some(span),
             "`{}` is not a valid type definition",
             expr.to_string()
@@ -175,14 +174,14 @@ fn eval_sum_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogRes
     let right = eval_type_definition_expr(right, env)?;
 
     let Type::Sum(ctors1) = left else {
-        return Err(runtime_error!(
+        return Err(type_check_error!(
             None,
             "`{}` is not a data constructor or a sum type",
             left.to_string()
         ));
     };
     let Type::Sum(ctors2) = right else {
-        return Err(runtime_error!(
+        return Err(type_check_error!(
             None,
             "`{}` is not a data constructor or a sum type",
             right.to_string()
@@ -202,7 +201,7 @@ pub fn apply_type_level_function(
 
     for arg in args {
         let Type::Function(param_type, return_type) = current else {
-            return Err(runtime_error!(
+            return Err(type_check_error!(
                 Some(*span),
                 "`{}` is not a valid type constructor",
                 current.to_string()
