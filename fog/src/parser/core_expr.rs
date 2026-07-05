@@ -233,8 +233,8 @@ pub enum CoreExpr {
         span: Span,
     },
     FunctionAppl {
-        fn_name: String,
-        args: Vec<CoreExpr>,
+        callee: Box<CoreExpr>,
+        arg: Box<CoreExpr>,
         span: Span,
     },
     Match {
@@ -255,6 +255,19 @@ impl CoreExpr {
             | CoreExpr::FunctionAppl { span, .. }
             | CoreExpr::Match { span, .. } => *span,
         }
+    }
+
+    pub fn uncurry(&self) -> (&CoreExpr, Vec<&CoreExpr>) {
+        let mut args = Vec::new();
+        let mut head = self;
+
+        while let CoreExpr::FunctionAppl { callee, arg, .. } = head {
+            args.push(arg.as_ref());
+            head = callee.as_ref();
+        }
+
+        args.reverse();
+        (head, args)
     }
 }
 
@@ -293,15 +306,10 @@ impl Display for CoreExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            CoreExpr::FunctionAppl { fn_name, args, .. } => {
-                write!(f, "{fn_name}")?;
-
-                for arg in args {
-                    write!(f, " ")?;
-                    fmt_parenthesized(f, arg)?;
-                }
-
-                Ok(())
+            CoreExpr::FunctionAppl { callee, arg, .. } => {
+                fmt_parenthesized(f, callee.as_ref())?;
+                write!(f, " ")?;
+                fmt_parenthesized(f, arg.as_ref())
             }
 
             CoreExpr::Match {

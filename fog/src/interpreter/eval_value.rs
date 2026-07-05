@@ -133,25 +133,11 @@ pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        CoreExpr::FunctionAppl {
-            fn_name,
-            args,
-            span,
-        } => {
-            let mut result = eval_value_expr(
-                &CoreExpr::Identifier {
-                    name: fn_name.clone(),
-                    span: *span,
-                },
-                env,
-            )?;
+        CoreExpr::FunctionAppl { callee, arg, span } => {
+            let function = eval_value_expr(callee, env)?;
+            let argument = eval_value_expr(arg, env)?;
 
-            for arg in args {
-                let argument = eval_value_expr(arg, env)?;
-                result = eval_function_appl(result, argument, span)?;
-            }
-
-            Ok(result)
+            eval_function_appl(function, argument, span)
         }
 
         CoreExpr::Match {

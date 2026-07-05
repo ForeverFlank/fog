@@ -494,8 +494,15 @@ impl Resolver {
             let rhs = self.resolve_collection(items, next_min_prec, index)?;
 
             lhs = ResolvedExpr::FunctionAppl {
-                fn_name: op_name,
-                args: vec![lhs, rhs],
+                callee: Box::new(ResolvedExpr::FunctionAppl {
+                    callee: Box::new(ResolvedExpr::Identifier {
+                        name: op_name,
+                        span: lhs_span,
+                    }),
+                    arg: Box::new(lhs),
+                    span: lhs_span,
+                }),
+                arg: Box::new(rhs),
                 span: lhs_span,
             };
         }
@@ -508,28 +515,20 @@ impl Resolver {
         exprs: &Vec<ParsedExpr>,
         index: &mut usize,
     ) -> FogResult<ResolvedExpr> {
-        let head = self.resolve_atomic(exprs, index)?;
-
-        let (name, span) = match &head {
-            ResolvedExpr::Identifier { name, span } => (name.clone(), span.clone()),
-            _ => return Ok(head),
-        };
-
-        let mut args = Vec::new();
+        let mut result = self.resolve_atomic(exprs, index)?;
+        let span = result.span();
 
         while *index < exprs.len() && exprs[*index].is_primary_starter() {
-            args.push(self.resolve_atomic(exprs, index)?);
+            let arg = self.resolve_atomic(exprs, index)?;
+
+            result = ResolvedExpr::FunctionAppl {
+                callee: Box::new(result),
+                arg: Box::new(arg),
+                span,
+            };
         }
 
-        if args.is_empty() {
-            Ok(head)
-        } else {
-            Ok(ResolvedExpr::FunctionAppl {
-                fn_name: name,
-                args,
-                span,
-            })
-        }
+        Ok(result)
     }
 
     fn resolve_atomic(
@@ -554,8 +553,11 @@ impl Resolver {
                 let operand = self.resolve_atomic(exprs, index)?;
 
                 Ok(ResolvedExpr::FunctionAppl {
-                    fn_name: "-".to_string(),
-                    args: vec![operand],
+                    callee: Box::new(ResolvedExpr::Identifier {
+                        name: "-".to_string(),
+                        span,
+                    }),
+                    arg: Box::new(operand),
                     span,
                 })
             }

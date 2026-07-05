@@ -11,7 +11,9 @@ use crate::static_check::eval_type::Annotation;
 use crate::static_check::eval_type::eval_annotation_expr;
 use crate::static_check::eval_type::eval_type_annotation_expr;
 use crate::static_check::eval_type::eval_type_definition_expr;
+use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
+use crate::static_check::variable::TypeVariable;
 use crate::static_check::variable::ValueVariable;
 use crate::type_check_error;
 
@@ -28,6 +30,15 @@ pub fn check(stmts: &Vec<CoreStatement>) -> Vec<FogError> {
 
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
+
+    env.types.insert(
+        "Int32".to_string(),
+        TypeVariable {
+            name: "Int32".to_string(),
+            r#type: Some(Type::Int32),
+            kind: Kind::Type,
+        },
+    );
 
     let var_add_int32 = ValueVariable::new(
         "addInt32",
@@ -209,23 +220,17 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
             expr_type_of(body, env)?.into(),
         )),
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } => {
-            let mut curr_type = env.get_value_var(fn_name, &span)?.r#type.clone();
+        CoreExpr::FunctionAppl { callee, .. } => {
+            let callee_type = expr_type_of(callee, env)?;
 
-            for _ in args {
-                curr_type = match curr_type {
-                    Type::Function(_, return_type) => *return_type,
-                    _ => {
-                        return Err(type_check_error!(
-                            Some(span),
-                            "{} is not a function type",
-                            curr_type.to_string()
-                        ));
-                    }
-                };
+            match callee_type {
+                Type::Function(_, return_type) => Ok(*return_type),
+                _ => Err(type_check_error!(
+                    Some(span),
+                    "{} is not a function type",
+                    callee_type.to_string()
+                )),
             }
-
-            Ok(curr_type)
         }
 
         CoreExpr::Tuple { items, .. } => Ok(Type::Product(

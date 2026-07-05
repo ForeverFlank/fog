@@ -280,10 +280,9 @@ fn optimize_expr(expr: &mut CoreExpr, errors: &mut Vec<FogError>) {
             }
         }
 
-        CoreExpr::FunctionAppl { args, .. } => {
-            for arg in args {
-                optimize_expr(arg, errors);
-            }
+        CoreExpr::FunctionAppl { callee, arg, .. } => {
+            optimize_expr(callee, errors);
+            optimize_expr(arg, errors);
         }
 
         CoreExpr::Match {
@@ -413,12 +412,9 @@ fn visit_expr<'a>(
             }
         }
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } => {
-            graph.add_edge(scope, this, fn_name.clone());
-
-            for arg in args {
-                visit_expr(graph, scope, this, arg);
-            }
+        CoreExpr::FunctionAppl { callee, arg, .. } => {
+            visit_expr(graph, scope, this, callee);
+            visit_expr(graph, scope, this, arg);
         }
 
         CoreExpr::Match {

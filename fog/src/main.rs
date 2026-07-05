@@ -6,6 +6,7 @@ use crate::lexer::token::*;
 use crate::lexer::*;
 use crate::parser::*;
 
+mod anf;
 mod error;
 // mod interpreter;
 mod lexer;

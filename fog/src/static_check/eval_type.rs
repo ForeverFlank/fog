@@ -30,23 +30,31 @@ pub fn eval_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Ann
             name
         )),
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
-            match (
-                eval_annotation_expr(&args[0], env)?,
-                eval_annotation_expr(&args[1], env)?,
-            ) {
-                (Annotation::Kind(k1), Annotation::Kind(k2)) => {
-                    Ok(Annotation::Kind(Kind::Function(k1.into(), k2.into())))
+        CoreExpr::FunctionAppl { .. } => {
+            let (head, args) = expr.uncurry();
+
+            if let (CoreExpr::Identifier { name, .. }, &[lhs, rhs]) = (head, args.as_slice()) {
+                if name == "->" {
+                    return match (
+                        eval_annotation_expr(lhs, env)?,
+                        eval_annotation_expr(rhs, env)?,
+                    ) {
+                        (Annotation::Kind(k1), Annotation::Kind(k2)) => {
+                            Ok(Annotation::Kind(Kind::Function(k1.into(), k2.into())))
+                        }
+                        (Annotation::Type(t1), Annotation::Type(t2)) => {
+                            Ok(Annotation::Type(Type::Function(t1.into(), t2.into())))
+                        }
+                        _ => Err(type_check_error!(
+                            Some(span),
+                            "mixed kind and type levels in `{}`",
+                            expr.to_string()
+                        )),
+                    };
                 }
-                (Annotation::Type(t1), Annotation::Type(t2)) => {
-                    Ok(Annotation::Type(Type::Function(t1.into(), t2.into())))
-                }
-                _ => Err(type_check_error!(
-                    Some(span),
-                    "mixed kind and type levels in `{}`",
-                    expr.to_string()
-                )),
             }
+
+            Ok(Annotation::Type(eval_type_annotation_expr(expr, env)?))
         }
 
         _ => Ok(Annotation::Type(eval_type_annotation_expr(expr, env)?)),
@@ -62,28 +70,35 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             .r#type
             .ok_or_else(|| type_check_error!(Some(span), "undeclared type `{}`", name)),
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
-            eval_function_type(&args[0], &args[1], env)
+        CoreExpr::FunctionAppl { .. } => {
+            let (head, args) = expr.uncurry();
+
+            let CoreExpr::Identifier { name, .. } = head else {
+                return Err(type_check_error!(
+                    Some(span),
+                    "cannot type annotate a value with data constructor `{}`",
+                    expr.to_string()
+                ));
+            };
+
+            match (name.as_str(), args.as_slice()) {
+                ("->", &[lhs, rhs]) => eval_function_type(lhs, rhs, env),
+                ("*", &[lhs, rhs]) => eval_product_type(lhs, rhs, env),
+
+                ("+", _) => Err(type_check_error!(
+                    Some(span),
+                    "cannot type annotate a value with sum types"
+                )),
+
+                _ if env.contains_type(name) => apply_type_level_function(name, &args, env, &span),
+
+                _ => Err(type_check_error!(
+                    Some(span),
+                    "cannot type annotate a value with data constructor `{}`",
+                    expr.to_string()
+                )),
+            }
         }
-
-        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
-            eval_product_type(&args[0], &args[1], env)
-        }
-
-        CoreExpr::FunctionAppl { fn_name, .. } if fn_name == "+" => Err(type_check_error!(
-            Some(span),
-            "cannot type annotate a value with sum types"
-        )),
-
-        CoreExpr::FunctionAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
-            apply_type_level_function(fn_name, args, env, &span)
-        }
-
-        CoreExpr::FunctionAppl { .. } => Err(type_check_error!(
-            Some(span),
-            "cannot type annotate a value with data constructor `{}`",
-            expr.to_string()
-        )),
 
         _ => Err(type_check_error!(
             Some(span),
@@ -107,33 +122,37 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
             types: Vec::new(),
         }])),
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
-            eval_function_type(&args[0], &args[1], env)
-        }
+        CoreExpr::FunctionAppl { .. } => {
+            let (head, args) = expr.uncurry();
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
-            eval_product_type(&args[0], &args[1], env)
-        }
+            let CoreExpr::Identifier { name, .. } = head else {
+                return Err(type_check_error!(
+                    Some(span),
+                    "`{}` is not a valid type definition",
+                    expr.to_string()
+                ));
+            };
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "+" && args.len() == 2 => {
-            eval_sum_type(&args[0], &args[1], env)
-        }
+            match (name.as_str(), args.as_slice()) {
+                ("->", &[lhs, rhs]) => eval_function_type(lhs, rhs, env),
+                ("*", &[lhs, rhs]) => eval_product_type(lhs, rhs, env),
+                ("+", &[lhs, rhs]) => eval_sum_type(lhs, rhs, env),
 
-        CoreExpr::FunctionAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
-            apply_type_level_function(fn_name, args, env, &span)
-        }
+                _ if env.contains_type(name) => apply_type_level_function(name, &args, env, &span),
 
-        // data constructor
-        CoreExpr::FunctionAppl { fn_name, args, .. } => {
-            let field_types = args
-                .iter()
-                .map(|arg| eval_type_annotation_expr(arg, env))
-                .collect::<Result<Vec<Type>, _>>()?;
+                // data constructor
+                _ => {
+                    let field_types = args
+                        .iter()
+                        .map(|&arg| eval_type_annotation_expr(arg, env))
+                        .collect::<Result<Vec<Type>, _>>()?;
 
-            Ok(Type::Sum(vec![DataConstructor {
-                tag: fn_name.clone(),
-                types: field_types,
-            }]))
+                    Ok(Type::Sum(vec![DataConstructor {
+                        tag: name.clone(),
+                        types: field_types,
+                    }]))
+                }
+            }
         }
 
         _ => Err(type_check_error!(
@@ -193,13 +212,13 @@ fn eval_sum_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogRes
 
 pub fn apply_type_level_function(
     fn_name: &str,
-    args: &Vec<CoreExpr>,
+    args: &Vec<&CoreExpr>,
     env: &Environment,
     span: &Span,
 ) -> FogResult<Type> {
     let mut current = env.get_type(fn_name, span)?;
 
-    for arg in args {
+    for &arg in args {
         let Type::Function(param_type, return_type) = current else {
             return Err(type_check_error!(
                 Some(*span),

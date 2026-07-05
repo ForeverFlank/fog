@@ -231,25 +231,43 @@ fn find_fn_clause_param_types(
     let mut param_types = Vec::with_capacity(arity);
 
     for _ in 0..arity {
-        match remaining_type {
-            CoreExpr::FunctionAppl {
-                fn_name: op,
-                mut args,
-                ..
-            } if op == "->" && args.len() == 2 => {
-                remaining_type = args.pop().unwrap();
-                param_types.push(args.pop().unwrap());
-            }
+        let arity_error = || {
+            parse_error!(
+                Some(span),
+                "function `{fn_name}` is declared with {arity} argument(s), \
+                 but its type signature only accounts for {}",
+                param_types.len()
+            )
+        };
 
-            _ => {
-                return Err(parse_error!(
-                    Some(span),
-                    "function `{fn_name}` is declared with {arity} argument(s), \
-                     but its type signature only accounts for {}",
-                    param_types.len()
-                ));
-            }
+        let CoreExpr::FunctionAppl {
+            callee,
+            arg: return_type,
+            ..
+        } = remaining_type
+        else {
+            return Err(arity_error());
+        };
+
+        let CoreExpr::FunctionAppl {
+            callee: op,
+            arg: param_type,
+            ..
+        } = *callee
+        else {
+            return Err(arity_error());
+        };
+
+        let CoreExpr::Identifier { name: op_name, .. } = *op else {
+            return Err(arity_error());
+        };
+
+        if op_name != "->" {
+            return Err(arity_error());
         }
+
+        param_types.push(*param_type);
+        remaining_type = *return_type;
     }
 
     Ok(param_types)
@@ -361,16 +379,9 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
             span,
         }),
 
-        ResolvedExpr::FunctionAppl {
-            fn_name,
-            args,
-            span,
-        } => Ok(CoreExpr::FunctionAppl {
-            fn_name,
-            args: args
-                .into_iter()
-                .map(desugar_expr)
-                .collect::<Result<Vec<_>, _>>()?,
+        ResolvedExpr::FunctionAppl { callee, arg, span } => Ok(CoreExpr::FunctionAppl {
+            callee: desugar_expr(*callee)?.into(),
+            arg: desugar_expr(*arg)?.into(),
             span,
         }),
 

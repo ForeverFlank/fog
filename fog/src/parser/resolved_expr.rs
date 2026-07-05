@@ -200,8 +200,8 @@ pub enum ResolvedExpr {
     },
 
     FunctionAppl {
-        fn_name: String,
-        args: Vec<ResolvedExpr>,
+        callee: Box<ResolvedExpr>,
+        arg: Box<ResolvedExpr>,
         span: Span,
     },
 
@@ -249,13 +249,10 @@ impl Display for ResolvedExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            ResolvedExpr::FunctionAppl { fn_name, args, .. } => {
-                write!(f, "{fn_name}")?;
-                for arg in args {
-                    write!(f, " ")?;
-                    fmt_parenthesized(f, arg)?;
-                }
-                Ok(())
+            ResolvedExpr::FunctionAppl { callee, arg, .. } => {
+                fmt_parenthesized(f, callee.as_ref())?;
+                write!(f, " ")?;
+                fmt_parenthesized(f, arg.as_ref())
             }
 
             ResolvedExpr::Match {
