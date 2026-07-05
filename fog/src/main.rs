@@ -5,11 +5,13 @@ use crate::error::*;
 use crate::interpreter::*;
 use crate::lexer::token::*;
 use crate::lexer::*;
+use crate::optimizer::optimizer::optimize;
 use crate::parser::*;
 
 mod error;
 mod interpreter;
 mod lexer;
+mod optimizer;
 mod parser;
 mod util;
 
@@ -28,20 +30,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // -- lexing
     let (tokens, lexer_errors) = tokenize(src);
+    print_errors("lexer", &lexer_errors);
 
     if arg_print_tokens {
         print_tokens(&tokens);
     }
 
-    print_errors("lexer", &lexer_errors);
-
     // -- parsing
-    let (ast, parser_errors) = parse_program(&tokens);
-
+    let (top_stmts, parser_errors) = parse_program(&tokens);
     print_errors("parser", &parser_errors);
 
+    // -- optimizing
+
+    let optimize_res = optimize(top_stmts);
+    print_errors("optimizer", &parser_errors);
+
+    if !lexer_errors.is_empty() || !parser_errors.is_empty() || !optimizer_errors.is_empty() {
+        return Err("syntax error".into());
+    }
+
     // -- interpreting
-    let res = interpret(&ast);
+    let res = interpret(&optimized_top_stmts);
 
     if let Err(error) = res {
         match error.span {
@@ -60,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn print_tokens(tokens: &Vec<Token>) {
     for token in tokens.as_slice() {
-        println!(
+        eprintln!(
             " {: >4}:{: >4} | {}",
             token.line,
             token.column,
@@ -72,11 +81,11 @@ fn print_tokens(tokens: &Vec<Token>) {
 fn print_errors(label: &str, errors: &Vec<FogError>) {
     for error in errors {
         match error.span.as_ref() {
-            Some(span) => println!(
+            Some(span) => eprintln!(
                 "{label} error ({}:{}): {}",
                 span.line, span.column, error.message
             ),
-            None => println!("{label} error: {}", error.message),
+            None => eprintln!("{label} error: {}", error.message),
         }
     }
 }

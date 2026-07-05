@@ -60,7 +60,7 @@ impl<'a> Environment<'a> {
         }
 
         Err(runtime_error!(
-            Some(span.clone()),
+            Some(*span),
             "variable `{}` not found in the current scope",
             name
         ))
@@ -76,7 +76,7 @@ impl<'a> Environment<'a> {
         }
 
         Err(runtime_error!(
-            Some(span.clone()),
+            Some(*span),
             "type `{}` not found in the current scope",
             name
         ))
@@ -104,7 +104,7 @@ impl<'a> Environment<'a> {
     pub fn annotate_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
         if self.variables.contains_key(name) {
             return Err(runtime_error!(
-                Some(span.clone()),
+                Some(*span),
                 "variable `{}` already annotated its type in the current scope",
                 name
             ));
@@ -119,7 +119,7 @@ impl<'a> Environment<'a> {
     pub fn annotate_kind(&mut self, name: &str, kind: Kind, span: &Span) -> FogResult<()> {
         if self.types.contains_key(name) {
             return Err(runtime_error!(
-                Some(span.clone()),
+                Some(*span),
                 "type `{}` already annotated its kind in the scope",
                 name
             ));
@@ -151,7 +151,7 @@ impl<'a> Environment<'a> {
 
             if var.value.borrow().is_some() {
                 return Err(runtime_error!(
-                    Some(span.clone()),
+                    Some(*span),
                     "variable `{}` already declared in the current scope",
                     name
                 ));
@@ -161,7 +161,7 @@ impl<'a> Environment<'a> {
 
             if type_of_value != type_of_var {
                 return Err(type_check_error!(
-                    Some(span.clone()),
+                    Some(*span),
                     "type mismatch when assigning variable `{name}` with `{value}`\n\
                      expected `{type_of_var}`, found `{type_of_value}`"
                 ));
@@ -187,7 +187,7 @@ impl<'a> Environment<'a> {
 
             if r#type.r#type.is_some() {
                 return Err(runtime_error!(
-                    Some(span.clone()),
+                    Some(*span),
                     "type `{}` already declared",
                     name
                 ));
@@ -200,7 +200,7 @@ impl<'a> Environment<'a> {
 
         if kind_of_type != kind_of_declared_type {
             return Err(runtime_error!(
-                Some(span.clone()),
+                Some(*span),
                 "kind mismatch when assigning to type `{}`\n\
                  expected `{}`, found `{}`",
                 name,

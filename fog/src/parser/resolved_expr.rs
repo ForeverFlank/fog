@@ -3,6 +3,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 
 use crate::error::Span;
+use crate::parser::Literal;
 use crate::util::{fmt_parenthesized, format_joined};
 
 // --- statements ---
@@ -25,31 +26,6 @@ pub enum ResolvedStatement {
     },
 }
 
-#[derive(Clone)]
-pub enum ResolvedDeclPattern {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-    Tuple {
-        items: Vec<ResolvedDeclPattern>,
-        span: Span,
-    },
-    FunctionClause {
-        name: String,
-        items: Vec<ResolvedDeclPattern>,
-        span: Span,
-    },
-    Int32Literal {
-        value: i32,
-        span: Span,
-    },
-    Float32Literal {
-        value: f32,
-        span: Span,
-    },
-}
-
 impl Display for ResolvedStatement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -68,15 +44,38 @@ impl Display for ResolvedStatement {
     }
 }
 
+// --- patterns ---
+
+// -- declaration statement
+
+#[derive(Clone)]
+pub enum ResolvedDeclPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Tuple {
+        items: Vec<ResolvedTupleDeclPattern>,
+        span: Span,
+    },
+    FunctionClause {
+        name: String,
+        items: Vec<ResolvedMatchArmPattern>,
+        span: Span,
+    },
+}
+
 impl Display for ResolvedDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ResolvedDeclPattern::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
+
             ResolvedDeclPattern::Tuple { items, .. } => {
                 write!(f, "{}", format_joined(items, ", "))
             }
+
             ResolvedDeclPattern::FunctionClause { items, .. } => {
                 for (i, expr) in items.iter().enumerate() {
                     if i > 0 {
@@ -89,6 +88,84 @@ impl Display for ResolvedDeclPattern {
             }
             ResolvedDeclPattern::Int32Literal { value, .. } => write!(f, "{value}"),
             ResolvedDeclPattern::Float32Literal { value, .. } => write!(f, "{value}"),
+        }
+    }
+}
+
+// -- tuple declaration patterns
+
+#[derive(Clone)]
+pub enum ResolvedTupleDeclPattern {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Tuple {
+        items: Vec<ResolvedTupleDeclPattern>,
+        span: Span,
+    },
+}
+
+impl Display for ResolvedTupleDeclPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResolvedTupleDeclPattern::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+
+            ResolvedTupleDeclPattern::Tuple { items, .. } => {
+                write!(f, "{}", format_joined(items, ", "))
+            }
+        }
+    }
+}
+
+// -- match arm patterns
+
+#[derive(Clone)]
+pub enum ResolvedMatchArmPattern {
+    Literal {
+        literal: Literal,
+        span: Span,
+    },
+    Tuple {
+        items: Vec<ResolvedMatchArmPattern>,
+        span: Span,
+    },
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    DataConstructor {
+        name: String,
+        args: Vec<ResolvedMatchArmPattern>,
+        span: Span,
+    },
+}
+
+impl Display for ResolvedMatchArmPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResolvedMatchArmPattern::Literal { literal, .. } => {
+                write!(f, "{literal}")
+            }
+
+            ResolvedMatchArmPattern::Tuple { items, .. } => {
+                write!(f, "({})", format_joined(items, ", "))
+            }
+
+            ResolvedMatchArmPattern::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+
+            ResolvedMatchArmPattern::DataConstructor { name, args, .. } => {
+                write!(f, "{name}")?;
+                for item in args {
+                    write!(f, " ")?;
+                    fmt_parenthesized(f, item)?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -107,12 +184,8 @@ pub enum ResolvedExpr {
         span: Span,
     },
 
-    Int32Literal {
-        value: i32,
-        span: Span,
-    },
-    Float32Literal {
-        value: f32,
+    Literal {
+        literal: Literal,
         span: Span,
     },
 
@@ -128,14 +201,14 @@ pub enum ResolvedExpr {
         span: Span,
     },
 
-    FuncAppl {
+    FunctionAppl {
         fn_name: String,
         args: Vec<ResolvedExpr>,
         span: Span,
     },
 
     Match {
-        expr: Box<ResolvedExpr>,
+        scrutinee: Box<ResolvedExpr>,
         match_arms: Vec<ResolvedMatchArm>,
         span: Span,
     },
@@ -146,79 +219,11 @@ impl ResolvedExpr {
         match self {
             ResolvedExpr::Block { span, .. }
             | ResolvedExpr::Identifier { span, .. }
-            | ResolvedExpr::Int32Literal { span, .. }
-            | ResolvedExpr::Float32Literal { span, .. }
+            | ResolvedExpr::Literal { span, .. }
             | ResolvedExpr::Lambda { span, .. }
             | ResolvedExpr::Tuple { span, .. }
-            | ResolvedExpr::FuncAppl { span, .. }
-            | ResolvedExpr::Match { span, .. } => span.clone(),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ResolvedMatchArm {
-    pub pattern: ResolvedMatchPattern,
-    pub value_expr: ResolvedExpr,
-}
-
-#[derive(Clone)]
-pub enum ResolvedMatchPattern {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-
-    Int32Literal {
-        value: i32,
-        span: Span,
-    },
-    Float32Literal {
-        value: f32,
-        span: Span,
-    },
-
-    Tuple {
-        items: Vec<ResolvedMatchPattern>,
-        span: Span,
-    },
-
-    FuncAppl {
-        fn_name: String,
-        args: Vec<ResolvedMatchPattern>,
-        span: Span,
-    },
-}
-
-impl ResolvedMatchPattern {
-    pub fn span(&self) -> Span {
-        match self {
-            ResolvedMatchPattern::Identifier { span, .. }
-            | ResolvedMatchPattern::Int32Literal { span, .. }
-            | ResolvedMatchPattern::Float32Literal { span, .. }
-            | ResolvedMatchPattern::Tuple { span, .. }
-            | ResolvedMatchPattern::FuncAppl { span, .. } => span.clone(),
-        }
-    }
-}
-
-impl Display for ResolvedMatchPattern {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ResolvedMatchPattern::Identifier { name, .. } => write!(f, "{name}"),
-            ResolvedMatchPattern::Int32Literal { value, .. } => write!(f, "{value}"),
-            ResolvedMatchPattern::Float32Literal { value, .. } => write!(f, "{value}"),
-            ResolvedMatchPattern::Tuple { items, .. } => {
-                write!(f, "({})", format_joined(items, ", "))
-            }
-            ResolvedMatchPattern::FuncAppl { fn_name, args, .. } => {
-                write!(f, "{fn_name}")?;
-                for arg in args {
-                    write!(f, " ")?;
-                    fmt_parenthesized(f, arg)?;
-                }
-                Ok(())
-            }
+            | ResolvedExpr::FunctionAppl { span, .. }
+            | ResolvedExpr::Match { span, .. } => *span,
         }
     }
 }
@@ -236,8 +241,7 @@ impl Display for ResolvedExpr {
 
             ResolvedExpr::Identifier { name, .. } => write!(f, "{name}"),
 
-            ResolvedExpr::Int32Literal { value, .. } => write!(f, "{value}"),
-            ResolvedExpr::Float32Literal { value, .. } => write!(f, "{value}"),
+            ResolvedExpr::Literal { literal, .. } => write!(f, "{literal}"),
 
             ResolvedExpr::Tuple { items, .. } => write!(f, "({})", format_joined(items, ", ")),
 
@@ -247,7 +251,7 @@ impl Display for ResolvedExpr {
                 write!(f, "{param_name} => {body}")
             }
 
-            ResolvedExpr::FuncAppl { fn_name, args, .. } => {
+            ResolvedExpr::FunctionAppl { fn_name, args, .. } => {
                 write!(f, "{fn_name}")?;
                 for arg in args {
                     write!(f, " ")?;
@@ -257,14 +261,28 @@ impl Display for ResolvedExpr {
             }
 
             ResolvedExpr::Match {
-                expr, match_arms, ..
+                scrutinee,
+                match_arms,
+                ..
             } => {
-                write!(f, "match {expr} {{\n")?;
+                write!(f, "match {scrutinee} {{\n")?;
                 for arm in match_arms {
                     write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;
                 }
                 write!(f, "}}")
             }
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct ResolvedMatchArm {
+    pub pattern: ResolvedMatchArmPattern,
+    pub value_expr: ResolvedExpr,
+}
+
+impl Display for ResolvedMatchArm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} => {}\n", self.pattern, self.value_expr)
     }
 }

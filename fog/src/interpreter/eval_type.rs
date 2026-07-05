@@ -4,7 +4,7 @@ use crate::interpreter::environment::Environment;
 use crate::interpreter::kind::Kind;
 use crate::interpreter::r#type::DataConstructor;
 use crate::interpreter::r#type::Type;
-use crate::parser::desugared_expr::DesugaredExpr;
+use crate::parser::core_expr::CoreExpr;
 use crate::runtime_error;
 use crate::type_check_error;
 
@@ -15,25 +15,23 @@ pub enum Annotation {
     Type(Type),
 }
 
-pub fn eval_annotation_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Annotation> {
+pub fn eval_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Annotation> {
     let span = expr.span();
 
     match expr {
-        DesugaredExpr::Identifier { name, .. } if name == "Type" => {
-            Ok(Annotation::Kind(Kind::Type))
-        }
+        CoreExpr::Identifier { name, .. } if name == "Type" => Ok(Annotation::Kind(Kind::Type)),
 
-        DesugaredExpr::Identifier { name, .. } if env.contains_type(name) => {
+        CoreExpr::Identifier { name, .. } if env.contains_type(name) => {
             Ok(Annotation::Type(env.get_type(name, &span)?))
         }
 
-        DesugaredExpr::Identifier { name, .. } => Err(runtime_error!(
+        CoreExpr::Identifier { name, .. } => Err(runtime_error!(
             Some(span),
             "unknown type or kind `{}`",
             name
         )),
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
             match (
                 eval_annotation_expr(&args[0], env)?,
                 eval_annotation_expr(&args[1], env)?,
@@ -56,33 +54,33 @@ pub fn eval_annotation_expr(expr: &DesugaredExpr, env: &Environment) -> FogResul
     }
 }
 
-pub fn eval_type_annotation_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Type> {
+pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
-        DesugaredExpr::Identifier { name, .. } => env
+        CoreExpr::Identifier { name, .. } => env
             .get_type_var(name, &span)?
             .r#type
             .ok_or_else(|| runtime_error!(Some(span), "undeclared type `{}`", name)),
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
             eval_function_type(&args[0], &args[1], env)
         }
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
             eval_product_type(&args[0], &args[1], env)
         }
 
-        DesugaredExpr::FuncAppl { fn_name, .. } if fn_name == "+" => Err(runtime_error!(
+        CoreExpr::FunctionAppl { fn_name, .. } if fn_name == "+" => Err(runtime_error!(
             Some(span),
             "cannot type annotate a value with sum types"
         )),
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
             apply_type_level_function(fn_name, args, env, &span)
         }
 
-        DesugaredExpr::FuncAppl { .. } => Err(runtime_error!(
+        CoreExpr::FunctionAppl { .. } => Err(runtime_error!(
             Some(span),
             "cannot type annotate a value with data constructor `{}`",
             expr.to_string()
@@ -96,38 +94,38 @@ pub fn eval_type_annotation_expr(expr: &DesugaredExpr, env: &Environment) -> Fog
     }
 }
 
-pub fn eval_type_definition_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Type> {
+pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
-        DesugaredExpr::Identifier { name, .. } if env.contains_type(name) => env
+        CoreExpr::Identifier { name, .. } if env.contains_type(name) => env
             .get_type_var(name, &span)?
             .r#type
             .ok_or_else(|| runtime_error!(Some(span), "undeclared type `{}`", name)),
 
-        DesugaredExpr::Identifier { name, .. } => Ok(Type::Sum(vec![DataConstructor {
+        CoreExpr::Identifier { name, .. } => Ok(Type::Sum(vec![DataConstructor {
             tag: name.clone(),
             types: Vec::new(),
         }])),
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "->" && args.len() == 2 => {
             eval_function_type(&args[0], &args[1], env)
         }
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "*" && args.len() == 2 => {
             eval_product_type(&args[0], &args[1], env)
         }
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if fn_name == "+" && args.len() == 2 => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if fn_name == "+" && args.len() == 2 => {
             eval_sum_type(&args[0], &args[1], env)
         }
 
-        DesugaredExpr::FuncAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } if env.contains_type(fn_name) => {
             apply_type_level_function(fn_name, args, env, &span)
         }
 
         // data constructor
-        DesugaredExpr::FuncAppl { fn_name, args, .. } => {
+        CoreExpr::FunctionAppl { fn_name, args, .. } => {
             let field_types = args
                 .iter()
                 .map(|arg| eval_type_annotation_expr(arg, env))
@@ -147,11 +145,7 @@ pub fn eval_type_definition_expr(expr: &DesugaredExpr, env: &Environment) -> Fog
     }
 }
 
-fn eval_product_type(
-    left: &DesugaredExpr,
-    right: &DesugaredExpr,
-    env: &Environment,
-) -> FogResult<Type> {
+fn eval_product_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
     let left = eval_type_annotation_expr(left, env)?;
     let right = eval_type_annotation_expr(right, env)?;
 
@@ -169,22 +163,14 @@ fn eval_product_type(
     Ok(Type::Product(types))
 }
 
-fn eval_function_type(
-    left: &DesugaredExpr,
-    right: &DesugaredExpr,
-    env: &Environment,
-) -> FogResult<Type> {
+fn eval_function_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
     let left = eval_type_annotation_expr(left, env)?;
     let right = eval_type_annotation_expr(right, env)?;
 
     Ok(Type::Function(left.into(), right.into()))
 }
 
-fn eval_sum_type(
-    left: &DesugaredExpr,
-    right: &DesugaredExpr,
-    env: &Environment,
-) -> FogResult<Type> {
+fn eval_sum_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
     let left = eval_type_definition_expr(left, env)?;
     let right = eval_type_definition_expr(right, env)?;
 
@@ -208,7 +194,7 @@ fn eval_sum_type(
 
 pub fn apply_type_level_function(
     fn_name: &str,
-    args: &Vec<DesugaredExpr>,
+    args: &Vec<CoreExpr>,
     env: &Environment,
     span: &Span,
 ) -> FogResult<Type> {
@@ -217,7 +203,7 @@ pub fn apply_type_level_function(
     for arg in args {
         let Type::Function(param_type, return_type) = current else {
             return Err(runtime_error!(
-                Some(span.clone()),
+                Some(*span),
                 "`{}` is not a valid type constructor",
                 current.to_string()
             ));
@@ -227,7 +213,7 @@ pub fn apply_type_level_function(
 
         if arg_kind != *param_type {
             return Err(type_check_error!(
-                Some(span.clone()),
+                Some(*span),
                 "type mismatch applying `{}`\n\
                  expected `{}`, found `{}`",
                 fn_name,

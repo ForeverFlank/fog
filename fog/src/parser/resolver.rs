@@ -11,8 +11,9 @@ use crate::parser::parsed_expr::ParsedStatement;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedMatchArm;
-use crate::parser::resolved_expr::ResolvedMatchPattern;
+use crate::parser::resolved_expr::ResolvedMatchArmPattern;
 use crate::parser::resolved_expr::ResolvedStatement;
+use crate::parser::resolved_expr::ResolvedTupleDeclPattern;
 
 pub fn resolve(parsed_statements: Vec<ParsedStatement>) -> (Vec<ResolvedStatement>, Vec<FogError>) {
     Resolver::resolve(parsed_statements)
@@ -43,12 +44,11 @@ pub struct InfixFunctionInfo {
 fn is_primary_starter(parsed_expr: &ParsedExpr) -> bool {
     match parsed_expr {
         ParsedExpr::Identifier { .. }
-        | ParsedExpr::Int32Literal { .. }
-        | ParsedExpr::Float32Literal { .. }
+        | ParsedExpr::Literal { .. }
         | ParsedExpr::Tuple { .. }
         | ParsedExpr::Collection { .. } => true,
 
-        ParsedExpr::Op { kind } => match kind {
+        ParsedExpr::Op { kind, .. } => match kind {
             OpKind::Minus => true,
             _ => false,
         },
@@ -107,21 +107,23 @@ impl Resolver {
 
     fn get_binary_op(&self, parsed_expr: &ParsedExpr) -> Option<&InfixFunctionInfo> {
         let key = match parsed_expr {
-            ParsedExpr::Op { kind } => InfixFunctionKey::Op(kind.clone()),
+            ParsedExpr::Op { kind, .. } => InfixFunctionKey::Op(kind.clone()),
             ParsedExpr::Identifier { name, .. } => InfixFunctionKey::Identifier(name.clone()),
             _ => return None,
         };
+
         self.infix_functions.get(&key)
     }
 
     pub fn resolve(
         parsed_statements: Vec<ParsedStatement>,
     ) -> (Vec<ResolvedStatement>, Vec<FogError>) {
+        let resolver = Resolver::new();
         let mut resolved_statements = Vec::new();
         let mut errors = Vec::new();
 
         for parsed_stmt in parsed_statements {
-            match Self::resolve_statement(parsed_stmt) {
+            match resolver.resolve_statement(parsed_stmt) {
                 Ok(resolved_stmt) => resolved_statements.push(resolved_stmt),
                 Err(error) => errors.push(error),
             }
@@ -130,12 +132,12 @@ impl Resolver {
         (resolved_statements, errors)
     }
 
-    fn resolve_statement(parsed_statement: ParsedStatement) -> FogResult<ResolvedStatement> {
+    fn resolve_statement(&self, parsed_statement: ParsedStatement) -> FogResult<ResolvedStatement> {
         match parsed_statement {
             ParsedStatement::TypeAnnotation { name, expr, span } => {
                 Ok(ResolvedStatement::TypeAnnotation {
                     name,
-                    expr: Self::resolve_expr(expr)?,
+                    expr: self.resolve_expr(expr)?,
                     span,
                 })
             }
@@ -145,141 +147,218 @@ impl Resolver {
                 expr,
                 span,
             } => Ok(ResolvedStatement::Declaration {
-                pattern: Self::resolve_decl_pattern(pattern)?,
-                expr: Self::resolve_expr(expr)?,
+                pattern: self.resolve_decl_pattern(pattern)?,
+                expr: self.resolve_expr(expr)?,
                 span,
             }),
 
             ParsedStatement::Expression { expr, span } => Ok(ResolvedStatement::Expression {
-                expr: Self::resolve_expr(expr)?,
+                expr: self.resolve_expr(expr)?,
                 span,
             }),
         }
     }
 
-    fn resolve_decl_pattern(decl_pattern: ParsedDeclPattern) -> FogResult<ResolvedDeclPattern> {
-        match decl_pattern {
+    fn resolve_decl_pattern(&self, pattern: ParsedDeclPattern) -> FogResult<ResolvedDeclPattern> {
+        match pattern {
             ParsedDeclPattern::Identifier { name, span } => {
                 Ok(ResolvedDeclPattern::Identifier { name, span })
+            }
+
+            ParsedDeclPattern::Literal { span, .. } => {
+                Err(parse_error!(Some(span), "invalid declaration pattern"))
             }
 
             ParsedDeclPattern::Tuple { items, span } => Ok(ResolvedDeclPattern::Tuple {
                 items: items
                     .into_iter()
-                    .map(Self::resolve_decl_pattern)
+                    .map(Self::resolve_tuple_decl_pattern)
                     .collect::<Result<Vec<_>, _>>()?,
                 span,
             }),
 
             ParsedDeclPattern::Collection { items, span } => {
-                if items.len() == 3 {
-                    let is_infix = match &items[1] {
-                        ParsedDeclPattern::Op { .. } => true,
-                        ParsedDeclPattern::Identifier { .. } => {
-                            !matches!(items[0], ParsedDeclPattern::Identifier { .. })
-                        }
-                        _ => false,
-                    };
-
-                    if is_infix {
-                        let [lhs, op, rhs]: [ParsedDeclPattern; 3] = items.try_into().ok().unwrap();
-
-                        let name = match op {
-                            ParsedDeclPattern::Op { kind } => kind.to_string(),
-                            ParsedDeclPattern::Identifier { name, .. } => name,
-                            _ => unreachable!(),
-                        };
-
-                        return Ok(ResolvedDeclPattern::FunctionClause {
-                            name,
-                            items: vec![
-                                Self::resolve_decl_pattern(lhs)?,
-                                Self::resolve_decl_pattern(rhs)?,
-                            ],
-                            span,
-                        });
-                    }
-                }
-
-                let mut items = items.into_iter();
-
-                let name = match items.next() {
-                    Some(ParsedDeclPattern::Identifier { name, .. }) => name,
-                    _ => {
-                        return Err(parse_error!(Some(span), "pattern must start with a name"));
-                    }
-                };
-
-                Ok(ResolvedDeclPattern::FunctionClause {
-                    name,
-                    items: items
-                        .map(Self::resolve_decl_pattern)
-                        .collect::<Result<Vec<_>, _>>()?,
-                    span,
-                })
-            }
-
-            ParsedDeclPattern::Op { .. } => {
-                Err(parse_error!(None, "unexpected operator in pattern"))
-            }
-
-            ParsedDeclPattern::Int32Literal { value, span } => {
-                Ok(ResolvedDeclPattern::Int32Literal { value, span })
-            }
-            ParsedDeclPattern::Float32Literal { value, span } => {
-                Ok(ResolvedDeclPattern::Float32Literal { value, span })
+                self.resolve_function_clause(items, span)
             }
         }
     }
 
-    fn resolve_expr(parsed_expr: ParsedExpr) -> FogResult<ResolvedExpr> {
+    fn resolve_function_clause(
+        &self,
+        items: Vec<ParsedDeclPattern>,
+        span: Span,
+    ) -> FogResult<ResolvedDeclPattern> {
+        let is_infix = matches!(
+            &items.as_slice(),
+            [_, ParsedDeclPattern::Identifier { name, .. }, _] if self.is_infix_function_name(name)
+        );
+
+        if is_infix {
+            let mut iter = items.into_iter();
+
+            let lhs = iter.next().unwrap();
+            let name = match iter.next().unwrap() {
+                ParsedDeclPattern::Identifier { name, .. } => name,
+                _ => unreachable!(),
+            };
+            let rhs = iter.next().unwrap();
+
+            Ok(ResolvedDeclPattern::FunctionClause {
+                name,
+                items: vec![
+                    Self::resolve_function_clause_item(lhs)?,
+                    Self::resolve_function_clause_item(rhs)?,
+                ],
+                span,
+            })
+        } else {
+            let mut iter = items.into_iter();
+            let first = iter.next().unwrap();
+
+            let ParsedDeclPattern::Identifier { name, .. } = first else {
+                return Err(parse_error!(
+                    Some(span),
+                    "function clause's first element must be an identifier"
+                ));
+            };
+
+            Ok(ResolvedDeclPattern::FunctionClause {
+                name,
+                items: iter
+                    .map(Self::resolve_function_clause_item)
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            })
+        }
+    }
+
+    fn is_infix_function_name(&self, name: &str) -> bool {
+        self.infix_functions.values().any(|info| info.name == name)
+    }
+
+    fn resolve_function_clause_item(
+        pattern: ParsedDeclPattern,
+    ) -> FogResult<ResolvedMatchArmPattern> {
+        match pattern {
+            ParsedDeclPattern::Identifier { name, span } => {
+                Ok(ResolvedMatchArmPattern::Identifier { name, span })
+            }
+
+            ParsedDeclPattern::Literal { literal, span } => {
+                Ok(ResolvedMatchArmPattern::Literal { literal, span })
+            }
+
+            ParsedDeclPattern::Tuple { items, span } => Ok(ResolvedMatchArmPattern::Tuple {
+                items: items
+                    .into_iter()
+                    .map(Self::resolve_function_clause_item)
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            }),
+
+            ParsedDeclPattern::Collection { items, span } => {
+                let mut iter = items.into_iter();
+
+                let head = iter.next().unwrap();
+
+                let ParsedDeclPattern::Identifier { name, .. } = head else {
+                    return Err(parse_error!(
+                        Some(span),
+                        "collection pattern's first element must be an identifier"
+                    ));
+                };
+
+                let first_char = name.chars().nth(0).unwrap();
+
+                if !first_char.is_uppercase() {
+                    return Err(parse_error!(
+                        Some(span),
+                        "data constructor's name must starts with an uppercase letter"
+                    ));
+                }
+
+                Ok(ResolvedMatchArmPattern::DataConstructor {
+                    name,
+                    args: iter
+                        .map(Self::resolve_function_clause_item)
+                        .collect::<Result<Vec<_>, _>>()?,
+                    span,
+                })
+            }
+        }
+    }
+
+    fn resolve_tuple_decl_pattern(
+        pattern: ParsedDeclPattern,
+    ) -> FogResult<ResolvedTupleDeclPattern> {
+        match pattern {
+            ParsedDeclPattern::Identifier { name, span } => {
+                Ok(ResolvedTupleDeclPattern::Identifier { name, span })
+            }
+
+            ParsedDeclPattern::Tuple { items, span } => Ok(ResolvedTupleDeclPattern::Tuple {
+                items: items
+                    .into_iter()
+                    .map(Self::resolve_tuple_decl_pattern)
+                    .collect::<Result<Vec<_>, _>>()?,
+                span,
+            }),
+
+            ParsedDeclPattern::Literal { span, .. }
+            | ParsedDeclPattern::Collection { span, .. } => {
+                Err(parse_error!(Some(span), "invalid tuple pattern"))
+            }
+        }
+    }
+
+    fn resolve_expr(&self, parsed_expr: ParsedExpr) -> FogResult<ResolvedExpr> {
         match parsed_expr {
-            ParsedExpr::Block { statements, span } => Self::resolve_block(statements, span),
+            ParsedExpr::Block { statements, span } => self.resolve_block(statements, span),
 
             ParsedExpr::Identifier { name, span } => Ok(ResolvedExpr::Identifier { name, span }),
             ParsedExpr::Op { .. } => unreachable!(),
 
-            ParsedExpr::Int32Literal { value, span } => {
-                Ok(ResolvedExpr::Int32Literal { value, span })
-            }
-            ParsedExpr::Float32Literal { value, span } => {
-                Ok(ResolvedExpr::Float32Literal { value, span })
-            }
+            ParsedExpr::Literal { literal, span } => Ok(ResolvedExpr::Literal { literal, span }),
 
             ParsedExpr::Lambda {
                 param_name,
                 param_type,
                 body,
                 span,
-            } => Self::resolve_lambda(param_name, param_type, body, span),
+            } => self.resolve_lambda(param_name, param_type, body, span),
 
-            ParsedExpr::Tuple { items, span } => Self::resolve_tuple(items, span),
+            ParsedExpr::Tuple { items, span } => self.resolve_tuple(items, span),
 
-            ParsedExpr::Collection { items, span: _ } => {
+            ParsedExpr::Collection { args, span: _ } => {
                 let mut resolver = Resolver::new();
                 let mut index = 0;
-                resolver.resolve_collection(&items, i32::MIN, &mut index)
+                resolver.resolve_collection(&args, i32::MIN, &mut index)
             }
 
             ParsedExpr::Match {
-                expr,
+                scrutinee,
                 match_arms,
                 span,
-            } => Self::resolve_match(expr, match_arms, span),
+            } => self.resolve_match(scrutinee, match_arms, span),
         }
     }
 
-    fn resolve_block(statements: Vec<ParsedStatement>, span: Span) -> FogResult<ResolvedExpr> {
+    fn resolve_block(
+        &self,
+        statements: Vec<ParsedStatement>,
+        span: Span,
+    ) -> FogResult<ResolvedExpr> {
         Ok(ResolvedExpr::Block {
             statements: statements
                 .iter()
-                .map(|stmt| Resolver::resolve_statement(stmt.clone()))
+                .map(|stmt| self.resolve_statement(stmt.clone()))
                 .collect::<Result<Vec<_>, _>>()?,
             span,
         })
     }
 
     fn resolve_lambda(
+        &self,
         param_name: String,
         param_type: Box<ParsedExpr>,
         body: Box<ParsedExpr>,
@@ -287,37 +366,38 @@ impl Resolver {
     ) -> FogResult<ResolvedExpr> {
         Ok(ResolvedExpr::Lambda {
             param_name,
-            param_type: Self::resolve_expr(*param_type)?.into(),
-            body: Self::resolve_expr(*body)?.into(),
+            param_type: self.resolve_expr(*param_type)?.into(),
+            body: self.resolve_expr(*body)?.into(),
             span,
         })
     }
 
-    fn resolve_tuple(items: Vec<ParsedExpr>, span: Span) -> FogResult<ResolvedExpr> {
+    fn resolve_tuple(&self, items: Vec<ParsedExpr>, span: Span) -> FogResult<ResolvedExpr> {
         Ok(ResolvedExpr::Tuple {
             items: items
                 .into_iter()
-                .map(Self::resolve_expr)
+                .map(|item| self.resolve_expr(item))
                 .collect::<Result<Vec<_>, _>>()?,
             span,
         })
     }
 
     fn resolve_match(
+        &self,
         expr: Box<ParsedExpr>,
         match_arms: Vec<crate::parser::parsed_expr::ParsedMatchArm>,
         span: Span,
     ) -> FogResult<ResolvedExpr> {
-        let scrutinee = Self::resolve_expr(*expr)?;
+        let scrutinee = self.resolve_expr(*expr)?;
 
         Ok(ResolvedExpr::Match {
-            expr: Box::new(scrutinee),
+            scrutinee: Box::new(scrutinee),
             match_arms: match_arms
                 .into_iter()
                 .map(|arm| {
                     Ok(ResolvedMatchArm {
-                        pattern: Self::resolve_expr_as_match_pattern(arm.pattern)?,
-                        value_expr: Self::resolve_expr(arm.value_expr)?,
+                        pattern: Self::resolve_match_pattern(arm.pattern)?,
+                        value_expr: self.resolve_expr(arm.value_expr)?,
                     })
                 })
                 .collect::<FogResult<Vec<_>>>()?,
@@ -325,52 +405,68 @@ impl Resolver {
         })
     }
 
-    fn resolve_expr_as_match_pattern(expr: ParsedExpr) -> FogResult<ResolvedMatchPattern> {
-        let resolved = Self::resolve_expr(expr)?;
-        Self::resolved_expr_to_match_pattern(resolved)
-    }
-
-    fn resolved_expr_to_match_pattern(expr: ResolvedExpr) -> FogResult<ResolvedMatchPattern> {
-        let expr_str = expr.to_string();
-
-        match expr {
-            ResolvedExpr::Identifier { name, span } => {
-                Ok(ResolvedMatchPattern::Identifier { name, span })
+    fn resolve_match_pattern(pattern: ParsedExpr) -> FogResult<ResolvedMatchArmPattern> {
+        match pattern {
+            ParsedExpr::Identifier { name, span } => {
+                Ok(ResolvedMatchArmPattern::Identifier { name, span })
             }
 
-            ResolvedExpr::Int32Literal { value, span } => {
-                Ok(ResolvedMatchPattern::Int32Literal { value, span })
-            }
-            ResolvedExpr::Float32Literal { value, span } => {
-                Ok(ResolvedMatchPattern::Float32Literal { value, span })
+            ParsedExpr::Literal { literal, span } => {
+                Ok(ResolvedMatchArmPattern::Literal { literal, span })
             }
 
-            ResolvedExpr::Tuple { items, span } => Ok(ResolvedMatchPattern::Tuple {
+            ParsedExpr::Tuple { items, span } => Ok(ResolvedMatchArmPattern::Tuple {
                 items: items
                     .into_iter()
-                    .map(Self::resolved_expr_to_match_pattern)
+                    .map(Self::resolve_match_pattern)
                     .collect::<FogResult<Vec<_>>>()?,
                 span,
             }),
 
-            ResolvedExpr::FuncAppl {
-                fn_name,
-                args,
-                span,
-            } => Ok(ResolvedMatchPattern::FuncAppl {
-                fn_name,
-                args: args
-                    .into_iter()
-                    .map(Self::resolved_expr_to_match_pattern)
-                    .collect::<FogResult<Vec<_>>>()?,
-                span,
-            }),
+            // data constructors
+            ParsedExpr::Collection { args, span } => {
+                let first = args.first().ok_or_else(|| {
+                    parse_error!(Some(span), "collection pattern items cannot be empty")
+                })?;
 
-            ResolvedExpr::Block { span, .. }
-            | ResolvedExpr::Lambda { span, .. }
-            | ResolvedExpr::Match { span, .. } => Err(parse_error!(
+                let ParsedExpr::Identifier { name, .. } = first else {
+                    return Err(parse_error!(
+                        Some(span),
+                        "collection pattern's first element must be an identifier"
+                    ));
+                };
+
+                let Some(first_char) = name.chars().nth(0) else {
+                    return Err(parse_error!(
+                        Some(span),
+                        "data constructor's name cannot be empty"
+                    ));
+                };
+
+                if !first_char.is_uppercase() {
+                    return Err(parse_error!(
+                        Some(span),
+                        "data constructor's name must starts with an uppercase letter"
+                    ));
+                }
+
+                Ok(ResolvedMatchArmPattern::DataConstructor {
+                    name: name.clone(),
+                    args: args
+                        .into_iter()
+                        .skip(1)
+                        .map(Self::resolve_match_pattern)
+                        .collect::<FogResult<Vec<_>>>()?,
+                    span,
+                })
+            }
+
+            ParsedExpr::Block { span, .. }
+            | ParsedExpr::Op { span, .. }
+            | ParsedExpr::Lambda { span, .. }
+            | ParsedExpr::Match { span, .. } => Err(parse_error!(
                 Some(span),
-                "`{expr_str}` cannot be used as a pattern"
+                "invalid match arm pattern `{pattern}`"
             )),
         }
     }
@@ -411,7 +507,7 @@ impl Resolver {
 
             let rhs = self.resolve_collection(items, next_min_prec, index)?;
 
-            lhs = ResolvedExpr::FuncAppl {
+            lhs = ResolvedExpr::FunctionAppl {
                 fn_name: op_name,
                 args: vec![lhs, rhs],
                 span: lhs_span,
@@ -442,7 +538,7 @@ impl Resolver {
         if args.is_empty() {
             Ok(head)
         } else {
-            Ok(ResolvedExpr::FuncAppl {
+            Ok(ResolvedExpr::FunctionAppl {
                 fn_name: name,
                 args,
                 span,
@@ -459,23 +555,19 @@ impl Resolver {
         *index += 1;
 
         match expr {
-            ParsedExpr::Block { statements, span } => Self::resolve_block(statements, span),
+            ParsedExpr::Block { statements, span } => self.resolve_block(statements, span),
 
             ParsedExpr::Identifier { name, span } => Ok(ResolvedExpr::Identifier { name, span }),
 
-            ParsedExpr::Int32Literal { value, span } => {
-                Ok(ResolvedExpr::Int32Literal { value, span })
-            }
-            ParsedExpr::Float32Literal { value, span } => {
-                Ok(ResolvedExpr::Float32Literal { value, span })
-            }
+            ParsedExpr::Literal { literal, span } => Ok(ResolvedExpr::Literal { literal, span }),
 
             ParsedExpr::Op {
                 kind: OpKind::Minus,
+                span,
             } => {
                 let operand = self.resolve_atomic(exprs, index)?;
-                let span = operand.span();
-                Ok(ResolvedExpr::FuncAppl {
+
+                Ok(ResolvedExpr::FunctionAppl {
                     fn_name: "-".to_string(),
                     args: vec![operand],
                     span,
@@ -487,22 +579,22 @@ impl Resolver {
                 param_type,
                 body,
                 span,
-            } => Self::resolve_lambda(param_name, param_type, body, span),
+            } => self.resolve_lambda(param_name, param_type, body, span),
 
-            ParsedExpr::Tuple { items, span } => Self::resolve_tuple(items, span),
+            ParsedExpr::Tuple { items, span } => self.resolve_tuple(items, span),
 
-            ParsedExpr::Collection { items, .. } => {
+            ParsedExpr::Collection { args, .. } => {
                 let mut inner_index = 0;
-                self.resolve_collection(&items, i32::MIN, &mut inner_index)
+                self.resolve_collection(&args, i32::MIN, &mut inner_index)
             }
 
             ParsedExpr::Op { .. } => Err(parse_error!(None, "unexpected infix operator")),
 
             ParsedExpr::Match {
-                expr,
+                scrutinee,
                 match_arms,
                 span,
-            } => Self::resolve_match(expr, match_arms, span),
+            } => self.resolve_match(scrutinee, match_arms, span),
         }
     }
 }

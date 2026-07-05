@@ -15,10 +15,12 @@ use crate::interpreter::type_check::expr_type_of;
 use crate::interpreter::value::Value;
 use crate::interpreter::value::value_type_of;
 use crate::interpreter::variable::ValueVariable;
-use crate::parser::desugared_expr::DesugaredDeclPattern;
-use crate::parser::desugared_expr::DesugaredExpr;
-use crate::parser::desugared_expr::DesugaredMatchPattern;
-use crate::parser::desugared_expr::DesugaredStatement;
+use crate::parser::Literal;
+use crate::parser::core_expr::CoreDeclPattern;
+use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreMatchArmPattern;
+use crate::parser::core_expr::CoreStatement;
+use crate::parser::core_expr::CoreTupleDeclPattern;
 use crate::runtime_error;
 
 // --- data constructors ---
@@ -30,7 +32,7 @@ pub fn register_data_constructors(
 ) -> FogResult<()> {
     let Type::Sum(ctors) = parent_sum_type else {
         return Err(runtime_error!(
-            Some(span.clone()),
+            Some(*span),
             "cannot register data constructors from a non-sum type `{}`",
             parent_sum_type.to_string()
         ));
@@ -90,22 +92,24 @@ pub fn make_data_constructor_function(
 
 // --- value expression evaluator ---
 
-pub fn eval_value_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Value> {
+pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
     match expr {
-        DesugaredExpr::Block { statements, span } => eval_block(statements, span.clone(), env),
+        CoreExpr::Block { statements, span } => eval_block(statements, span, env),
 
-        DesugaredExpr::Identifier { name, span } => {
+        CoreExpr::Identifier { name, span } => {
             let var = env.get_value_var(name, span)?;
             var.value
                 .borrow()
                 .clone()
-                .ok_or_else(|| runtime_error!(Some(span.clone()), "undeclared variable `{}`", name))
+                .ok_or_else(|| runtime_error!(Some(*span), "undeclared variable `{}`", name))
         }
 
-        DesugaredExpr::Int32Literal { value, .. } => Ok(Value::Int32(*value)),
-        DesugaredExpr::Float32Literal { value, .. } => Ok(Value::Float32(*value)),
+        CoreExpr::Literal { literal, .. } => match *literal {
+            Literal::Int32(value) => Ok(Value::Int32(value)),
+            Literal::Float32(value) => Ok(Value::Float32(value)),
+        },
 
-        DesugaredExpr::Lambda {
+        CoreExpr::Lambda {
             param_name,
             param_type,
             body,
@@ -117,45 +121,45 @@ pub fn eval_value_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Val
                 param_name: param_name.clone(),
                 param_type,
                 return_type,
-                body: Rc::clone(body),
+                body: Rc::new((**body).clone()),
                 captured_env: env.flatten().into(),
             })
         }
 
-        DesugaredExpr::Tuple { items, .. } => Ok(Value::Tuple(
+        CoreExpr::Tuple { items, .. } => Ok(Value::Tuple(
             items
                 .iter()
                 .map(|expr| eval_value_expr(expr, env))
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        DesugaredExpr::FuncAppl {
+        CoreExpr::FunctionAppl {
             fn_name,
             args,
             span,
         } => {
             let mut result = eval_value_expr(
-                &DesugaredExpr::Identifier {
+                &CoreExpr::Identifier {
                     name: fn_name.clone(),
-                    span: span.clone(),
+                    span: *span,
                 },
                 env,
             )?;
 
             for arg in args {
                 let argument = eval_value_expr(arg, env)?;
-                result = apply_function(result, argument, span)?;
+                result = eval_function_appl(result, argument, span)?;
             }
 
             Ok(result)
         }
 
-        DesugaredExpr::Match {
-            expr,
+        CoreExpr::Match {
+            scrutinee,
             match_arms,
             span,
         } => {
-            let value = eval_value_expr(expr, env)?;
+            let value = eval_value_expr(scrutinee, env)?;
 
             for arm in match_arms {
                 if let Some(bindings) = match_pattern(&value, &arm.pattern) {
@@ -170,21 +174,18 @@ pub fn eval_value_expr(expr: &DesugaredExpr, env: &Environment) -> FogResult<Val
                 }
             }
 
-            Err(runtime_error!(
-                Some(span.clone()),
-                "match expression not covered"
-            ))
+            Err(runtime_error!(Some(*span), "match expression not covered"))
         }
     }
 }
 
 pub fn eval_scope(
-    statements: &Vec<DesugaredStatement>,
+    statements: &Vec<CoreStatement>,
     env: &mut Environment,
 ) -> FogResult<Option<Value>> {
     // type's kind annotations
     for stmt in statements {
-        if let DesugaredStatement::TypeAnnotation { name, expr, span } = stmt {
+        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
             if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
                 env.annotate_kind(name, kind, span)?;
             }
@@ -194,26 +195,26 @@ pub fn eval_scope(
     // type definitions (only a bare name can define a type; a tuple pattern
     // can only ever be a value destructuring assignment)
     for stmt in statements {
-        if let DesugaredStatement::Declaration {
-            pattern: DesugaredDeclPattern::Identifier { name, span },
-            expr,
-            ..
-        } = stmt
-        {
-            if env.types.contains_key(name) {
-                let defined_type = eval_type_definition_expr(expr, env)?;
-                env.declare_type(name, defined_type.clone(), span)?;
+        if let CoreStatement::Declaration { pattern, expr, .. } = stmt {
+            match pattern {
+                CoreDeclPattern::Identifier { name, span } => {
+                    if env.types.contains_key(name) {
+                        let defined_type = eval_type_definition_expr(expr, env)?;
+                        env.declare_type(name, defined_type.clone(), span)?;
 
                 if let Type::Sum(_) = &defined_type {
                     register_data_constructors(env, &defined_type, span)?;
                 }
+
+                // _ => return Err(runtime_error!(Some(*span), "invalid type declaration")),
+                _ => (),
             }
         }
     }
 
     // variable's type annotations
     for stmt in statements {
-        if let DesugaredStatement::TypeAnnotation { name, expr, span } = stmt {
+        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
             match eval_annotation_expr(expr, env)? {
                 Annotation::Type(r#type) => env.annotate_type(name, r#type, span)?,
                 _ => (),
@@ -223,23 +224,21 @@ pub fn eval_scope(
 
     // value declarations
     for stmt in statements {
-        if let DesugaredStatement::Declaration {
-            pattern,
-            expr,
-            span,
-        } = stmt
-        {
+        if let CoreStatement::Declaration { pattern, expr, .. } = stmt {
             match pattern {
-                DesugaredDeclPattern::Identifier { name, .. } => {
+                CoreDeclPattern::Identifier { name, span } => {
                     if !env.types.contains_key(name) {
                         let value = eval_value_expr(expr, env)?;
                         env.declare_value(name, value, span)?;
                     }
                 }
 
-                DesugaredDeclPattern::Tuple { .. } => {
+                CoreDeclPattern::Tuple {
+                    items: pattern_items,
+                    span,
+                } => {
                     let value = eval_value_expr(expr, env)?;
-                    declare_pattern_value(pattern, value, env, span)?;
+                    eval_tuple_items_declaration(pattern_items, value, env, span)?;
                 }
             }
         }
@@ -247,7 +246,7 @@ pub fn eval_scope(
 
     // final expression (blocks only)
     for stmt in statements {
-        if let DesugaredStatement::Expression { expr, .. } = stmt {
+        if let CoreStatement::Expression { expr, .. } = stmt {
             return Ok(Some(eval_value_expr(expr, env)?));
         }
     }
@@ -255,45 +254,51 @@ pub fn eval_scope(
     Ok(None)
 }
 
-fn declare_pattern_value(
-    pattern: &DesugaredDeclPattern,
+fn eval_tuple_items_declaration(
+    pattern_items: &Vec<CoreTupleDeclPattern>,
     value: Value,
     env: &mut Environment,
     span: &Span,
 ) -> FogResult<()> {
-    match pattern {
-        DesugaredDeclPattern::Identifier { name, .. } => env.declare_value(name, value, span),
+    let Value::Tuple(expr_items) = value else {
+        return Err(runtime_error!(
+            Some(*span),
+            "cannot declare a non-tuple value `{value}` to a tuple"
+        ));
+    };
 
-        // assign values to a possibly nested LHS tuple
-        DesugaredDeclPattern::Tuple { items, .. } => match value {
-            Value::Tuple(values) if values.len() == items.len() => {
-                for (item, val) in items.iter().zip(values) {
-                    declare_pattern_value(item, val, env, span)?;
-                }
-                Ok(())
-            }
-            _ => Err(runtime_error!(
-                Some(span.clone()),
-                "cannot destructure `{}` into a {}-tuple pattern",
-                value,
-                items.len()
-            )),
-        },
+    if pattern_items.len() != expr_items.len() {
+        return Err(runtime_error!(
+            Some(*span),
+            "tuple declaration size mismatch"
+        ));
     }
+
+    for (pattern_item, value) in pattern_items.iter().zip(expr_items) {
+        match pattern_item {
+            CoreTupleDeclPattern::Identifier { name, span } => {
+                // let value = eval_value_expr(expr_item, env)?;
+                env.declare_value(name, value, span)?;
+            }
+
+            CoreTupleDeclPattern::Tuple {
+                items: pattern_items,
+                span,
+            } => eval_tuple_items_declaration(pattern_items, value, env, span)?,
+        }
+    }
+
+    Ok(())
 }
 
-fn eval_block(
-    statements: &Vec<DesugaredStatement>,
-    span: Span,
-    env: &Environment,
-) -> FogResult<Value> {
+fn eval_block(statements: &Vec<CoreStatement>, span: &Span, env: &Environment) -> FogResult<Value> {
     let mut block_env = Environment::new(Some(env));
 
     eval_scope(statements, &mut block_env)?
-        .ok_or_else(|| runtime_error!(Some(span), "final operand not found in block statement"))
+        .ok_or_else(|| runtime_error!(Some(*span), "final operand not found in block statement"))
 }
 
-fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
+fn eval_function_appl(function: Value, argument: Value, span: &Span) -> FogResult<Value> {
     match function {
         Value::Function {
             param_name,
@@ -314,31 +319,32 @@ fn apply_function(function: Value, argument: Value, span: &Span) -> FogResult<Va
 
         Value::NativeFunction { function, .. } => function(argument).map_err(|mut e| {
             if e.span.is_none() {
-                e.span = Some(span.clone());
+                e.span = Some(*span);
             }
             e
         }),
 
         _ => Err(runtime_error!(
-            Some(span.clone()),
+            Some(*span),
             "cannot apply a non-function value"
         )),
     }
 }
 
-fn match_pattern(value: &Value, pattern: &DesugaredMatchPattern) -> Option<HashMap<String, Value>> {
+fn match_pattern(
+    value: &Value,
+    pattern: &CoreMatchArmPattern,
+) -> FogResult<Option<HashMap<String, Value>>> {
+    // let span = pattern.span();
+
     match pattern {
-        DesugaredMatchPattern::Int32Literal { value: pat_val, .. } => match value {
-            Value::Int32(val) if val == pat_val => Some(HashMap::new()),
-            _ => None,
+        CoreMatchArmPattern::Literal { literal, .. } => match (literal, value) {
+            (Literal::Int32(p), Value::Int32(v)) if p == v => Ok(Some(HashMap::new())),
+            (Literal::Float32(p), Value::Float32(v)) if p == v => Ok(Some(HashMap::new())),
+            _ => Ok(None),
         },
 
-        DesugaredMatchPattern::Float32Literal { value: pat_val, .. } => match value {
-            Value::Float32(val) if val == pat_val => Some(HashMap::new()),
-            _ => None,
-        },
-
-        DesugaredMatchPattern::Identifier { name, .. } => {
+        CoreMatchArmPattern::Identifier { name, .. } => {
             if name == "_" {
                 // wildcard
                 Some(HashMap::new())
@@ -358,7 +364,7 @@ fn match_pattern(value: &Value, pattern: &DesugaredMatchPattern) -> Option<HashM
             }
         }
 
-        DesugaredMatchPattern::Tuple { items, .. } => match value {
+        CoreMatchArmPattern::Tuple { items, .. } => match value {
             Value::Tuple(values) if values.len() == items.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(items) {
@@ -373,10 +379,8 @@ fn match_pattern(value: &Value, pattern: &DesugaredMatchPattern) -> Option<HashM
         },
 
         // data constructor pattern
-        DesugaredMatchPattern::FuncAppl { fn_name, args, .. } => match value {
-            Value::Constructor { tag, values, .. }
-                if tag == fn_name && values.len() == args.len() =>
-            {
+        CoreMatchArmPattern::DataConstructor { name, args, .. } => match value {
+            Value::Constructor { tag, values, .. } if tag == name && values.len() == args.len() => {
                 let mut bindings = HashMap::new();
                 for (v, p) in values.iter().zip(args) {
                     match match_pattern(v, p) {
