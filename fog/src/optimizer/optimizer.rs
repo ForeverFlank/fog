@@ -131,6 +131,24 @@ impl DependencyGraph {
         let to = self.add_node(Node::Name(to_name));
         self.edges.push((from, to));
     }
+
+    fn to_adj_matrix(&mut self) -> Vec<Vec<NodeId>> {
+        let node_count = self.dsu.parent.len();
+        let mut adj = vec![Vec::new(); node_count];
+
+        for i in 0..self.edges.len() {
+            let (from, to) = self.edges[i];
+
+            let from = self.dsu.find(from);
+            let to = self.dsu.find(to);
+
+            if from != to {
+                adj[from.value()].push(to);
+            }
+        }
+
+        adj
+    }
 }
 
 // Tarjan's SCC algorithm
@@ -309,6 +327,10 @@ fn optimize_block(mut stmts: Vec<CoreStatement>) -> Result<Vec<CoreStatement>, V
     }
 
     // SCC
+    let sccs = tarjan_scc(&graph.to_adj_matrix())
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
 
     if errors.is_empty() {
         Ok(optimized_stmts)
