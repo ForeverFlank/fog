@@ -6,10 +6,10 @@ use crate::error::Span;
 use crate::parse_error;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
-use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedMatchArmPattern;
@@ -138,7 +138,7 @@ fn desugar_statements(
             }
         };
 
-        let match_arms = patterns
+        let arms = patterns
             .into_iter()
             .map(|(mut items, value_expr)| {
                 let pattern = if arity == 1 {
@@ -179,7 +179,7 @@ fn desugar_statements(
 
         let match_expr = CoreExpr::Match {
             scrutinee: scrutinee.into(),
-            match_arms,
+            arms,
             span,
         };
 
@@ -387,11 +387,11 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
 
         ResolvedExpr::Match {
             scrutinee,
-            match_arms,
+            arms,
             span,
         } => Ok(CoreExpr::Match {
             scrutinee: desugar_expr(*scrutinee)?.into(),
-            match_arms: match_arms
+            arms: arms
                 .into_iter()
                 .map(|arm| {
                     Ok(CoreMatchArm {

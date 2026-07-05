@@ -4,8 +4,8 @@ use std::collections::HashSet;
 
 use crate::error::FogError;
 use crate::parser::core_expr::CoreExpr;
-use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreMatchArm;
+use crate::parser::core_expr::CoreStatement;
 
 // --- node ---
 
@@ -286,13 +286,11 @@ fn optimize_expr(expr: &mut CoreExpr, errors: &mut Vec<FogError>) {
         }
 
         CoreExpr::Match {
-            scrutinee,
-            match_arms,
-            ..
+            scrutinee, arms, ..
         } => {
             optimize_expr(scrutinee, errors);
 
-            for arm in match_arms {
+            for arm in arms {
                 optimize_expr(&mut arm.value_expr, errors);
             }
         }
@@ -418,13 +416,11 @@ fn visit_expr<'a>(
         }
 
         CoreExpr::Match {
-            scrutinee,
-            match_arms,
-            ..
+            scrutinee, arms, ..
         } => {
             visit_expr(graph, scope, this, scrutinee);
 
-            for match_arm in match_arms {
+            for match_arm in arms {
                 visit_match_arm(graph, scope, this, match_arm);
             }
         }

@@ -207,7 +207,7 @@ pub enum ResolvedExpr {
 
     Match {
         scrutinee: Box<ResolvedExpr>,
-        match_arms: Vec<ResolvedMatchArm>,
+        arms: Vec<ResolvedMatchArm>,
         span: Span,
     },
 }
@@ -257,7 +257,7 @@ impl Display for ResolvedExpr {
 
             ResolvedExpr::Match {
                 scrutinee,
-                match_arms,
+                arms: match_arms,
                 ..
             } => {
                 write!(f, "match {scrutinee} {{\n")?;

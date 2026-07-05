@@ -2,12 +2,14 @@ use crate::parser::Literal;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreMatchArmPattern;
 
+#[derive(Clone)]
 pub enum ANFExpr {
     Atomic(AtomicExpr),
-    Declaration(CoreDeclPattern, Box<ANFExpr>),
+    Let(CoreDeclPattern, Box<ANFExpr>),
     FunctionAppl(AtomicExpr, AtomicExpr),
 }
 
+#[derive(Clone)]
 pub enum AtomicExpr {
     Literal {
         literal: Literal,

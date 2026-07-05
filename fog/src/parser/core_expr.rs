@@ -239,7 +239,7 @@ pub enum CoreExpr {
     },
     Match {
         scrutinee: Box<CoreExpr>,
-        match_arms: Vec<CoreMatchArm>,
+        arms: Vec<CoreMatchArm>,
         span: Span,
     },
 }
@@ -313,13 +313,11 @@ impl Display for CoreExpr {
             }
 
             CoreExpr::Match {
-                scrutinee,
-                match_arms,
-                ..
+                scrutinee, arms, ..
             } => {
                 write!(f, "match {scrutinee} {{\n")?;
 
-                for arm in match_arms {
+                for arm in arms {
                     write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;
                 }
 

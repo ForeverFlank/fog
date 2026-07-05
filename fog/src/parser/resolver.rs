@@ -7,6 +7,7 @@ use crate::parse_error;
 use crate::parser::parsed_expr::OpKind;
 use crate::parser::parsed_expr::ParsedDeclPattern;
 use crate::parser::parsed_expr::ParsedExpr;
+use crate::parser::parsed_expr::ParsedMatchArm;
 use crate::parser::parsed_expr::ParsedStatement;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
@@ -371,14 +372,14 @@ impl Resolver {
     fn resolve_match(
         &self,
         expr: Box<ParsedExpr>,
-        match_arms: Vec<crate::parser::parsed_expr::ParsedMatchArm>,
+        arms: Vec<ParsedMatchArm>,
         span: Span,
     ) -> FogResult<ResolvedExpr> {
         let scrutinee = self.resolve_expr(*expr)?;
 
         Ok(ResolvedExpr::Match {
             scrutinee: Box::new(scrutinee),
-            match_arms: match_arms
+            arms: arms
                 .into_iter()
                 .map(|arm| {
                     Ok(ResolvedMatchArm {

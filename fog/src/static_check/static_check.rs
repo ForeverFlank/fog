@@ -240,7 +240,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
 
-        CoreExpr::Match { match_arms, .. } => match match_arms.first() {
+        CoreExpr::Match { arms, .. } => match arms.first() {
             Some(arm) => expr_type_of(&arm.value_expr, env),
             None => Err(type_check_error!(Some(span), "match with no arms")),
         },
