@@ -2,15 +2,17 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parser::Literal;
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
+use crate::parser::core_expr::CoreTypeExpr;
 use crate::static_check::environment::Environment;
-use crate::static_check::eval_type::eval_kind_expr;
-use crate::static_check::eval_type::eval_type_annotation_expr;
-use crate::static_check::eval_type::eval_type_definition_expr;
-use crate::static_check::eval_type::register_data_constructors;
+use crate::static_check::eval::eval_atomic_type_expr;
+use crate::static_check::eval::eval_kind_expr;
+use crate::static_check::eval::eval_type_expr;
+use crate::static_check::eval::register_data_constructors;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
@@ -75,7 +77,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     // type kind annotations
     for stmt in stmts {
         if let CoreStatement::KindAnnotation { name, expr, span } = stmt {
-            match eval_kind_expr(expr, env) {
+            match eval_kind_expr(expr) {
                 Ok(kind) => {
                     if let Err(error) = env.annotate_kind(name, kind, span) {
                         all_errors.push(error);
@@ -130,11 +132,11 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
 
 fn check_type_declaration(
     name: &str,
-    expr: &CoreExpr,
+    expr: &CoreTypeExpr,
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
-    let defined_type = eval_type_definition_expr(expr, env)?;
+    let defined_type = eval_type_expr(expr, env)?;
 
     if !env.types.contains_key(name) {
         env.annotate_kind(name, kind_of(&defined_type), span)?;
@@ -151,11 +153,11 @@ fn check_type_declaration(
 
 fn check_type_annotation(
     name: &str,
-    expr: &CoreExpr,
+    expr: &CoreAtomicTypeExpr,
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
-    let r#type = eval_type_annotation_expr(expr, env)?;
+    let r#type = eval_atomic_type_expr(expr, env)?;
     env.annotate_type(name, r#type, span)
 }
 
@@ -268,7 +270,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
         CoreExpr::Lambda {
             param_type, body, ..
         } => Ok(Type::Function(
-            eval_type_annotation_expr(param_type, env)?.into(),
+            eval_atomic_type_expr(param_type, env)?.into(),
             expr_type_of(body, env)?.into(),
         )),
 

@@ -242,7 +242,7 @@ fn find_fn_clause_param_types(
             )
         };
 
-        let CoreTypeExpr::FunctionAppl {
+        let CoreAtomicTypeExpr::FunctionAppl {
             callee,
             arg: return_type,
             ..
@@ -269,7 +269,7 @@ fn find_fn_clause_param_types(
         }
 
         param_types.push((*param_type).to_type_expr());
-        remaining_type = (*return_type).to_type_expr();
+        remaining_type = *return_type;
     }
 
     Ok(param_types)
@@ -288,7 +288,7 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
         ResolvedStatement::TypeDeclaration { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::TypeDeclaration {
                 name,
-                expr: desugar_atomic_type_expr(expr)?,
+                expr: desugar_type_expr(expr)?,
                 span,
             }))
         }
@@ -296,7 +296,7 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
         ResolvedStatement::TypeAnnotation { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::TypeAnnotation {
                 name,
-                expr: desugar_type_expr(expr)?,
+                expr: desugar_atomic_type_expr(expr)?,
                 span,
             }))
         }

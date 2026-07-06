@@ -17,12 +17,13 @@ pub enum CoreStatement {
     },
     TypeDeclaration {
         name: String,
-        expr: CoreAtomicTypeExpr,
+        expr: CoreTypeExpr,
         span: Span,
     },
+
     TypeAnnotation {
         name: String,
-        expr: CoreTypeExpr,
+        expr: CoreAtomicTypeExpr,
         span: Span,
     },
     VarDeclaration {
@@ -30,6 +31,7 @@ pub enum CoreStatement {
         expr: CoreExpr,
         span: Span,
     },
+
     Expression {
         expr: CoreExpr,
         span: Span,
@@ -297,6 +299,17 @@ pub enum CoreTypeExpr {
     },
 }
 
+impl CoreTypeExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            CoreTypeExpr::Identifier { span, .. }
+            | CoreTypeExpr::FunctionAppl { span, .. }
+            | CoreTypeExpr::Product { span, .. }
+            | CoreTypeExpr::Sum { span, .. } => *span,
+        }
+    }
+}
+
 impl Display for CoreTypeExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -334,6 +347,16 @@ pub enum CoreAtomicTypeExpr {
         arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
+}
+
+impl CoreAtomicTypeExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            CoreAtomicTypeExpr::Identifier { span, .. }
+            | CoreAtomicTypeExpr::FunctionAppl { span, .. }
+            | CoreAtomicTypeExpr::Product { span, .. } => *span,
+        }
+    }
 }
 
 impl CoreAtomicTypeExpr {

@@ -2,7 +2,7 @@ use crate::error::FogError;
 use crate::parser::core_expr::CoreStatement;
 
 pub mod environment;
-pub mod eval_type;
+pub mod eval;
 pub mod kind;
 pub mod static_check;
 pub mod r#type;

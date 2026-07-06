@@ -1,6 +1,9 @@
 use crate::error::FogResult;
 use crate::error::Span;
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreKindExpr;
+use crate::parser::core_expr::CoreTypeExpr;
 use crate::static_check::environment::Environment;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::DataConstructor;
@@ -9,59 +12,33 @@ use crate::static_check_error;
 
 // --- kind ---
 
-pub fn eval_kind_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Kind> {
-    let span = expr.span();
-
+pub fn eval_kind_expr(expr: &CoreKindExpr) -> FogResult<Kind> {
     match expr {
-        CoreExpr::Identifier { name, .. } if name == "Type" => Ok(Kind::Type),
+        CoreKindExpr::Type { .. } => Ok(Kind::Type),
 
-        CoreExpr::Identifier { name, .. } => {
-            Err(static_check_error!(Some(span), "unknown kind `{}`", name))
-        }
+        CoreKindExpr::Constraint { .. } => Ok(Kind::Constraint),
 
-        CoreExpr::FunctionAppl { .. } => {
-            let (head, args) = expr.uncurry();
-
-            let (CoreExpr::Identifier { name, .. }, &[lhs, rhs]) = (head, args.as_slice()) else {
-                return Err(static_check_error!(
-                    Some(span),
-                    "`{}` is not a valid kind",
-                    expr.to_string()
-                ));
-            };
-
-            if name != "->" {
-                return Err(static_check_error!(
-                    Some(span),
-                    "`{}` is not a valid kind",
-                    expr.to_string()
-                ));
-            }
-
-            Ok(Kind::Function(
-                eval_kind_expr(lhs, env)?.into(),
-                eval_kind_expr(rhs, env)?.into(),
-            ))
-        }
-
-        _ => Err(static_check_error!(
-            Some(span),
-            "`{}` is not a valid kind",
-            expr.to_string()
+        CoreKindExpr::Function {
+            param_kind,
+            return_kind,
+            ..
+        } => Ok(Kind::Function(
+            eval_kind_expr(&param_kind)?.into(),
+            eval_kind_expr(&return_kind)?.into(),
         )),
     }
 }
 
-pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
+pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
-        CoreExpr::Identifier { name, .. } => env
+        CoreAtomicTypeExpr::Identifier { name, .. } => env
             .get_type_var(name, &span)?
             .r#type
             .ok_or_else(|| static_check_error!(Some(span), "undeclared type `{}`", name)),
 
-        CoreExpr::FunctionAppl { .. } => {
+        CoreAtomicTypeExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
             let CoreExpr::Identifier { name, .. } = head else {
@@ -99,24 +76,24 @@ pub fn eval_type_annotation_expr(expr: &CoreExpr, env: &Environment) -> FogResul
     }
 }
 
-pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
+pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
-        CoreExpr::Identifier { name, .. } if env.contains_type(name) => env
+        CoreTypeExpr::Identifier { name, .. } if env.contains_type(name) => env
             .get_type_var(name, &span)?
             .r#type
             .ok_or_else(|| static_check_error!(Some(span), "undeclared type `{}`", name)),
 
-        CoreExpr::Identifier { name, .. } => Ok(Type::Sum(vec![DataConstructor {
+        CoreTypeExpr::Identifier { name, .. } => Ok(Type::Sum(vec![DataConstructor {
             tag: name.clone(),
             types: Vec::new(),
         }])),
 
-        CoreExpr::FunctionAppl { .. } => {
+        CoreTypeExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
-            let CoreExpr::Identifier { name, .. } = head else {
+            let CoreTypeExpr::Identifier { name, .. } = head else {
                 return Err(static_check_error!(
                     Some(span),
                     "`{}` is not a valid type definition",
@@ -135,7 +112,7 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
                 _ => {
                     let field_types = args
                         .iter()
-                        .map(|&arg| eval_type_annotation_expr(arg, env))
+                        .map(|&arg| eval_atomic_type_expr(arg, env))
                         .collect::<Result<Vec<Type>, _>>()?;
 
                     Ok(Type::Sum(vec![DataConstructor {
@@ -155,8 +132,8 @@ pub fn eval_type_definition_expr(expr: &CoreExpr, env: &Environment) -> FogResul
 }
 
 fn eval_product_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
-    let left = eval_type_annotation_expr(left, env)?;
-    let right = eval_type_annotation_expr(right, env)?;
+    let left = eval_atomic_type_expr(left, env)?;
+    let right = eval_atomic_type_expr(right, env)?;
 
     let mut types = Vec::new();
 
@@ -173,15 +150,15 @@ fn eval_product_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> Fo
 }
 
 fn eval_function_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
-    let left = eval_type_annotation_expr(left, env)?;
-    let right = eval_type_annotation_expr(right, env)?;
+    let left = eval_atomic_type_expr(left, env)?;
+    let right = eval_atomic_type_expr(right, env)?;
 
     Ok(Type::Function(left.into(), right.into()))
 }
 
 fn eval_sum_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
-    let left = eval_type_definition_expr(left, env)?;
-    let right = eval_type_definition_expr(right, env)?;
+    let left = eval_type_expr(left, env)?;
+    let right = eval_type_expr(right, env)?;
 
     let Type::Sum(ctors1) = left else {
         return Err(static_check_error!(
@@ -218,7 +195,7 @@ pub fn apply_type_level_function(
             ));
         };
 
-        let arg_kind = eval_type_annotation_expr(arg, env)?;
+        let arg_kind = eval_atomic_type_expr(arg, env)?;
 
         if arg_kind != *param_type {
             return Err(static_check_error!(
