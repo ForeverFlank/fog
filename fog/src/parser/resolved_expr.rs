@@ -242,6 +242,20 @@ impl ResolvedExpr {
             | ResolvedExpr::Match { span, .. } => *span,
         }
     }
+
+    pub fn uncurry(&self) -> (&ResolvedExpr, Vec<&ResolvedExpr>) {
+        let mut args = Vec::new();
+        let mut head = self;
+
+        while let ResolvedExpr::FunctionAppl { callee, arg, .. } = head {
+            args.push(arg.as_ref());
+            head = callee.as_ref();
+        }
+
+        args.reverse();
+
+        (head, args)
+    }
 }
 
 impl Display for ResolvedExpr {

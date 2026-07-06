@@ -21,7 +21,7 @@ pub enum ParsedStatement {
     },
     TypeDeclaration {
         name: String,
-        expr: ParsedTypeExpr,
+        expr: ParsedValueExpr,
         span: Span,
     },
 
@@ -185,6 +185,16 @@ pub enum ParsedKindExpr {
     },
 }
 
+impl ParsedKindExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedKindExpr::Type { span }
+            | ParsedKindExpr::Constraint { span }
+            | ParsedKindExpr::Function { span, .. } => *span,
+        }
+    }
+}
+
 impl Display for ParsedKindExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -201,35 +211,12 @@ impl Display for ParsedKindExpr {
                 return_kind,
                 ..
             } => {
-                write!(f, "{} -> {}", param_kind, return_kind)
+                fmt_parenthesized(f, param_kind)?;
+                write!(f, " -> ");
+                fmt_parenthesized(f, return_kind)
             }
         }
     }
-}
-
-#[derive(Clone)]
-pub enum ParsedTypeExpr {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-    Function {
-        param_type: Box<ParsedAtomicTypeExpr>,
-        return_type: Box<ParsedAtomicTypeExpr>,
-    },
-    Sum {},
-}
-
-#[derive(Clone)]
-pub enum ParsedAtomicTypeExpr {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-    Function {
-        param_type: Box<ParsedAtomicTypeExpr>,
-        return_type: Box<ParsedAtomicTypeExpr>,
-    },
 }
 
 #[derive(Clone)]

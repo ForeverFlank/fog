@@ -271,20 +271,22 @@ pub enum CoreTypeExpr {
         span: Span,
     },
     FunctionAppl {
-        // arrow types also belong here
         callee: Box<CoreAtomicTypeExpr>,
         arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
     Product {
-        // exists because (a * b) * c != a * (b * c)
         types: Vec<CoreAtomicTypeExpr>,
         span: Span,
     },
     Sum {
-        // ,,,
+        ctors: Vec<CoreDataConstructor>,
         span: Span,
     },
+}
+
+impl Display for CoreTypeExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {}
 }
 
 #[derive(Clone)]
@@ -302,6 +304,36 @@ pub enum CoreAtomicTypeExpr {
         arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
+}
+
+impl Display for CoreAtomicTypeExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CoreAtomicTypeExpr::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+
+            CoreAtomicTypeExpr::Product { types, .. } => {
+                write!(f, "{}", format_joined(types, " * "))
+            }
+
+            CoreAtomicTypeExpr::FunctionAppl { callee, arg, .. } => {
+                fmt_parenthesized(f, callee.as_ref())?;
+                write!(f, " ")?;
+                fmt_parenthesized(f, arg.as_ref())
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct CoreDataConstructor {
+    tag: String,
+    types: Vec<CoreAtomicTypeExpr>,
+}
+
+impl Display for CoreDataConstructor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {}
 }
 
 #[derive(Clone)]
@@ -363,6 +395,7 @@ impl CoreExpr {
         }
 
         args.reverse();
+
         (head, args)
     }
 }

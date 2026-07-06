@@ -37,6 +37,9 @@ Ordered a = {
 
 -- using the type classes
 
+-- !! NOTE !! this might be a bad example,
+-- version is just an alias of Int32 * Int32 in this case!
+
 Version : Type
 Version = Int32 * Int32     -- semantic version number, major and minor
 
