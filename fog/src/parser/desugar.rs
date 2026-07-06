@@ -1,13 +1,11 @@
 use std::collections::HashMap;
 
-use crate::anf::anf::AtomicExpr::Identifier;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parse_error;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
-use crate::parser::core_expr::CoreKindExpr;
 use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
@@ -280,7 +278,7 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
         ResolvedStatement::KindAnnotation { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::KindAnnotation {
                 name,
-                expr: desugar_kind_expr(expr)?,
+                expr,
                 span,
             }))
         }
@@ -366,29 +364,6 @@ fn desugar_match_arm_pattern(pattern: ResolvedMatchArmPattern) -> FogResult<Core
                 span,
             })
         }
-    }
-}
-
-fn desugar_kind_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreKindExpr> {
-    match resolved_expr {
-        ResolvedExpr::Identifier { name, span } => match name.as_str() {
-            "Type" => Ok(CoreKindExpr::Type { span }),
-            "Constraint" => Ok(CoreKindExpr::Constraint { span }),
-            _ => Err(parse_error!(Some(span), "invalid kind `{name}`")),
-        },
-
-        ResolvedExpr::FunctionAppl { callee, arg, span } => {
-            let param_kind = desugar_expr(*arg)?;
-
-            let (head, [a, b]) = resolved_expr.uncurry();
-
-            ()
-        }
-
-        _ => Err(parse_error!(
-            Some(resolved_expr.span()),
-            "invalid kind {resolved_expr}"
-        )),
     }
 }
 

@@ -242,6 +242,16 @@ pub enum CoreKindExpr {
     },
 }
 
+impl CoreKindExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            CoreKindExpr::Type { span }
+            | CoreKindExpr::Constraint { span }
+            | CoreKindExpr::Function { span, .. } => *span,
+        }
+    }
+}
+
 impl Display for CoreKindExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -258,7 +268,9 @@ impl Display for CoreKindExpr {
                 return_kind,
                 ..
             } => {
-                write!(f, "{} -> {}", param_kind, return_kind)
+                fmt_parenthesized(f, param_kind)?;
+                write!(f, " -> ");
+                fmt_parenthesized(f, return_kind)
             }
         }
     }

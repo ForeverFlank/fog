@@ -7,6 +7,7 @@ use crate::lexer::token::Token;
 use crate::lexer::token::TokenKind;
 use crate::parse_error;
 use crate::parser::Literal;
+use crate::parser::core_expr::CoreKindExpr;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 
@@ -16,7 +17,7 @@ use crate::util::format_joined;
 pub enum ParsedStatement {
     KindAnnotation {
         name: String,
-        expr: ParsedKindExpr,
+        expr: CoreKindExpr,
         span: Span,
     },
     TypeDeclaration {
@@ -169,55 +170,6 @@ impl OpKind {
 }
 
 // --- expressions ---
-
-#[derive(Clone)]
-pub enum ParsedKindExpr {
-    Type {
-        span: Span,
-    },
-    Constraint {
-        span: Span,
-    },
-    Function {
-        param_kind: Box<ParsedKindExpr>,
-        return_kind: Box<ParsedKindExpr>,
-        span: Span,
-    },
-}
-
-impl ParsedKindExpr {
-    pub fn span(&self) -> Span {
-        match self {
-            ParsedKindExpr::Type { span }
-            | ParsedKindExpr::Constraint { span }
-            | ParsedKindExpr::Function { span, .. } => *span,
-        }
-    }
-}
-
-impl Display for ParsedKindExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ParsedKindExpr::Type { .. } => {
-                write!(f, "Type")
-            }
-
-            ParsedKindExpr::Constraint { .. } => {
-                write!(f, "Constraint")
-            }
-
-            ParsedKindExpr::Function {
-                param_kind,
-                return_kind,
-                ..
-            } => {
-                fmt_parenthesized(f, param_kind)?;
-                write!(f, " -> ");
-                fmt_parenthesized(f, return_kind)
-            }
-        }
-    }
-}
 
 #[derive(Clone)]
 pub enum ParsedValueExpr {

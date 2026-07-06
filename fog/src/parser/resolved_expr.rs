@@ -4,7 +4,9 @@ use std::rc::Rc;
 
 use crate::error::Span;
 use crate::parser::Literal;
-use crate::util::{fmt_parenthesized, format_joined};
+use crate::parser::core_expr::CoreKindExpr;
+use crate::util::fmt_parenthesized;
+use crate::util::format_joined;
 
 // --- statements ---
 
@@ -12,7 +14,7 @@ use crate::util::{fmt_parenthesized, format_joined};
 pub enum ResolvedStatement {
     KindAnnotation {
         name: String,
-        expr: ResolvedExpr,
+        expr: CoreKindExpr,
         span: Span,
     },
     TypeDeclaration {

@@ -120,11 +120,7 @@ impl Resolver {
     fn resolve_statement(&self, parsed_statement: ParsedStatement) -> FogResult<ResolvedStatement> {
         match parsed_statement {
             ParsedStatement::KindAnnotation { name, expr, span } => {
-                Ok(ResolvedStatement::KindAnnotation {
-                    name,
-                    expr: self.resolve_expr(expr)?,
-                    span,
-                })
+                Ok(ResolvedStatement::KindAnnotation { name, expr, span })
             }
 
             ParsedStatement::TypeAnnotation {

@@ -5,6 +5,7 @@ use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
 use crate::parser::Literal;
+use crate::parser::core_expr::CoreKindExpr;
 use crate::parser::parsed_expr::ParsedMatchArm;
 use crate::parser::parsed_expr::*;
 
@@ -427,7 +428,7 @@ impl Parser<'_> {
 
     // -- kind expressions
 
-    fn parse_kind_expression(&mut self) -> FogResult<ParsedKindExpr> {
+    fn parse_kind_expression(&mut self) -> FogResult<CoreKindExpr> {
         let start_span = self.peek().span;
 
         loop {
@@ -438,7 +439,7 @@ impl Parser<'_> {
 
                 let rhs = self.parse_kind_expression()?;
 
-                return Ok(ParsedKindExpr::Function {
+                return Ok(CoreKindExpr::Function {
                     param_kind: atom.into(),
                     return_kind: rhs.into(),
                     span: start_span,
@@ -449,19 +450,19 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_atomic_kind(&mut self) -> FogResult<ParsedKindExpr> {
+    fn parse_atomic_kind(&mut self) -> FogResult<CoreKindExpr> {
         let token = self.peek().clone();
         let span = token.span;
 
         match token.kind {
             TokenKind::Identifier(name) if name == "Type" => {
                 self.next();
-                Ok(ParsedKindExpr::Type { span })
+                Ok(CoreKindExpr::Type { span })
             }
 
             TokenKind::Identifier(name) if name == "Constraint" => {
                 self.next();
-                Ok(ParsedKindExpr::Constraint { span })
+                Ok(CoreKindExpr::Constraint { span })
             }
 
             TokenKind::LeftParenthesis => {
