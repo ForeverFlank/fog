@@ -298,7 +298,25 @@ pub enum CoreTypeExpr {
 }
 
 impl Display for CoreTypeExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {}
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CoreTypeExpr::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+
+            CoreTypeExpr::Product { types, .. } => {
+                write!(f, "{}", format_joined(types, " * "))
+            }
+
+            CoreTypeExpr::FunctionAppl { callee, arg, .. } => {
+                fmt_parenthesized(f, callee.as_ref())?;
+                write!(f, " ")?;
+                fmt_parenthesized(f, arg.as_ref())
+            }
+
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -316,6 +334,22 @@ pub enum CoreAtomicTypeExpr {
         arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
+}
+
+impl CoreAtomicTypeExpr {
+    pub fn to_type_expr(self) -> CoreTypeExpr {
+        match self {
+            CoreAtomicTypeExpr::Identifier { name, span } => {
+                CoreTypeExpr::Identifier { name, span }
+            }
+
+            CoreAtomicTypeExpr::Product { types, span } => CoreTypeExpr::Product { types, span },
+
+            CoreAtomicTypeExpr::FunctionAppl { callee, arg, span } => {
+                CoreTypeExpr::FunctionAppl { callee, arg, span }
+            }
+        }
+    }
 }
 
 impl Display for CoreAtomicTypeExpr {
@@ -345,7 +379,15 @@ pub struct CoreDataConstructor {
 }
 
 impl Display for CoreDataConstructor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {}
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.tag)?;
+
+        for r#type in &self.types {
+            write!(f, " {}", r#type)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -364,7 +406,7 @@ pub enum CoreExpr {
     },
     Lambda {
         param_name: String,
-        param_type: Box<CoreExpr>,
+        param_type: Box<CoreTypeExpr>,
         body: Box<CoreExpr>,
         span: Span,
     },
