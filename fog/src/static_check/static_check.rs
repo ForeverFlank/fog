@@ -311,7 +311,7 @@ fn block_expr_type_of(
     for stmt in statements {
         match stmt {
             CoreStatement::KindAnnotation { name, expr, span } => {
-                let kind = eval_kind_expr(expr, &block_env)?;
+                let kind = eval_kind_expr(expr)?;
                 block_env.annotate_kind(name, kind, span)?;
             }
 

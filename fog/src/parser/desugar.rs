@@ -190,7 +190,7 @@ fn desugar_statements(
             match_expr,
             |body, (param_name, param_type)| CoreExpr::Lambda {
                 param_name,
-                param_type: param_type.into(),
+                param_type,
                 body: body.into(),
                 span,
             },
@@ -214,7 +214,7 @@ fn find_fn_clause_param_types(
     fn_name: &str,
     arity: usize,
     span: Span,
-) -> FogResult<Vec<CoreTypeExpr>> {
+) -> FogResult<Vec<CoreAtomicTypeExpr>> {
     let mut remaining_type = statements
         .iter()
         .find_map(|stmt| match stmt {
@@ -268,7 +268,7 @@ fn find_fn_clause_param_types(
             return Err(arity_error());
         }
 
-        param_types.push((*param_type).to_type_expr());
+        param_types.push(*param_type);
         remaining_type = *return_type;
     }
 
@@ -417,7 +417,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
             span,
         } => Ok(CoreExpr::Lambda {
             param_name,
-            param_type: desugar_type_expr(*param_type)?.into(),
+            param_type: desugar_atomic_type_expr(*param_type)?,
             body: desugar_expr((*body).clone())?.into(),
             span,
         }),

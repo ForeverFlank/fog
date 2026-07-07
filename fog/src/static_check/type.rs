@@ -115,12 +115,6 @@ impl fmt::Display for DataConstructor {
 
 // --- functions ---
 
-pub fn nest_function_types(field_types: &Vec<Type>, return_type: Type) -> Type {
-    field_types.iter().rev().fold(return_type, |ret, ft| {
-        Type::Function(ft.clone().into(), ret.into())
-    })
-}
-
 pub fn kind_of(r#type: &Type) -> Kind {
     match r#type {
         Type::Function(_, _) => Kind::Function(

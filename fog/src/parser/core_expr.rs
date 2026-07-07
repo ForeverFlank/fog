@@ -308,6 +308,17 @@ impl CoreTypeExpr {
             | CoreTypeExpr::Sum { span, .. } => *span,
         }
     }
+
+    pub fn uncurry(&self) -> (&CoreAtomicTypeExpr, Vec<&CoreAtomicTypeExpr>) {
+        let CoreTypeExpr::FunctionAppl { callee, arg, .. } = self else {
+            unreachable!("uncurry called on a non-application CoreTypeExpr");
+        };
+
+        let (head, mut args) = callee.uncurry();
+        args.push(arg.as_ref());
+
+        (head, args)
+    }
 }
 
 impl Display for CoreTypeExpr {
@@ -356,6 +367,20 @@ impl CoreAtomicTypeExpr {
             | CoreAtomicTypeExpr::FunctionAppl { span, .. }
             | CoreAtomicTypeExpr::Product { span, .. } => *span,
         }
+    }
+
+    pub fn uncurry(&self) -> (&CoreAtomicTypeExpr, Vec<&CoreAtomicTypeExpr>) {
+        let mut args = Vec::new();
+        let mut head = self;
+
+        while let CoreAtomicTypeExpr::FunctionAppl { callee, arg, .. } = head {
+            args.push(arg.as_ref());
+            head = callee.as_ref();
+        }
+
+        args.reverse();
+
+        (head, args)
     }
 }
 
@@ -429,7 +454,7 @@ pub enum CoreExpr {
     },
     Lambda {
         param_name: String,
-        param_type: Box<CoreTypeExpr>,
+        param_type: CoreAtomicTypeExpr,
         body: Box<CoreExpr>,
         span: Span,
     },

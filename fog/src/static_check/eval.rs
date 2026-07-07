@@ -41,7 +41,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
         CoreAtomicTypeExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
-            let CoreExpr::Identifier { name, .. } = head else {
+            let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
                 return Err(static_check_error!(
                     Some(span),
                     "cannot type annotate a value with data constructor `{}`",
@@ -93,7 +93,7 @@ pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type>
         CoreTypeExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
-            let CoreTypeExpr::Identifier { name, .. } = head else {
+            let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
                 return Err(static_check_error!(
                     Some(span),
                     "`{}` is not a valid type definition",
@@ -131,7 +131,11 @@ pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type>
     }
 }
 
-fn eval_product_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
+fn eval_product_type(
+    left: &CoreAtomicTypeExpr,
+    right: &CoreAtomicTypeExpr,
+    env: &Environment,
+) -> FogResult<Type> {
     let left = eval_atomic_type_expr(left, env)?;
     let right = eval_atomic_type_expr(right, env)?;
 
@@ -149,16 +153,24 @@ fn eval_product_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> Fo
     Ok(Type::Product(types))
 }
 
-fn eval_function_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
+fn eval_function_type(
+    left: &CoreAtomicTypeExpr,
+    right: &CoreAtomicTypeExpr,
+    env: &Environment,
+) -> FogResult<Type> {
     let left = eval_atomic_type_expr(left, env)?;
     let right = eval_atomic_type_expr(right, env)?;
 
     Ok(Type::Function(left.into(), right.into()))
 }
 
-fn eval_sum_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogResult<Type> {
-    let left = eval_type_expr(left, env)?;
-    let right = eval_type_expr(right, env)?;
+fn eval_sum_type(
+    left: &CoreAtomicTypeExpr,
+    right: &CoreAtomicTypeExpr,
+    env: &Environment,
+) -> FogResult<Type> {
+    let left = eval_atomic_type_expr(left, env)?;
+    let right = eval_atomic_type_expr(right, env)?;
 
     let Type::Sum(ctors1) = left else {
         return Err(static_check_error!(
@@ -180,7 +192,7 @@ fn eval_sum_type(left: &CoreExpr, right: &CoreExpr, env: &Environment) -> FogRes
 
 pub fn apply_type_level_function(
     fn_name: &str,
-    args: &Vec<&CoreExpr>,
+    args: &Vec<&CoreAtomicTypeExpr>,
     env: &Environment,
     span: &Span,
 ) -> FogResult<Type> {
