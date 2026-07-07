@@ -586,13 +586,13 @@ impl Parser<'_> {
 
     fn parse_application_type_expr(&mut self) -> FogResult<CoreAtomicTypeExpr> {
         let start_span = self.peek().span;
-        let mut callee = self.parse_atomic_type_expr()?;
+        let mut callee = self.parse_primary_type_expr()?;
 
         while matches!(
             self.peek().kind,
             TokenKind::Identifier(_) | TokenKind::LeftParenthesis
         ) {
-            let arg = self.parse_atomic_type_expr()?;
+            let arg = self.parse_primary_type_expr()?;
             let span = Span::merge(start_span, arg.span());
 
             callee = CoreAtomicTypeExpr::FunctionAppl {
@@ -603,5 +603,37 @@ impl Parser<'_> {
         }
 
         Ok(callee)
+    }
+
+    fn parse_primary_type_expr(&mut self) -> FogResult<CoreAtomicTypeExpr> {
+        let token = self.peek().clone();
+        let span = token.span;
+
+        match token.kind {
+            TokenKind::Identifier(name) => {
+                self.next();
+                Ok(CoreAtomicTypeExpr::Identifier { name, span })
+            }
+
+            TokenKind::LeftParenthesis => {
+                self.next();
+                let expr = self.parse_atomic_type_expr()?;
+
+                if let TokenKind::RightParenthesis = self.peek().kind {
+                    self.next();
+                    Ok(expr)
+                } else {
+                    Err(parse_error!(Some(span), "expected `)`"))
+                }
+            }
+
+            _ => {
+                self.next();
+                Err(parse_error!(
+                    Some(span),
+                    "expected a type identifier or `(`"
+                ))
+            }
+        }
     }
 }

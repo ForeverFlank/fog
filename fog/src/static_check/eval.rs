@@ -64,10 +64,33 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
     let span = expr.span();
 
     match expr {
-        CoreAtomicTypeExpr::Identifier { name, .. } => env
-            .get_type_var(name, &span)?
-            .r#type
-            .ok_or_else(|| static_check_error!(Some(span), "undeclared type `{}`", name)),
+        CoreAtomicTypeExpr::Identifier { name, .. } => {
+            if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
+                Ok(r#type)
+            } else {
+                Err(static_check_error!(Some(span), "undeclared type `{name}`"))
+            }
+        }
+
+        CoreAtomicTypeExpr::Function {
+            param_type,
+            return_type,
+            ..
+        } => {
+            let param_type = eval_atomic_type_expr(param_type, env)?;
+            let return_type = eval_atomic_type_expr(return_type, env)?;
+
+            Ok(Type::Function(param_type.into(), return_type.into()))
+        }
+
+        CoreAtomicTypeExpr::Product { types, .. } => {
+            let types = types
+                .into_iter()
+                .map(|t| eval_atomic_type_expr(t, env))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(Type::Product(types))
+        }
 
         CoreAtomicTypeExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
@@ -81,14 +104,6 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             };
 
             match (name.as_str(), args.as_slice()) {
-                ("->", &[lhs, rhs]) => eval_function_type(lhs, rhs, env),
-                ("*", &[lhs, rhs]) => eval_product_type(lhs, rhs, env),
-
-                ("+", _) => Err(static_check_error!(
-                    Some(span),
-                    "cannot type annotate a value with sum types"
-                )),
-
                 _ if env.contains_type(name) => apply_type_level_function(name, &args, env, &span),
 
                 _ => Err(static_check_error!(
@@ -98,46 +113,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
                 )),
             }
         }
-
-        _ => Err(static_check_error!(
-            Some(span),
-            "`{}` is not a type",
-            expr.to_string()
-        )),
     }
-}
-
-fn eval_product_type(
-    left: &CoreAtomicTypeExpr,
-    right: &CoreAtomicTypeExpr,
-    env: &Environment,
-) -> FogResult<Type> {
-    let left = eval_atomic_type_expr(left, env)?;
-    let right = eval_atomic_type_expr(right, env)?;
-
-    let mut types = Vec::new();
-
-    match left {
-        Type::Product(ts) => types.extend(ts),
-        t => types.push(t),
-    }
-    match right {
-        Type::Product(ts) => types.extend(ts),
-        t => types.push(t),
-    }
-
-    Ok(Type::Product(types))
-}
-
-fn eval_function_type(
-    left: &CoreAtomicTypeExpr,
-    right: &CoreAtomicTypeExpr,
-    env: &Environment,
-) -> FogResult<Type> {
-    let left = eval_atomic_type_expr(left, env)?;
-    let right = eval_atomic_type_expr(right, env)?;
-
-    Ok(Type::Function(left.into(), right.into()))
 }
 
 pub fn apply_type_level_function(

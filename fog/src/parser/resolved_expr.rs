@@ -9,6 +9,7 @@ use crate::parser::core_expr::CoreKindExpr;
 use crate::parser::core_expr::CoreTypeExpr;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
+use crate::util::indent;
 
 // --- statements ---
 
@@ -254,7 +255,7 @@ impl Display for ResolvedExpr {
             ResolvedExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
                 for stmt in statements {
-                    write!(f, "    {}\n", stmt)?;
+                    write!(f, "{}\n", indent(&stmt.to_string()))?;
                 }
                 write!(f, "}}")
             }
@@ -284,7 +285,11 @@ impl Display for ResolvedExpr {
             } => {
                 write!(f, "match {scrutinee} {{\n")?;
                 for arm in match_arms {
-                    write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;
+                    write!(
+                        f,
+                        "{}\n",
+                        indent(&format!("{} => {}", arm.pattern, arm.value_expr))
+                    )?;
                 }
                 write!(f, "}}")
             }

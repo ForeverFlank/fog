@@ -21,8 +21,8 @@ fn collect_stmt_to_anf(
 ) {
     match stmt {
         CoreStatement::VarDeclaration { pattern, expr, .. } => {
-            let expr = parse_expr_to_anf(expr, collected_anf, var_counter);
-            let anf = ANFExpr::Declaration(pattern.clone(), expr.into());
+            let anf_expr = parse_expr_to_anf(expr, collected_anf, var_counter);
+            let anf = ANFExpr::Declaration(pattern.clone(), anf_expr.into());
             collected_anf.push(anf);
         }
 
@@ -42,31 +42,13 @@ fn parse_expr_to_anf(
     var_counter: &mut i32,
 ) -> ANFExpr {
     match expr {
-        // atomic
-        CoreExpr::Identifier { .. }
+        CoreExpr::Block { .. }
+        | CoreExpr::Identifier { .. }
         | CoreExpr::Literal { .. }
         | CoreExpr::Lambda { .. }
         | CoreExpr::Tuple { .. }
         | CoreExpr::Match { .. } => {
             ANFExpr::Atomic(parse_expr_to_atomic(expr, collected_anf, var_counter))
-        }
-
-        // not atomic
-        CoreExpr::Block { statements, .. } => {
-            let (last, stmts) = statements.split_last().unwrap();
-
-            for stmt in stmts.iter() {
-                collect_stmt_to_anf(stmt, collected_anf, var_counter);
-            }
-
-            let CoreStatement::Expression {
-                expr: last_expr, ..
-            } = last
-            else {
-                unreachable!()
-            };
-
-            parse_expr_to_anf(last_expr, collected_anf, var_counter)
         }
 
         CoreExpr::FunctionAppl { callee, arg, .. } => {
@@ -85,28 +67,39 @@ fn parse_expr_to_atomic(
 ) -> AtomicExpr {
     match expr {
         // atomic -- trivial parse
-        CoreExpr::Identifier { name, .. } => AtomicExpr::Identifier { name: name.clone() },
+        CoreExpr::Identifier { name, span } => AtomicExpr::Identifier {
+            name: name.clone(),
+            span: *span,
+        },
 
-        CoreExpr::Literal { literal, .. } => AtomicExpr::Literal {
+        CoreExpr::Literal { literal, span } => AtomicExpr::Literal {
             literal: literal.clone(),
+            span: *span,
         },
 
         CoreExpr::Lambda {
-            param_name, body, ..
+            param_name,
+            body,
+            span,
+            ..
         } => AtomicExpr::Lambda {
             param_name: param_name.clone(),
             body: parse_expr_to_anf(body, collected_anf, var_counter).into(),
+            span: *span,
         },
 
-        CoreExpr::Tuple { items, .. } => AtomicExpr::Tuple {
+        CoreExpr::Tuple { items, span } => AtomicExpr::Tuple {
             items: items
                 .into_iter()
                 .map(|item| parse_expr_to_anf(item, collected_anf, var_counter))
                 .collect(),
+            span: *span,
         },
 
         CoreExpr::Match {
-            scrutinee, arms, ..
+            scrutinee,
+            arms,
+            span,
         } => AtomicExpr::Match {
             scrutinee: parse_expr_to_atomic(scrutinee, collected_anf, var_counter).into(),
             arms: arms
@@ -117,14 +110,16 @@ fn parse_expr_to_atomic(
                     (pattern, value_expr)
                 })
                 .collect::<Vec<_>>(),
+            span: *span,
         },
 
-        // not atomic -- need ANF trickeries
-        CoreExpr::Block { statements, .. } => {
+        CoreExpr::Block { statements, span } => {
+            let mut block_collected_anf = Vec::new();
+
             let (last, stmts) = statements.split_last().unwrap();
 
             for stmt in stmts.iter() {
-                collect_stmt_to_anf(stmt, collected_anf, var_counter);
+                collect_stmt_to_anf(stmt, &mut block_collected_anf, var_counter);
             }
 
             let CoreStatement::Expression {
@@ -134,7 +129,13 @@ fn parse_expr_to_atomic(
                 unreachable!()
             };
 
-            parse_expr_to_atomic(last_expr, collected_anf, var_counter)
+            let last_anf = parse_expr_to_anf(last_expr, collected_anf, var_counter);
+            block_collected_anf.push(last_anf);
+
+            AtomicExpr::Block {
+                anfs: block_collected_anf,
+                span: *span,
+            }
         }
 
         CoreExpr::FunctionAppl { callee, arg, span } => {
@@ -150,7 +151,10 @@ fn parse_expr_to_atomic(
             let let_expr = ANFExpr::Declaration(let_pattern, anf.into());
             collected_anf.push(let_expr.clone());
 
-            AtomicExpr::Identifier { name: let_name }
+            AtomicExpr::Identifier {
+                name: let_name,
+                span: *span,
+            }
         }
     }
 }

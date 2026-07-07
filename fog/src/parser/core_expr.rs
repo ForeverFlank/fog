@@ -5,6 +5,7 @@ use crate::error::Span;
 use crate::parser::Literal;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
+use crate::util::indent;
 
 // --- statements ---
 
@@ -227,7 +228,7 @@ impl Display for CoreKindExpr {
                 ..
             } => {
                 fmt_parenthesized(f, param_kind)?;
-                write!(f, " -> ");
+                write!(f, " -> ")?;
                 fmt_parenthesized(f, return_kind)
             }
         }
@@ -249,17 +250,6 @@ impl CoreTypeExpr {
             CoreTypeExpr::Atomic(expr) => expr.span(),
             CoreTypeExpr::Sum { span, .. } => *span,
         }
-    }
-
-    pub fn uncurry(&self) -> (&CoreAtomicTypeExpr, Vec<&CoreAtomicTypeExpr>) {
-        let Self::Atomic(CoreAtomicTypeExpr::FunctionAppl { callee, arg, .. }) = self else {
-            unreachable!("uncurry called on a non-application CoreTypeExpr");
-        };
-
-        let (head, mut args) = callee.uncurry();
-        args.push(arg.as_ref());
-
-        (head, args)
     }
 }
 
@@ -420,20 +410,6 @@ impl CoreExpr {
             | CoreExpr::Match { span, .. } => *span,
         }
     }
-
-    pub fn uncurry(&self) -> (&CoreExpr, Vec<&CoreExpr>) {
-        let mut args = Vec::new();
-        let mut head = self;
-
-        while let CoreExpr::FunctionAppl { callee, arg, .. } = head {
-            args.push(arg.as_ref());
-            head = callee.as_ref();
-        }
-
-        args.reverse();
-
-        (head, args)
-    }
 }
 
 #[derive(Clone)]
@@ -448,7 +424,7 @@ impl Display for CoreExpr {
             CoreExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
                 for stmt in statements {
-                    write!(f, "    {}\n", stmt)?;
+                    write!(f, "{}\n", indent(&stmt.to_string()))?;
                 }
                 write!(f, "}}")
             }
@@ -483,7 +459,11 @@ impl Display for CoreExpr {
                 write!(f, "match {scrutinee} {{\n")?;
 
                 for arm in arms {
-                    write!(f, "    {} => {}\n", arm.pattern, arm.value_expr)?;
+                    write!(
+                        f,
+                        "{}\n",
+                        indent(&format!("{} => {}", arm.pattern, arm.value_expr))
+                    )?;
                 }
 
                 write!(f, "}}")

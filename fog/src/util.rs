@@ -17,3 +17,10 @@ pub fn fmt_parenthesized<T: Display>(f: &mut fmt::Formatter<'_>, expr: &T) -> fm
         write!(f, "{s}")
     }
 }
+
+pub fn indent(s: &str) -> String {
+    s.lines()
+        .map(|line| format!("    {line}"))
+        .collect::<Vec<String>>()
+        .join("\n")
+}

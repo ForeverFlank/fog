@@ -12,6 +12,7 @@ use crate::parser::core_expr::CoreKindExpr;
 use crate::parser::core_expr::CoreTypeExpr;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
+use crate::util::indent;
 
 // --- statement ---
 
@@ -93,17 +94,6 @@ pub enum ParsedDeclPattern {
         items: Vec<ParsedDeclPattern>,
         span: Span,
     },
-}
-
-impl ParsedDeclPattern {
-    pub fn span(&self) -> Span {
-        match self {
-            ParsedDeclPattern::Identifier { span, .. }
-            | ParsedDeclPattern::Literal { span, .. }
-            | ParsedDeclPattern::Tuple { span, .. }
-            | ParsedDeclPattern::Collection { span, .. } => *span,
-        }
-    }
 }
 
 impl Display for ParsedDeclPattern {
@@ -282,7 +272,7 @@ impl Display for ParsedValueExpr {
             ParsedValueExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
                 for stmt in statements {
-                    write!(f, "    {}\n", stmt)?;
+                    write!(f, "{}\n", indent(&stmt.to_string()))?;
                 }
                 write!(f, "}}")
             }
@@ -315,9 +305,13 @@ impl Display for ParsedValueExpr {
                 match_arms,
                 ..
             } => {
-                write!(f, "match {scrutinee} {{")?;
+                write!(f, "match {scrutinee} {{\n")?;
                 for arm in match_arms {
-                    write!(f, "    {} => {}", arm.pattern, arm.value_expr)?;
+                    write!(
+                        f,
+                        "{}\n",
+                        indent(&format!("{} => {}", arm.pattern, arm.value_expr))
+                    )?;
                 }
                 write!(f, "}}")
             }
