@@ -23,7 +23,7 @@ pub enum CoreStatement {
 
     TypeAnnotation {
         name: String,
-        expr: CoreTypeAtomExpr,
+        expr: CoreAtomicTypeExpr,
         span: Span,
     },
     VarDeclaration {
@@ -285,12 +285,12 @@ pub enum CoreTypeExpr {
         span: Span,
     },
     FunctionAppl {
-        callee: Box<CoreTypeAtomExpr>,
-        arg: Box<CoreTypeAtomExpr>,
+        callee: Box<CoreAtomicTypeExpr>,
+        arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
     Product {
-        types: Vec<CoreTypeAtomExpr>,
+        types: Vec<CoreAtomicTypeExpr>,
         span: Span,
     },
     Sum {
@@ -309,7 +309,7 @@ impl CoreTypeExpr {
         }
     }
 
-    pub fn uncurry(&self) -> (&CoreTypeAtomExpr, Vec<&CoreTypeAtomExpr>) {
+    pub fn uncurry(&self) -> (&CoreAtomicTypeExpr, Vec<&CoreAtomicTypeExpr>) {
         let CoreTypeExpr::FunctionAppl { callee, arg, .. } = self else {
             unreachable!("uncurry called on a non-application CoreTypeExpr");
         };
@@ -346,36 +346,36 @@ impl Display for CoreTypeExpr {
 }
 
 #[derive(Clone)]
-pub enum CoreTypeAtomExpr {
+pub enum CoreAtomicTypeExpr {
     Identifier {
         name: String,
         span: Span,
     },
     Product {
-        types: Vec<CoreTypeAtomExpr>,
+        types: Vec<CoreAtomicTypeExpr>,
         span: Span,
     },
     FunctionAppl {
-        callee: Box<CoreTypeAtomExpr>,
-        arg: Box<CoreTypeAtomExpr>,
+        callee: Box<CoreAtomicTypeExpr>,
+        arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
 }
 
-impl CoreTypeAtomExpr {
+impl CoreAtomicTypeExpr {
     pub fn span(&self) -> Span {
         match self {
-            CoreTypeAtomExpr::Identifier { span, .. }
-            | CoreTypeAtomExpr::FunctionAppl { span, .. }
-            | CoreTypeAtomExpr::Product { span, .. } => *span,
+            CoreAtomicTypeExpr::Identifier { span, .. }
+            | CoreAtomicTypeExpr::FunctionAppl { span, .. }
+            | CoreAtomicTypeExpr::Product { span, .. } => *span,
         }
     }
 
-    pub fn uncurry(&self) -> (&CoreTypeAtomExpr, Vec<&CoreTypeAtomExpr>) {
+    pub fn uncurry(&self) -> (&CoreAtomicTypeExpr, Vec<&CoreAtomicTypeExpr>) {
         let mut args = Vec::new();
         let mut head = self;
 
-        while let CoreTypeAtomExpr::FunctionAppl { callee, arg, .. } = head {
+        while let CoreAtomicTypeExpr::FunctionAppl { callee, arg, .. } = head {
             args.push(arg.as_ref());
             head = callee.as_ref();
         }
@@ -386,32 +386,34 @@ impl CoreTypeAtomExpr {
     }
 }
 
-impl CoreTypeAtomExpr {
+impl CoreAtomicTypeExpr {
     pub fn to_type_expr(self) -> CoreTypeExpr {
         match self {
-            CoreTypeAtomExpr::Identifier { name, span } => CoreTypeExpr::Identifier { name, span },
+            CoreAtomicTypeExpr::Identifier { name, span } => {
+                CoreTypeExpr::Identifier { name, span }
+            }
 
-            CoreTypeAtomExpr::Product { types, span } => CoreTypeExpr::Product { types, span },
+            CoreAtomicTypeExpr::Product { types, span } => CoreTypeExpr::Product { types, span },
 
-            CoreTypeAtomExpr::FunctionAppl { callee, arg, span } => {
+            CoreAtomicTypeExpr::FunctionAppl { callee, arg, span } => {
                 CoreTypeExpr::FunctionAppl { callee, arg, span }
             }
         }
     }
 }
 
-impl Display for CoreTypeAtomExpr {
+impl Display for CoreAtomicTypeExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreTypeAtomExpr::Identifier { name, .. } => {
+            CoreAtomicTypeExpr::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
 
-            CoreTypeAtomExpr::Product { types, .. } => {
+            CoreAtomicTypeExpr::Product { types, .. } => {
                 write!(f, "{}", format_joined(types, " * "))
             }
 
-            CoreTypeAtomExpr::FunctionAppl { callee, arg, .. } => {
+            CoreAtomicTypeExpr::FunctionAppl { callee, arg, .. } => {
                 fmt_parenthesized(f, callee.as_ref())?;
                 write!(f, " ")?;
                 fmt_parenthesized(f, arg.as_ref())
@@ -423,7 +425,7 @@ impl Display for CoreTypeAtomExpr {
 #[derive(Clone)]
 pub struct CoreDataConstructor {
     pub tag: String,
-    pub types: Vec<CoreTypeAtomExpr>,
+    pub types: Vec<CoreAtomicTypeExpr>,
 }
 
 impl Display for CoreDataConstructor {
@@ -454,7 +456,7 @@ pub enum CoreExpr {
     },
     Lambda {
         param_name: String,
-        param_type: CoreTypeAtomExpr,
+        param_type: CoreAtomicTypeExpr,
         body: Box<CoreExpr>,
         span: Span,
     },

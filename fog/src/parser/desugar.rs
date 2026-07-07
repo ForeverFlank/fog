@@ -4,13 +4,13 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parse_error;
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
-use crate::parser::core_expr::CoreTypeAtomExpr;
 use crate::parser::core_expr::CoreTypeExpr;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
@@ -214,7 +214,7 @@ fn find_fn_clause_param_types(
     fn_name: &str,
     arity: usize,
     span: Span,
-) -> FogResult<Vec<CoreTypeAtomExpr>> {
+) -> FogResult<Vec<CoreAtomicTypeExpr>> {
     let mut remaining_type = statements
         .iter()
         .find_map(|stmt| match stmt {
@@ -242,7 +242,7 @@ fn find_fn_clause_param_types(
             )
         };
 
-        let CoreTypeAtomExpr::FunctionAppl {
+        let CoreAtomicTypeExpr::FunctionAppl {
             callee,
             arg: return_type,
             ..
@@ -251,7 +251,7 @@ fn find_fn_clause_param_types(
             return Err(arity_error());
         };
 
-        let CoreTypeAtomExpr::FunctionAppl {
+        let CoreAtomicTypeExpr::FunctionAppl {
             callee: op,
             arg: param_type,
             ..
@@ -260,7 +260,7 @@ fn find_fn_clause_param_types(
             return Err(arity_error());
         };
 
-        let CoreTypeAtomExpr::Identifier { name: op_name, .. } = *op else {
+        let CoreAtomicTypeExpr::Identifier { name: op_name, .. } = *op else {
             return Err(arity_error());
         };
 
@@ -296,7 +296,7 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
         ResolvedStatement::TypeAnnotation { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::TypeAnnotation {
                 name,
-                expr: desugar_type_atom_expr(expr)?,
+                expr: desugar_atomic_type_expr(expr)?,
                 span,
             }))
         }
@@ -386,13 +386,13 @@ fn desugar_type_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreTypeExpr> {
         return Ok(CoreTypeExpr::Product {
             types: operands
                 .into_iter()
-                .map(|e| desugar_type_atom_expr(e.clone()))
+                .map(|e| desugar_atomic_type_expr(e.clone()))
                 .collect::<Result<_, _>>()?,
             span,
         });
     }
 
-    Ok(desugar_type_atom_expr(resolved_expr)?.to_type_expr())
+    Ok(desugar_atomic_type_expr(resolved_expr)?.to_type_expr())
 }
 
 fn flatten_operator<'a>(op: &str, expr: &'a ResolvedExpr) -> Option<Vec<&'a ResolvedExpr>> {
@@ -417,21 +417,23 @@ fn flatten_operator<'a>(op: &str, expr: &'a ResolvedExpr) -> Option<Vec<&'a Reso
     Some(operands)
 }
 
-fn desugar_type_atom_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreTypeAtomExpr> {
+fn desugar_atomic_type_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreAtomicTypeExpr> {
     match resolved_expr {
-        ResolvedExpr::Identifier { name, span } => Ok(CoreTypeAtomExpr::Identifier { name, span }),
+        ResolvedExpr::Identifier { name, span } => {
+            Ok(CoreAtomicTypeExpr::Identifier { name, span })
+        }
 
-        ResolvedExpr::Tuple { items, span } => Ok(CoreTypeAtomExpr::Product {
+        ResolvedExpr::Tuple { items, span } => Ok(CoreAtomicTypeExpr::Product {
             types: items
                 .into_iter()
-                .map(desugar_type_atom_expr)
+                .map(desugar_atomic_type_expr)
                 .collect::<Result<Vec<_>, _>>()?,
             span,
         }),
 
-        ResolvedExpr::FunctionAppl { callee, arg, span } => Ok(CoreTypeAtomExpr::FunctionAppl {
-            callee: desugar_type_atom_expr(*callee)?.into(),
-            arg: desugar_type_atom_expr(*arg)?.into(),
+        ResolvedExpr::FunctionAppl { callee, arg, span } => Ok(CoreAtomicTypeExpr::FunctionAppl {
+            callee: desugar_atomic_type_expr(*callee)?.into(),
+            arg: desugar_atomic_type_expr(*arg)?.into(),
             span,
         }),
 
@@ -459,7 +461,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
             span,
         } => Ok(CoreExpr::Lambda {
             param_name,
-            param_type: desugar_type_atom_expr(*param_type)?,
+            param_type: desugar_atomic_type_expr(*param_type)?,
             body: desugar_expr((*body).clone())?.into(),
             span,
         }),

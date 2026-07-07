@@ -29,7 +29,7 @@ pub enum ParsedStatement {
 
     TypeAnnotation {
         pattern: ParsedDeclPattern,
-        expr: ParsedTypeAtomExpr,
+        expr: ParsedAtomicTypeExpr,
         span: Span,
     },
     VarDeclaration {
@@ -176,7 +176,7 @@ impl OpKind {
 
 #[derive(Clone)]
 pub enum ParsedTypeExpr {
-    Atomic(ParsedTypeAtomExpr),
+    Atomic(ParsedAtomicTypeExpr),
     Sum {
         ctors: Vec<ParsedDataConstructor>,
         span: Span,
@@ -204,7 +204,7 @@ impl Display for ParsedTypeExpr {
 #[derive(Clone)]
 pub struct ParsedDataConstructor {
     pub tag: String,
-    pub types: Vec<ParsedTypeAtomExpr>,
+    pub types: Vec<ParsedAtomicTypeExpr>,
 }
 
 impl Display for ParsedDataConstructor {
@@ -222,42 +222,42 @@ impl Display for ParsedDataConstructor {
 // -- type atom expresions
 
 #[derive(Clone)]
-pub enum ParsedTypeAtomExpr {
+pub enum ParsedAtomicTypeExpr {
     Identifier {
         name: String,
         span: Span,
     },
     Function {
-        param_type: Box<ParsedTypeAtomExpr>,
-        return_type: Box<ParsedTypeAtomExpr>,
+        param_type: Box<ParsedAtomicTypeExpr>,
+        return_type: Box<ParsedAtomicTypeExpr>,
         span: Span,
     },
     Product {
-        types: Vec<ParsedTypeAtomExpr>,
+        types: Vec<ParsedAtomicTypeExpr>,
         span: Span,
     },
     FunctionAppl {
-        callee: Box<ParsedTypeAtomExpr>,
-        arg: Box<ParsedTypeAtomExpr>,
+        callee: Box<ParsedAtomicTypeExpr>,
+        arg: Box<ParsedAtomicTypeExpr>,
         span: Span,
     },
 }
 
-impl ParsedTypeAtomExpr {
+impl ParsedAtomicTypeExpr {
     pub fn span(&self) -> Span {
         match self {
-            ParsedTypeAtomExpr::Identifier { span, .. }
-            | ParsedTypeAtomExpr::Function { span, .. }
-            | ParsedTypeAtomExpr::Product { span, .. }
-            | ParsedTypeAtomExpr::FunctionAppl { span, .. } => *span,
+            ParsedAtomicTypeExpr::Identifier { span, .. }
+            | ParsedAtomicTypeExpr::Function { span, .. }
+            | ParsedAtomicTypeExpr::Product { span, .. }
+            | ParsedAtomicTypeExpr::FunctionAppl { span, .. } => *span,
         }
     }
 
-    pub fn uncurry(self) -> (ParsedTypeAtomExpr, Vec<ParsedTypeAtomExpr>) {
+    pub fn uncurry(self) -> (ParsedAtomicTypeExpr, Vec<ParsedAtomicTypeExpr>) {
         let mut args = Vec::new();
         let mut head = self;
 
-        while let ParsedTypeAtomExpr::FunctionAppl { callee, arg, .. } = head {
+        while let ParsedAtomicTypeExpr::FunctionAppl { callee, arg, .. } = head {
             args.push(*arg);
             head = *callee;
         }
@@ -267,14 +267,14 @@ impl ParsedTypeAtomExpr {
     }
 }
 
-impl Display for ParsedTypeAtomExpr {
+impl Display for ParsedAtomicTypeExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParsedTypeAtomExpr::Identifier { name, .. } => {
+            ParsedAtomicTypeExpr::Identifier { name, .. } => {
                 write!(f, "{name}")
             }
 
-            ParsedTypeAtomExpr::Function {
+            ParsedAtomicTypeExpr::Function {
                 param_type,
                 return_type,
                 ..
@@ -284,11 +284,11 @@ impl Display for ParsedTypeAtomExpr {
                 fmt_parenthesized(f, return_type)
             }
 
-            ParsedTypeAtomExpr::Product { types, .. } => {
+            ParsedAtomicTypeExpr::Product { types, .. } => {
                 write!(f, "{}", format_joined(types, " * "))
             }
 
-            ParsedTypeAtomExpr::FunctionAppl { callee, arg, .. } => {
+            ParsedAtomicTypeExpr::FunctionAppl { callee, arg, .. } => {
                 fmt_parenthesized(f, callee)?;
                 write!(f, " ")?;
                 fmt_parenthesized(f, arg)
@@ -319,7 +319,7 @@ pub enum ParsedValueExpr {
     },
     Lambda {
         param_name: String,
-        param_type: Box<ParsedTypeAtomExpr>,
+        param_type: Box<ParsedAtomicTypeExpr>,
         body: Box<ParsedValueExpr>,
         span: Span,
     },

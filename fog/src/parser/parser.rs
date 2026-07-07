@@ -103,12 +103,12 @@ impl Parser<'_> {
                 self.next(); // :
 
                 if is_type_name(&name) {
-                    let expr = self.parse_kind_expression()?;
+                    let expr = self.parse_kind_expr()?;
                     let span = Span::merge(start_span, expr.span());
 
                     Ok(ParsedStatement::KindAnnotation { name, expr, span })
                 } else {
-                    let expr = self.parse_atomic_type_expression()?;
+                    let expr = self.parse_atomic_type_expr()?;
                     let span = Span::merge(start_span, expr.span());
 
                     Ok(ParsedStatement::TypeAnnotation {
@@ -134,12 +134,12 @@ impl Parser<'_> {
                 }
 
                 if is_type_name(&name) {
-                    let expr = self.parse_type_expression()?;
+                    let expr = self.parse_type_expr()?;
                     let span = Span::merge(start_span, expr.span());
 
                     Ok(ParsedStatement::TypeDeclaration { name, expr, span })
                 } else {
-                    let expr = self.parse_expression()?;
+                    let expr = self.parse_expr()?;
                     let span = Span::merge(start_span, expr.span());
 
                     Ok(ParsedStatement::VarDeclaration {
@@ -156,13 +156,13 @@ impl Parser<'_> {
             // either a tuple assignemt, a function clause,
             // or an final operand expression
             _ => {
-                let expr = self.parse_expression()?;
+                let expr = self.parse_expr()?;
 
                 if let TokenKind::Equal = self.peek().kind {
                     self.next();
 
                     let pattern = expr.into_decl_pattern()?;
-                    let expr = self.parse_expression()?;
+                    let expr = self.parse_expr()?;
                     let span = Span::merge(pattern.span(), expr.span());
 
                     Ok(ParsedStatement::VarDeclaration {
@@ -181,7 +181,7 @@ impl Parser<'_> {
     // --- expressions ---
     // -- normal expressions
 
-    fn parse_expression(&mut self) -> FogResult<ParsedValueExpr> {
+    fn parse_expr(&mut self) -> FogResult<ParsedValueExpr> {
         let mut args = Vec::new();
         let start_span = self.peek().span;
 
@@ -250,7 +250,7 @@ impl Parser<'_> {
                 if let TokenKind::Colon = self.peek().kind {
                     self.next();
 
-                    let param_type = self.parse_atomic_type_expression()?;
+                    let param_type = self.parse_atomic_type_expr()?;
 
                     let TokenKind::FatArrow = self.peek().kind else {
                         return Err(parse_error!(Some(self.peek().span), "expected `=>`"));
@@ -262,7 +262,7 @@ impl Parser<'_> {
                         self.next();
                     }
 
-                    let body = self.parse_expression()?;
+                    let body = self.parse_expr()?;
                     let span = Span::merge(span, body.span());
 
                     return Ok(ParsedValueExpr::Lambda {
@@ -293,7 +293,7 @@ impl Parser<'_> {
                 let mut items: Vec<ParsedValueExpr> = Vec::new();
 
                 loop {
-                    let expr = self.parse_expression()?;
+                    let expr = self.parse_expr()?;
                     items.push(expr);
 
                     match self.peek().kind {
@@ -337,7 +337,7 @@ impl Parser<'_> {
             TokenKind::Match => {
                 self.next();
 
-                let scrutinee = Box::new(self.parse_expression()?);
+                let scrutinee = Box::new(self.parse_expr()?);
 
                 let TokenKind::LeftBrace = self.peek().kind else {
                     return Err(parse_error!(Some(self.peek().span), "expected `{{`"));
@@ -379,7 +379,7 @@ impl Parser<'_> {
                 return Ok((arms, close_span));
             }
 
-            let pattern = self.parse_expression()?;
+            let pattern = self.parse_expr()?;
 
             let TokenKind::FatArrow = self.peek().kind else {
                 return Err(parse_error!(Some(self.peek().span), "expected `=>`"));
@@ -391,7 +391,7 @@ impl Parser<'_> {
                 self.next();
             }
 
-            let value_expr = self.parse_expression()?;
+            let value_expr = self.parse_expr()?;
 
             arms.push(ParsedMatchArm {
                 pattern,
@@ -432,16 +432,16 @@ impl Parser<'_> {
 
     // -- kind expressions
 
-    fn parse_kind_expression(&mut self) -> FogResult<CoreKindExpr> {
+    fn parse_kind_expr(&mut self) -> FogResult<CoreKindExpr> {
         let start_span = self.peek().span;
 
         loop {
-            let atom = self.parse_kind_atom_expression()?;
+            let atom = self.parse_kind_atom_expr()?;
 
             if let TokenKind::Arrow = self.peek().kind {
                 self.next();
 
-                let rhs = self.parse_kind_expression()?;
+                let rhs = self.parse_kind_expr()?;
 
                 return Ok(CoreKindExpr::Function {
                     param_kind: atom.into(),
@@ -454,7 +454,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_kind_atom_expression(&mut self) -> FogResult<CoreKindExpr> {
+    fn parse_kind_atom_expr(&mut self) -> FogResult<CoreKindExpr> {
         let token = self.peek().clone();
         let span = token.span;
 
@@ -471,7 +471,7 @@ impl Parser<'_> {
 
             TokenKind::LeftParenthesis => {
                 self.next();
-                let expr = self.parse_kind_expression()?;
+                let expr = self.parse_kind_expr()?;
 
                 if let TokenKind::RightParenthesis = self.peek().kind {
                     self.next();
@@ -493,9 +493,9 @@ impl Parser<'_> {
 
     // -- type expressions
 
-    fn parse_type_expression(&mut self) -> FogResult<ParsedTypeExpr> {
+    fn parse_type_expr(&mut self) -> FogResult<ParsedTypeExpr> {
         let start_span = self.peek().span;
-        let first = self.parse_atomic_type_expression()?;
+        let first = self.parse_atomic_type_expr()?;
 
         if let TokenKind::Plus = self.peek().kind {
             // expression is a sum type declaration
@@ -504,7 +504,7 @@ impl Parser<'_> {
 
             while let TokenKind::Plus = self.peek().kind {
                 self.next();
-                ctors.push(self.parse_atomic_type_expression()?);
+                ctors.push(self.parse_atomic_type_expr()?);
             }
 
             let span = Span::merge(start_span, ctors.last().unwrap().span());
@@ -512,15 +512,15 @@ impl Parser<'_> {
             let ctors = ctors
                 .into_iter()
                 .map(|ctor| match ctor {
-                    ParsedTypeAtomExpr::Identifier { name, .. } => Ok(ParsedDataConstructor {
+                    ParsedAtomicTypeExpr::Identifier { name, .. } => Ok(ParsedDataConstructor {
                         tag: name,
                         types: Vec::new(),
                     }),
 
-                    ParsedTypeAtomExpr::FunctionAppl { .. } => {
+                    ParsedAtomicTypeExpr::FunctionAppl { .. } => {
                         let (tag_expr, types) = ctor.uncurry();
 
-                        let ParsedTypeAtomExpr::Identifier { name, .. } = tag_expr else {
+                        let ParsedAtomicTypeExpr::Identifier { name, .. } = tag_expr else {
                             return Err(parse_error!(Some(tag_expr.span()), "expected identifier"));
                         };
 
@@ -540,16 +540,16 @@ impl Parser<'_> {
         Ok(ParsedTypeExpr::Atomic(first))
     }
 
-    fn parse_atomic_type_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
-        let param_type = self.parse_product_type_expression()?;
+    fn parse_atomic_type_expr(&mut self) -> FogResult<ParsedAtomicTypeExpr> {
+        let param_type = self.parse_product_type_expr()?;
 
         if let TokenKind::Arrow = self.peek().kind {
             self.next();
 
-            let return_type = self.parse_atomic_type_expression()?;
+            let return_type = self.parse_atomic_type_expr()?;
             let span = Span::merge(param_type.span(), return_type.span());
 
-            return Ok(ParsedTypeAtomExpr::Function {
+            return Ok(ParsedAtomicTypeExpr::Function {
                 param_type: param_type.into(),
                 return_type: return_type.into(),
                 span,
@@ -559,38 +559,38 @@ impl Parser<'_> {
         Ok(param_type)
     }
 
-    fn parse_product_type_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
+    fn parse_product_type_expr(&mut self) -> FogResult<ParsedAtomicTypeExpr> {
         let start_span = self.peek().span;
-        let first = self.parse_application_type_expression()?;
+        let first = self.parse_application_type_expr()?;
 
         if let TokenKind::Star = self.peek().kind {
             let mut types = vec![first];
 
             while let TokenKind::Star = self.peek().kind {
                 self.next();
-                types.push(self.parse_application_type_expression()?);
+                types.push(self.parse_application_type_expr()?);
             }
 
             let span = Span::merge(start_span, types.last().unwrap().span());
 
-            return Ok(ParsedTypeAtomExpr::Product { types, span });
+            return Ok(ParsedAtomicTypeExpr::Product { types, span });
         }
 
         Ok(first)
     }
 
-    fn parse_application_type_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
+    fn parse_application_type_expr(&mut self) -> FogResult<ParsedAtomicTypeExpr> {
         let start_span = self.peek().span;
-        let mut callee = self.parse_type_atom_expression()?;
+        let mut callee = self.parse_atomic_type_expr()?;
 
         while matches!(
             self.peek().kind,
             TokenKind::Identifier(_) | TokenKind::LeftParenthesis
         ) {
-            let arg = self.parse_type_atom_expression()?;
+            let arg = self.parse_atomic_type_expr()?;
             let span = Span::merge(start_span, arg.span());
 
-            callee = ParsedTypeAtomExpr::FunctionAppl {
+            callee = ParsedAtomicTypeExpr::FunctionAppl {
                 callee: callee.into(),
                 arg: arg.into(),
                 span,
@@ -598,34 +598,5 @@ impl Parser<'_> {
         }
 
         Ok(callee)
-    }
-
-    fn parse_type_atom_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
-        let token = self.peek().clone();
-        let span = token.span;
-
-        match token.kind {
-            TokenKind::Identifier(name) => {
-                self.next();
-                Ok(ParsedTypeAtomExpr::Identifier { name, span })
-            }
-
-            TokenKind::LeftParenthesis => {
-                self.next();
-                let expr = self.parse_atomic_type_expression()?;
-
-                if let TokenKind::RightParenthesis = self.peek().kind {
-                    self.next();
-                    Ok(expr)
-                } else {
-                    Err(parse_error!(Some(span), "expected `)`"))
-                }
-            }
-
-            _ => {
-                self.next();
-                Err(parse_error!(Some(span), "expected identifier, or `(`"))
-            }
-        }
     }
 }
