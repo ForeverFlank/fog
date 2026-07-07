@@ -2,11 +2,11 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parser::Literal;
-use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
+use crate::parser::core_expr::CoreTypeAtomExpr;
 use crate::parser::core_expr::CoreTypeExpr;
 use crate::static_check::environment::Environment;
 use crate::static_check::eval::eval_atomic_type_expr;
@@ -153,7 +153,7 @@ fn check_type_declaration(
 
 fn check_type_annotation(
     name: &str,
-    expr: &CoreAtomicTypeExpr,
+    expr: &CoreTypeAtomExpr,
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {

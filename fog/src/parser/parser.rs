@@ -5,6 +5,7 @@ use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
 use crate::parser::Literal;
+use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreKindExpr;
 use crate::parser::parsed_expr::ParsedMatchArm;
 use crate::parser::parsed_expr::*;
@@ -107,7 +108,7 @@ impl Parser<'_> {
 
                     Ok(ParsedStatement::KindAnnotation { name, expr, span })
                 } else {
-                    let expr = self.parse_expression()?;
+                    let expr = self.parse_atomic_type_expression()?;
                     let span = Span::merge(start_span, expr.span());
 
                     Ok(ParsedStatement::TypeAnnotation {
@@ -132,12 +133,15 @@ impl Parser<'_> {
                     self.next();
                 }
 
-                let expr = self.parse_expression()?;
-                let span = Span::merge(start_span, expr.span());
-
                 if is_type_name(&name) {
+                    let expr = self.parse_type_expression()?;
+                    let span = Span::merge(start_span, expr.span());
+
                     Ok(ParsedStatement::TypeDeclaration { name, expr, span })
                 } else {
+                    let expr = self.parse_expression()?;
+                    let span = Span::merge(start_span, expr.span());
+
                     Ok(ParsedStatement::VarDeclaration {
                         pattern: ParsedDeclPattern::Identifier {
                             name,
@@ -246,7 +250,7 @@ impl Parser<'_> {
                 if let TokenKind::Colon = self.peek().kind {
                     self.next();
 
-                    let param_type = self.parse_expression()?;
+                    let param_type = self.parse_atomic_type_expression()?;
 
                     let TokenKind::FatArrow = self.peek().kind else {
                         return Err(parse_error!(Some(self.peek().span), "expected `=>`"));
@@ -432,7 +436,7 @@ impl Parser<'_> {
         let start_span = self.peek().span;
 
         loop {
-            let atom = self.parse_atomic_kind()?;
+            let atom = self.parse_kind_atom_expression()?;
 
             if let TokenKind::Arrow = self.peek().kind {
                 self.next();
@@ -450,7 +454,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_atomic_kind(&mut self) -> FogResult<CoreKindExpr> {
+    fn parse_kind_atom_expression(&mut self) -> FogResult<CoreKindExpr> {
         let token = self.peek().clone();
         let span = token.span;
 
@@ -467,11 +471,11 @@ impl Parser<'_> {
 
             TokenKind::LeftParenthesis => {
                 self.next();
-                let expr = self.parse_kind_expression();
+                let expr = self.parse_kind_expression()?;
 
                 if let TokenKind::RightParenthesis = self.peek().kind {
                     self.next();
-                    expr
+                    Ok(expr)
                 } else {
                     Err(parse_error!(Some(span), "expected `)`"))
                 }
@@ -483,6 +487,144 @@ impl Parser<'_> {
                     Some(span),
                     "expected `Type`, `Constraint`, or `(`"
                 ))
+            }
+        }
+    }
+
+    // -- type expressions
+
+    fn parse_type_expression(&mut self) -> FogResult<ParsedTypeExpr> {
+        let start_span = self.peek().span;
+        let first = self.parse_atomic_type_expression()?;
+
+        if let TokenKind::Plus = self.peek().kind {
+            // expression is a sum type declaration
+
+            let mut ctors = vec![first];
+
+            while let TokenKind::Plus = self.peek().kind {
+                self.next();
+                ctors.push(self.parse_atomic_type_expression()?);
+            }
+
+            let span = Span::merge(start_span, ctors.last().unwrap().span());
+
+            let ctors = ctors
+                .into_iter()
+                .map(|ctor| match ctor {
+                    ParsedTypeAtomExpr::Identifier { name, .. } => Ok(ParsedDataConstructor {
+                        tag: name,
+                        types: Vec::new(),
+                    }),
+
+                    ParsedTypeAtomExpr::FunctionAppl { .. } => {
+                        let (tag_expr, types) = ctor.uncurry();
+
+                        let ParsedTypeAtomExpr::Identifier { name, .. } = tag_expr else {
+                            return Err(parse_error!(Some(tag_expr.span()), "expected identifier"));
+                        };
+
+                        Ok(ParsedDataConstructor { tag: name, types })
+                    }
+
+                    _ => Err(parse_error!(
+                        Some(ctor.span()),
+                        "invalid data constructor `{ctor}`"
+                    )),
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            return Ok(ParsedTypeExpr::Sum { ctors, span });
+        }
+
+        Ok(ParsedTypeExpr::Atomic(first))
+    }
+
+    fn parse_atomic_type_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
+        let param_type = self.parse_product_type_expression()?;
+
+        if let TokenKind::Arrow = self.peek().kind {
+            self.next();
+
+            let return_type = self.parse_atomic_type_expression()?;
+            let span = Span::merge(param_type.span(), return_type.span());
+
+            return Ok(ParsedTypeAtomExpr::Function {
+                param_type: param_type.into(),
+                return_type: return_type.into(),
+                span,
+            });
+        }
+
+        Ok(param_type)
+    }
+
+    fn parse_product_type_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
+        let start_span = self.peek().span;
+        let first = self.parse_application_type_expression()?;
+
+        if let TokenKind::Star = self.peek().kind {
+            let mut types = vec![first];
+
+            while let TokenKind::Star = self.peek().kind {
+                self.next();
+                types.push(self.parse_application_type_expression()?);
+            }
+
+            let span = Span::merge(start_span, types.last().unwrap().span());
+
+            return Ok(ParsedTypeAtomExpr::Product { types, span });
+        }
+
+        Ok(first)
+    }
+
+    fn parse_application_type_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
+        let start_span = self.peek().span;
+        let mut callee = self.parse_type_atom_expression()?;
+
+        while matches!(
+            self.peek().kind,
+            TokenKind::Identifier(_) | TokenKind::LeftParenthesis
+        ) {
+            let arg = self.parse_type_atom_expression()?;
+            let span = Span::merge(start_span, arg.span());
+
+            callee = ParsedTypeAtomExpr::FunctionAppl {
+                callee: callee.into(),
+                arg: arg.into(),
+                span,
+            };
+        }
+
+        Ok(callee)
+    }
+
+    fn parse_type_atom_expression(&mut self) -> FogResult<ParsedTypeAtomExpr> {
+        let token = self.peek().clone();
+        let span = token.span;
+
+        match token.kind {
+            TokenKind::Identifier(name) => {
+                self.next();
+                Ok(ParsedTypeAtomExpr::Identifier { name, span })
+            }
+
+            TokenKind::LeftParenthesis => {
+                self.next();
+                let expr = self.parse_atomic_type_expression()?;
+
+                if let TokenKind::RightParenthesis = self.peek().kind {
+                    self.next();
+                    Ok(expr)
+                } else {
+                    Err(parse_error!(Some(span), "expected `)`"))
+                }
+            }
+
+            _ => {
+                self.next();
+                Err(parse_error!(Some(span), "expected identifier, or `(`"))
             }
         }
     }

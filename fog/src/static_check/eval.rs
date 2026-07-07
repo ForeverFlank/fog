@@ -1,8 +1,7 @@
 use crate::error::FogResult;
 use crate::error::Span;
-use crate::parser::core_expr::CoreAtomicTypeExpr;
-use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreKindExpr;
+use crate::parser::core_expr::CoreTypeAtomExpr;
 use crate::parser::core_expr::CoreTypeExpr;
 use crate::static_check::environment::Environment;
 use crate::static_check::kind::Kind;
@@ -29,19 +28,19 @@ pub fn eval_kind_expr(expr: &CoreKindExpr) -> FogResult<Kind> {
     }
 }
 
-pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> FogResult<Type> {
+pub fn eval_atomic_type_expr(expr: &CoreTypeAtomExpr, env: &Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
-        CoreAtomicTypeExpr::Identifier { name, .. } => env
+        CoreTypeAtomExpr::Identifier { name, .. } => env
             .get_type_var(name, &span)?
             .r#type
             .ok_or_else(|| static_check_error!(Some(span), "undeclared type `{}`", name)),
 
-        CoreAtomicTypeExpr::FunctionAppl { .. } => {
+        CoreTypeAtomExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
-            let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
+            let CoreTypeAtomExpr::Identifier { name, .. } = head else {
                 return Err(static_check_error!(
                     Some(span),
                     "cannot type annotate a value with data constructor `{}`",
@@ -93,7 +92,7 @@ pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type>
         CoreTypeExpr::FunctionAppl { .. } => {
             let (head, args) = expr.uncurry();
 
-            let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
+            let CoreTypeAtomExpr::Identifier { name, .. } = head else {
                 return Err(static_check_error!(
                     Some(span),
                     "`{}` is not a valid type definition",
@@ -132,8 +131,8 @@ pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type>
 }
 
 fn eval_product_type(
-    left: &CoreAtomicTypeExpr,
-    right: &CoreAtomicTypeExpr,
+    left: &CoreTypeAtomExpr,
+    right: &CoreTypeAtomExpr,
     env: &Environment,
 ) -> FogResult<Type> {
     let left = eval_atomic_type_expr(left, env)?;
@@ -154,8 +153,8 @@ fn eval_product_type(
 }
 
 fn eval_function_type(
-    left: &CoreAtomicTypeExpr,
-    right: &CoreAtomicTypeExpr,
+    left: &CoreTypeAtomExpr,
+    right: &CoreTypeAtomExpr,
     env: &Environment,
 ) -> FogResult<Type> {
     let left = eval_atomic_type_expr(left, env)?;
@@ -165,8 +164,8 @@ fn eval_function_type(
 }
 
 fn eval_sum_type(
-    left: &CoreAtomicTypeExpr,
-    right: &CoreAtomicTypeExpr,
+    left: &CoreTypeAtomExpr,
+    right: &CoreTypeAtomExpr,
     env: &Environment,
 ) -> FogResult<Type> {
     let left = eval_atomic_type_expr(left, env)?;
@@ -192,7 +191,7 @@ fn eval_sum_type(
 
 pub fn apply_type_level_function(
     fn_name: &str,
-    args: &Vec<&CoreAtomicTypeExpr>,
+    args: &Vec<&CoreTypeAtomExpr>,
     env: &Environment,
     span: &Span,
 ) -> FogResult<Type> {

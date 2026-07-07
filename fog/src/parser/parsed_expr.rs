@@ -7,6 +7,7 @@ use crate::lexer::token::Token;
 use crate::lexer::token::TokenKind;
 use crate::parse_error;
 use crate::parser::Literal;
+use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreKindExpr;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
@@ -22,13 +23,13 @@ pub enum ParsedStatement {
     },
     TypeDeclaration {
         name: String,
-        expr: ParsedValueExpr,
+        expr: ParsedTypeExpr,
         span: Span,
     },
 
     TypeAnnotation {
         pattern: ParsedDeclPattern,
-        expr: ParsedValueExpr,
+        expr: ParsedTypeAtomExpr,
         span: Span,
     },
     VarDeclaration {
@@ -171,6 +172,133 @@ impl OpKind {
 
 // --- expressions ---
 
+// -- type expresions
+
+#[derive(Clone)]
+pub enum ParsedTypeExpr {
+    Atomic(ParsedTypeAtomExpr),
+    Sum {
+        ctors: Vec<ParsedDataConstructor>,
+        span: Span,
+    },
+}
+
+impl ParsedTypeExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedTypeExpr::Atomic(expr) => expr.span(),
+            ParsedTypeExpr::Sum { span, .. } => *span,
+        }
+    }
+}
+
+impl Display for ParsedTypeExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParsedTypeExpr::Atomic(expr) => write!(f, "{expr}"),
+            ParsedTypeExpr::Sum { ctors, .. } => write!(f, "{}", format_joined(ctors, " + ")),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct ParsedDataConstructor {
+    pub tag: String,
+    pub types: Vec<ParsedTypeAtomExpr>,
+}
+
+impl Display for ParsedDataConstructor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.tag)?;
+
+        for r#type in &self.types {
+            write!(f, " {}", r#type)?;
+        }
+
+        Ok(())
+    }
+}
+
+// -- type atom expresions
+
+#[derive(Clone)]
+pub enum ParsedTypeAtomExpr {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Function {
+        param_type: Box<ParsedTypeAtomExpr>,
+        return_type: Box<ParsedTypeAtomExpr>,
+        span: Span,
+    },
+    Product {
+        types: Vec<ParsedTypeAtomExpr>,
+        span: Span,
+    },
+    FunctionAppl {
+        callee: Box<ParsedTypeAtomExpr>,
+        arg: Box<ParsedTypeAtomExpr>,
+        span: Span,
+    },
+}
+
+impl ParsedTypeAtomExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            ParsedTypeAtomExpr::Identifier { span, .. }
+            | ParsedTypeAtomExpr::Function { span, .. }
+            | ParsedTypeAtomExpr::Product { span, .. }
+            | ParsedTypeAtomExpr::FunctionAppl { span, .. } => *span,
+        }
+    }
+
+    pub fn uncurry(self) -> (ParsedTypeAtomExpr, Vec<ParsedTypeAtomExpr>) {
+        let mut args = Vec::new();
+        let mut head = self;
+
+        while let ParsedTypeAtomExpr::FunctionAppl { callee, arg, .. } = head {
+            args.push(*arg);
+            head = *callee;
+        }
+
+        args.reverse();
+        (head, args)
+    }
+}
+
+impl Display for ParsedTypeAtomExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParsedTypeAtomExpr::Identifier { name, .. } => {
+                write!(f, "{name}")
+            }
+
+            ParsedTypeAtomExpr::Function {
+                param_type,
+                return_type,
+                ..
+            } => {
+                fmt_parenthesized(f, param_type)?;
+                write!(f, " -> ")?;
+                fmt_parenthesized(f, return_type)
+            }
+
+            ParsedTypeAtomExpr::Product { types, .. } => {
+                write!(f, "{}", format_joined(types, " * "))
+            }
+
+            ParsedTypeAtomExpr::FunctionAppl { callee, arg, .. } => {
+                fmt_parenthesized(f, callee)?;
+                write!(f, " ")?;
+                fmt_parenthesized(f, arg)
+            }
+        }
+    }
+}
+
+// -- value expresions
+
 #[derive(Clone)]
 pub enum ParsedValueExpr {
     Block {
@@ -191,7 +319,7 @@ pub enum ParsedValueExpr {
     },
     Lambda {
         param_name: String,
-        param_type: Box<ParsedValueExpr>,
+        param_type: Box<ParsedTypeAtomExpr>,
         body: Box<ParsedValueExpr>,
         span: Span,
     },
