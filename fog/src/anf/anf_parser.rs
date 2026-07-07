@@ -88,19 +88,8 @@ fn parse_expr_to_atomic(
             ..
         } => {
             let mut body_collected_anf = Vec::new();
-
             let body_anf = parse_expr_to_anf(body, &mut body_collected_anf, var_counter);
-
-            let body_anf = if body_collected_anf.is_empty() {
-                body_anf
-            } else {
-                body_collected_anf.push(body_anf);
-
-                ANFExpr::Atomic(AtomicExpr::Block {
-                    anfs: body_collected_anf,
-                    span: *span,
-                })
-            };
+            let body_anf = wrap_scoped_anf(body_collected_anf, body_anf, *span);
 
             AtomicExpr::Lambda {
                 param_name: param_name.clone(),
@@ -160,14 +149,19 @@ fn parse_expr_to_atomic(
             let arg = parse_expr_to_atomic(arg, collected_anf, var_counter);
             let anf = ANFExpr::FunctionAppl(callee, arg);
 
-            let let_name = generate_var_name(var_counter);
-            let let_pattern = CoreDeclPattern::Identifier {
+            // generate a new temporary variable name
+            let let_name = format!("$t{var_counter}");
+            *var_counter += 1;
+
+            // declare it
+            let let_decl_pattern = CoreDeclPattern::Identifier {
                 name: let_name.clone(),
                 span: *span,
             };
-            let let_expr = ANFExpr::Declaration(let_pattern, anf.into());
+            let let_expr = ANFExpr::Declaration(let_decl_pattern, anf.into());
             collected_anf.push(let_expr.clone());
 
+            // return it
             AtomicExpr::Identifier {
                 name: let_name,
                 span: *span,
@@ -185,24 +179,20 @@ fn parse_match_arm(
 
     let mut arm_collected_anf = Vec::new();
     let arm_anf = parse_expr_to_anf(&arm.value_expr, &mut arm_collected_anf, var_counter);
-
-    let arm_anf = if arm_collected_anf.is_empty() {
-        arm_anf
-    } else {
-        arm_collected_anf.push(arm_anf);
-
-        ANFExpr::Atomic(AtomicExpr::Block {
-            anfs: arm_collected_anf,
-            span: *span,
-        })
-    };
+    let arm_anf = wrap_scoped_anf(arm_collected_anf, arm_anf, *span);
 
     (pattern, arm_anf)
 }
 
-fn generate_var_name(var_counter: &mut i32) -> String {
-    let s = format!("$t{var_counter}");
-    *var_counter += 1;
+fn wrap_scoped_anf(mut collected_anf: Vec<ANFExpr>, tail: ANFExpr, span: Span) -> ANFExpr {
+    if collected_anf.is_empty() {
+        tail
+    } else {
+        collected_anf.push(tail);
 
-    s
+        ANFExpr::Atomic(AtomicExpr::Block {
+            anfs: collected_anf,
+            span,
+        })
+    }
 }
