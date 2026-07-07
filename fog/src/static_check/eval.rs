@@ -170,8 +170,6 @@ pub fn register_data_constructors(
     for ctor in ctors {
         let ctor_type = nest_function_types(&ctor.types, parent_sum_type.clone());
 
-        println!("{}", ctor.tag);
-
         env.annotate_type(&ctor.tag, ctor_type.clone(), span)?;
         env.declare_var(&ctor.tag, ctor_type, span)?;
     }

@@ -158,7 +158,7 @@ fn desugar_statements(
             })
             .collect::<Vec<_>>();
 
-        let param_names = (0..arity).map(|i| format!("arg{i}")).collect::<Vec<_>>();
+        let param_names = (0..arity).map(|i| format!("$arg{i}")).collect::<Vec<_>>();
 
         let scrutinee = if arity == 1 {
             CoreExpr::Identifier {

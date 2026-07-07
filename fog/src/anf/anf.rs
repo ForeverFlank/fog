@@ -110,7 +110,7 @@ impl Display for AtomicExpr {
             AtomicExpr::Match {
                 scrutinee, arms, ..
             } => {
-                write!(f, "{} => {{\n", *scrutinee)?;
+                write!(f, "match {} {{\n", *scrutinee)?;
                 for arm in arms {
                     write!(f, "{}\n", indent(&format!("{} => {}", arm.0, arm.1)))?;
                 }

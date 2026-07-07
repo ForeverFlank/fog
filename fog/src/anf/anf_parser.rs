@@ -1,14 +1,18 @@
 use crate::anf::anf::ANFExpr;
 use crate::anf::anf::AtomicExpr;
+use crate::error::Span;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
+use crate::parser::core_expr::CoreMatchArm;
+use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 
 pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFExpr> {
     let mut res = Vec::new();
+    let mut var_counter = 0;
 
     for stmt in stmts {
-        collect_stmt_to_anf(stmt, &mut res, &mut 0);
+        collect_stmt_to_anf(stmt, &mut res, &mut var_counter);
     }
 
     res
@@ -82,11 +86,28 @@ fn parse_expr_to_atomic(
             body,
             span,
             ..
-        } => AtomicExpr::Lambda {
-            param_name: param_name.clone(),
-            body: parse_expr_to_anf(body, collected_anf, var_counter).into(),
-            span: *span,
-        },
+        } => {
+            let mut body_collected_anf = Vec::new();
+
+            let body_anf = parse_expr_to_anf(body, &mut body_collected_anf, var_counter);
+
+            let body_anf = if body_collected_anf.is_empty() {
+                body_anf
+            } else {
+                body_collected_anf.push(body_anf);
+
+                ANFExpr::Atomic(AtomicExpr::Block {
+                    anfs: body_collected_anf,
+                    span: *span,
+                })
+            };
+
+            AtomicExpr::Lambda {
+                param_name: param_name.clone(),
+                body: body_anf.into(),
+                span: *span,
+            }
+        }
 
         CoreExpr::Tuple { items, span } => AtomicExpr::Tuple {
             items: items
@@ -104,12 +125,8 @@ fn parse_expr_to_atomic(
             scrutinee: parse_expr_to_atomic(scrutinee, collected_anf, var_counter).into(),
             arms: arms
                 .iter()
-                .map(|arm| {
-                    let pattern = arm.pattern.clone();
-                    let value_expr = parse_expr_to_anf(&arm.value_expr, collected_anf, var_counter);
-                    (pattern, value_expr)
-                })
-                .collect::<Vec<_>>(),
+                .map(|arm| parse_match_arm(arm, var_counter, span))
+                .collect::<Vec<(_, _)>>(),
             span: *span,
         },
 
@@ -129,7 +146,7 @@ fn parse_expr_to_atomic(
                 unreachable!()
             };
 
-            let last_anf = parse_expr_to_anf(last_expr, collected_anf, var_counter);
+            let last_anf = parse_expr_to_anf(last_expr, &mut block_collected_anf, var_counter);
             block_collected_anf.push(last_anf);
 
             AtomicExpr::Block {
@@ -157,6 +174,30 @@ fn parse_expr_to_atomic(
             }
         }
     }
+}
+
+fn parse_match_arm(
+    arm: &CoreMatchArm,
+    var_counter: &mut i32,
+    span: &Span,
+) -> (CoreMatchArmPattern, ANFExpr) {
+    let pattern = arm.pattern.clone();
+
+    let mut arm_collected_anf = Vec::new();
+    let arm_anf = parse_expr_to_anf(&arm.value_expr, &mut arm_collected_anf, var_counter);
+
+    let arm_anf = if arm_collected_anf.is_empty() {
+        arm_anf
+    } else {
+        arm_collected_anf.push(arm_anf);
+
+        ANFExpr::Atomic(AtomicExpr::Block {
+            anfs: arm_collected_anf,
+            span: *span,
+        })
+    };
+
+    (pattern, arm_anf)
 }
 
 fn generate_var_name(var_counter: &mut i32) -> String {
