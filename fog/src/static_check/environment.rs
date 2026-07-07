@@ -25,26 +25,6 @@ impl<'a> Environment<'a> {
         }
     }
 
-    pub fn flatten(&self) -> Environment<'static> {
-        let mut variables = HashMap::new();
-        let mut types = HashMap::new();
-
-        if let Some(parent) = self.parent {
-            let flat = parent.flatten();
-            variables.extend(flat.variables);
-            types.extend(flat.types);
-        }
-
-        variables.extend(self.variables.clone());
-        types.extend(self.types.clone());
-
-        Environment {
-            variables,
-            types,
-            parent: None,
-        }
-    }
-
     // --- getters ---
 
     pub fn get_value_var(&self, name: &str, span: &Span) -> FogResult<ValueVariable> {

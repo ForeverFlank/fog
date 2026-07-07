@@ -4,6 +4,7 @@ use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parse_error;
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::parsed_expr::OpKind;
 use crate::parser::parsed_expr::ParsedDeclPattern;
 use crate::parser::parsed_expr::ParsedMatchArm;
@@ -132,30 +133,20 @@ impl Resolver {
                     return Err(parse_error!(Some(span), "invalid type annotation"));
                 };
 
-                Ok(ResolvedStatement::TypeAnnotation {
-                    name,
-                    expr: self.resolve_expr(expr)?,
-                    span,
-                })
+                Ok(ResolvedStatement::TypeAnnotation { name, expr, span })
             }
 
             ParsedStatement::TypeDeclaration { name, expr, span } => {
-                Ok(ResolvedStatement::TypeDeclaration {
-                    name,
-                    expr: self.resolve_expr(expr)?,
-                    span,
-                })
+                Ok(ResolvedStatement::TypeDeclaration { name, expr, span })
             }
 
-            ParsedStatement::VarDeclaration {
-                pattern,
-                expr,
-                span,
-            } => Ok(ResolvedStatement::VarDeclaration {
-                pattern: self.resolve_decl_pattern(pattern)?,
-                expr: self.resolve_expr(expr)?,
-                span,
-            }),
+            ParsedStatement::VarDeclaration { pattern, expr, .. } => {
+                Ok(ResolvedStatement::VarDeclaration {
+                    pattern: self.resolve_decl_pattern(pattern)?,
+                    expr: self.resolve_expr(expr)?,
+                    // span,
+                })
+            }
 
             ParsedStatement::Expression { expr, span } => Ok(ResolvedStatement::Expression {
                 expr: self.resolve_expr(expr)?,
@@ -214,7 +205,7 @@ impl Resolver {
                     Self::resolve_function_clause_item(lhs)?,
                     Self::resolve_function_clause_item(rhs)?,
                 ],
-                span,
+                // span,
             })
         } else {
             let mut iter = items.into_iter();
@@ -232,7 +223,7 @@ impl Resolver {
                 items: iter
                     .map(Self::resolve_function_clause_item)
                     .collect::<Result<Vec<_>, _>>()?,
-                span,
+                // span,
             })
         }
     }
@@ -371,13 +362,13 @@ impl Resolver {
     fn resolve_lambda(
         &self,
         param_name: String,
-        param_type: Box<ParsedValueExpr>,
+        param_type: CoreAtomicTypeExpr,
         body: Box<ParsedValueExpr>,
         span: Span,
     ) -> FogResult<ResolvedExpr> {
         Ok(ResolvedExpr::Lambda {
             param_name,
-            param_type: self.resolve_expr(*param_type)?.into(),
+            param_type,
             body: self.resolve_expr(*body)?.into(),
             span,
         })

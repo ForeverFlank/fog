@@ -1,6 +1,7 @@
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parser::core_expr::CoreAtomicTypeExpr;
+use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreKindExpr;
 use crate::parser::core_expr::CoreTypeExpr;
 use crate::static_check::environment::Environment;
@@ -26,6 +27,37 @@ pub fn eval_kind_expr(expr: &CoreKindExpr) -> FogResult<Kind> {
             eval_kind_expr(&return_kind)?.into(),
         )),
     }
+}
+
+pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type> {
+    match expr {
+        CoreTypeExpr::Atomic(expr) => eval_atomic_type_expr(expr, env),
+
+        CoreTypeExpr::Sum { ctors, .. } => {
+            let ctors = ctors
+                .iter()
+                .map(|ctor| eval_data_constructor(ctor, env))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(Type::Sum(ctors))
+        }
+    }
+}
+
+fn eval_data_constructor(
+    ctor: &CoreDataConstructor,
+    env: &Environment,
+) -> FogResult<DataConstructor> {
+    let types = ctor
+        .types
+        .iter()
+        .map(|t| eval_atomic_type_expr(t, env))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(DataConstructor {
+        tag: ctor.tag.clone(),
+        types,
+    })
 }
 
 pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> FogResult<Type> {
@@ -75,61 +107,6 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
     }
 }
 
-pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type> {
-    let span = expr.span();
-
-    match expr {
-        CoreTypeExpr::Identifier { name, .. } if env.contains_type(name) => env
-            .get_type_var(name, &span)?
-            .r#type
-            .ok_or_else(|| static_check_error!(Some(span), "undeclared type `{}`", name)),
-
-        CoreTypeExpr::Identifier { name, .. } => Ok(Type::Sum(vec![DataConstructor {
-            tag: name.clone(),
-            types: Vec::new(),
-        }])),
-
-        CoreTypeExpr::FunctionAppl { .. } => {
-            let (head, args) = expr.uncurry();
-
-            let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
-                return Err(static_check_error!(
-                    Some(span),
-                    "`{}` is not a valid type definition",
-                    expr.to_string()
-                ));
-            };
-
-            match (name.as_str(), args.as_slice()) {
-                ("->", &[lhs, rhs]) => eval_function_type(lhs, rhs, env),
-                ("*", &[lhs, rhs]) => eval_product_type(lhs, rhs, env),
-                ("+", &[lhs, rhs]) => eval_sum_type(lhs, rhs, env),
-
-                _ if env.contains_type(name) => apply_type_level_function(name, &args, env, &span),
-
-                // data constructor
-                _ => {
-                    let field_types = args
-                        .iter()
-                        .map(|&arg| eval_atomic_type_expr(arg, env))
-                        .collect::<Result<Vec<Type>, _>>()?;
-
-                    Ok(Type::Sum(vec![DataConstructor {
-                        tag: name.clone(),
-                        types: field_types,
-                    }]))
-                }
-            }
-        }
-
-        _ => Err(static_check_error!(
-            Some(span),
-            "`{}` is not a valid type definition",
-            expr.to_string()
-        )),
-    }
-}
-
 fn eval_product_type(
     left: &CoreAtomicTypeExpr,
     right: &CoreAtomicTypeExpr,
@@ -161,32 +138,6 @@ fn eval_function_type(
     let right = eval_atomic_type_expr(right, env)?;
 
     Ok(Type::Function(left.into(), right.into()))
-}
-
-fn eval_sum_type(
-    left: &CoreAtomicTypeExpr,
-    right: &CoreAtomicTypeExpr,
-    env: &Environment,
-) -> FogResult<Type> {
-    let left = eval_atomic_type_expr(left, env)?;
-    let right = eval_atomic_type_expr(right, env)?;
-
-    let Type::Sum(ctors1) = left else {
-        return Err(static_check_error!(
-            None,
-            "`{}` is not a data constructor or a sum type",
-            left.to_string()
-        ));
-    };
-    let Type::Sum(ctors2) = right else {
-        return Err(static_check_error!(
-            None,
-            "`{}` is not a data constructor or a sum type",
-            right.to_string()
-        ));
-    };
-
-    Ok(Type::Sum([&ctors1[..], &ctors2[..]].concat()))
 }
 
 pub fn apply_type_level_function(

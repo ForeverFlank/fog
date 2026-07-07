@@ -4,7 +4,9 @@ use std::rc::Rc;
 
 use crate::error::Span;
 use crate::parser::Literal;
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreKindExpr;
+use crate::parser::core_expr::CoreTypeExpr;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 
@@ -19,18 +21,18 @@ pub enum ResolvedStatement {
     },
     TypeDeclaration {
         name: String,
-        expr: ResolvedExpr,
+        expr: CoreTypeExpr,
         span: Span,
     },
     TypeAnnotation {
         name: String,
-        expr: ResolvedExpr,
+        expr: CoreAtomicTypeExpr,
         span: Span,
     },
     VarDeclaration {
         pattern: ResolvedDeclPattern,
         expr: ResolvedExpr,
-        span: Span,
+        // span: Span,
     },
     Expression {
         expr: ResolvedExpr,
@@ -81,7 +83,7 @@ pub enum ResolvedDeclPattern {
     FunctionClause {
         name: String,
         items: Vec<ResolvedMatchArmPattern>,
-        span: Span,
+        // span: Span,
     },
 }
 
@@ -209,7 +211,7 @@ pub enum ResolvedExpr {
 
     Lambda {
         param_name: String,
-        param_type: Box<ResolvedExpr>,
+        param_type: CoreAtomicTypeExpr,
         body: Rc<ResolvedExpr>,
         span: Span,
     },
@@ -243,20 +245,6 @@ impl ResolvedExpr {
             | ResolvedExpr::FunctionAppl { span, .. }
             | ResolvedExpr::Match { span, .. } => *span,
         }
-    }
-
-    pub fn uncurry(&self) -> (&ResolvedExpr, Vec<&ResolvedExpr>) {
-        let mut args = Vec::new();
-        let mut head = self;
-
-        while let ResolvedExpr::FunctionAppl { callee, arg, .. } = head {
-            args.push(arg.as_ref());
-            head = callee.as_ref();
-        }
-
-        args.reverse();
-
-        (head, args)
     }
 }
 

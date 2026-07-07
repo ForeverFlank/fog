@@ -5,8 +5,10 @@ use crate::error::Span;
 use crate::lexer::token::*;
 use crate::parse_error;
 use crate::parser::Literal;
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreKindExpr;
+use crate::parser::core_expr::CoreTypeExpr;
 use crate::parser::parsed_expr::ParsedMatchArm;
 use crate::parser::parsed_expr::*;
 
@@ -140,7 +142,7 @@ impl Parser<'_> {
                     Ok(ParsedStatement::TypeDeclaration { name, expr, span })
                 } else {
                     let expr = self.parse_expr()?;
-                    let span = Span::merge(start_span, expr.span());
+                    // let span = Span::merge(start_span, expr.span());
 
                     Ok(ParsedStatement::VarDeclaration {
                         pattern: ParsedDeclPattern::Identifier {
@@ -148,7 +150,7 @@ impl Parser<'_> {
                             span: start_span,
                         },
                         expr,
-                        span,
+                        // span,
                     })
                 }
             }
@@ -163,12 +165,12 @@ impl Parser<'_> {
 
                     let pattern = expr.into_decl_pattern()?;
                     let expr = self.parse_expr()?;
-                    let span = Span::merge(pattern.span(), expr.span());
+                    // let span = Span::merge(pattern.span(), expr.span());
 
                     Ok(ParsedStatement::VarDeclaration {
                         pattern,
                         expr,
-                        span,
+                        // span,
                     })
                 } else {
                     let span = expr.span();
@@ -493,7 +495,7 @@ impl Parser<'_> {
 
     // -- type expressions
 
-    fn parse_type_expr(&mut self) -> FogResult<ParsedTypeExpr> {
+    fn parse_type_expr(&mut self) -> FogResult<CoreTypeExpr> {
         let start_span = self.peek().span;
         let first = self.parse_atomic_type_expr()?;
 
@@ -512,19 +514,22 @@ impl Parser<'_> {
             let ctors = ctors
                 .into_iter()
                 .map(|ctor| match ctor {
-                    ParsedAtomicTypeExpr::Identifier { name, .. } => Ok(ParsedDataConstructor {
+                    CoreAtomicTypeExpr::Identifier { name, .. } => Ok(CoreDataConstructor {
                         tag: name,
                         types: Vec::new(),
                     }),
 
-                    ParsedAtomicTypeExpr::FunctionAppl { .. } => {
+                    CoreAtomicTypeExpr::FunctionAppl { .. } => {
                         let (tag_expr, types) = ctor.uncurry();
 
-                        let ParsedAtomicTypeExpr::Identifier { name, .. } = tag_expr else {
+                        let CoreAtomicTypeExpr::Identifier { name, .. } = tag_expr else {
                             return Err(parse_error!(Some(tag_expr.span()), "expected identifier"));
                         };
 
-                        Ok(ParsedDataConstructor { tag: name, types })
+                        Ok(CoreDataConstructor {
+                            tag: name.to_string(),
+                            types: types.into_iter().cloned().collect(),
+                        })
                     }
 
                     _ => Err(parse_error!(
@@ -534,13 +539,13 @@ impl Parser<'_> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            return Ok(ParsedTypeExpr::Sum { ctors, span });
+            return Ok(CoreTypeExpr::Sum { ctors, span });
         }
 
-        Ok(ParsedTypeExpr::Atomic(first))
+        Ok(CoreTypeExpr::Atomic(first))
     }
 
-    fn parse_atomic_type_expr(&mut self) -> FogResult<ParsedAtomicTypeExpr> {
+    fn parse_atomic_type_expr(&mut self) -> FogResult<CoreAtomicTypeExpr> {
         let param_type = self.parse_product_type_expr()?;
 
         if let TokenKind::Arrow = self.peek().kind {
@@ -549,7 +554,7 @@ impl Parser<'_> {
             let return_type = self.parse_atomic_type_expr()?;
             let span = Span::merge(param_type.span(), return_type.span());
 
-            return Ok(ParsedAtomicTypeExpr::Function {
+            return Ok(CoreAtomicTypeExpr::Function {
                 param_type: param_type.into(),
                 return_type: return_type.into(),
                 span,
@@ -559,7 +564,7 @@ impl Parser<'_> {
         Ok(param_type)
     }
 
-    fn parse_product_type_expr(&mut self) -> FogResult<ParsedAtomicTypeExpr> {
+    fn parse_product_type_expr(&mut self) -> FogResult<CoreAtomicTypeExpr> {
         let start_span = self.peek().span;
         let first = self.parse_application_type_expr()?;
 
@@ -573,13 +578,13 @@ impl Parser<'_> {
 
             let span = Span::merge(start_span, types.last().unwrap().span());
 
-            return Ok(ParsedAtomicTypeExpr::Product { types, span });
+            return Ok(CoreAtomicTypeExpr::Product { types, span });
         }
 
         Ok(first)
     }
 
-    fn parse_application_type_expr(&mut self) -> FogResult<ParsedAtomicTypeExpr> {
+    fn parse_application_type_expr(&mut self) -> FogResult<CoreAtomicTypeExpr> {
         let start_span = self.peek().span;
         let mut callee = self.parse_atomic_type_expr()?;
 
@@ -590,7 +595,7 @@ impl Parser<'_> {
             let arg = self.parse_atomic_type_expr()?;
             let span = Span::merge(start_span, arg.span());
 
-            callee = ParsedAtomicTypeExpr::FunctionAppl {
+            callee = CoreAtomicTypeExpr::FunctionAppl {
                 callee: callee.into(),
                 arg: arg.into(),
                 span,

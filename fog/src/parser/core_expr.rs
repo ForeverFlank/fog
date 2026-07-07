@@ -80,18 +80,6 @@ pub enum CoreDeclPattern {
     },
 }
 
-impl CoreDeclPattern {
-    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        match self {
-            CoreDeclPattern::Identifier { name, .. } => Box::new(std::iter::once(name.as_str())),
-
-            CoreDeclPattern::Tuple { items, .. } => {
-                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
-            }
-        }
-    }
-}
-
 impl Display for CoreDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -118,20 +106,6 @@ pub enum CoreTupleDeclPattern {
         items: Vec<CoreTupleDeclPattern>,
         span: Span,
     },
-}
-
-impl CoreTupleDeclPattern {
-    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        match self {
-            CoreTupleDeclPattern::Identifier { name, .. } => {
-                Box::new(std::iter::once(name.as_str()))
-            }
-
-            CoreTupleDeclPattern::Tuple { items, .. } => {
-                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
-            }
-        }
-    }
 }
 
 impl Display for CoreTupleDeclPattern {
@@ -178,24 +152,6 @@ impl CoreMatchArmPattern {
             | CoreMatchArmPattern::Tuple { span, .. }
             | CoreMatchArmPattern::Identifier { span, .. }
             | CoreMatchArmPattern::DataConstructor { span, .. } => span,
-        }
-    }
-
-    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        match self {
-            CoreMatchArmPattern::Literal { .. } => Box::new(std::iter::empty()),
-
-            CoreMatchArmPattern::Tuple { items, .. } => {
-                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
-            }
-
-            CoreMatchArmPattern::Identifier { name, .. } => {
-                Box::new(std::iter::once(name.as_str()))
-            }
-
-            CoreMatchArmPattern::DataConstructor { args, .. } => {
-                Box::new(args.iter().flat_map(|item| item.all_identifiers()))
-            }
         }
     }
 }
@@ -280,19 +236,7 @@ impl Display for CoreKindExpr {
 
 #[derive(Clone)]
 pub enum CoreTypeExpr {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-    FunctionAppl {
-        callee: Box<CoreAtomicTypeExpr>,
-        arg: Box<CoreAtomicTypeExpr>,
-        span: Span,
-    },
-    Product {
-        types: Vec<CoreAtomicTypeExpr>,
-        span: Span,
-    },
+    Atomic(CoreAtomicTypeExpr),
     Sum {
         ctors: Vec<CoreDataConstructor>,
         span: Span,
@@ -302,15 +246,13 @@ pub enum CoreTypeExpr {
 impl CoreTypeExpr {
     pub fn span(&self) -> Span {
         match self {
-            CoreTypeExpr::Identifier { span, .. }
-            | CoreTypeExpr::FunctionAppl { span, .. }
-            | CoreTypeExpr::Product { span, .. }
-            | CoreTypeExpr::Sum { span, .. } => *span,
+            CoreTypeExpr::Atomic(expr) => expr.span(),
+            CoreTypeExpr::Sum { span, .. } => *span,
         }
     }
 
     pub fn uncurry(&self) -> (&CoreAtomicTypeExpr, Vec<&CoreAtomicTypeExpr>) {
-        let CoreTypeExpr::FunctionAppl { callee, arg, .. } = self else {
+        let Self::Atomic(CoreAtomicTypeExpr::FunctionAppl { callee, arg, .. }) = self else {
             unreachable!("uncurry called on a non-application CoreTypeExpr");
         };
 
@@ -324,18 +266,8 @@ impl CoreTypeExpr {
 impl Display for CoreTypeExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreTypeExpr::Identifier { name, .. } => {
-                write!(f, "{name}")
-            }
-
-            CoreTypeExpr::Product { types, .. } => {
-                write!(f, "{}", format_joined(types, " * "))
-            }
-
-            CoreTypeExpr::FunctionAppl { callee, arg, .. } => {
-                fmt_parenthesized(f, callee.as_ref())?;
-                write!(f, " ")?;
-                fmt_parenthesized(f, arg.as_ref())
+            CoreTypeExpr::Atomic(expr) => {
+                write!(f, "{expr}")
             }
 
             CoreTypeExpr::Sum { ctors, .. } => {
@@ -349,6 +281,11 @@ impl Display for CoreTypeExpr {
 pub enum CoreAtomicTypeExpr {
     Identifier {
         name: String,
+        span: Span,
+    },
+    Function {
+        param_type: Box<CoreAtomicTypeExpr>,
+        return_type: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
     Product {
@@ -366,6 +303,7 @@ impl CoreAtomicTypeExpr {
     pub fn span(&self) -> Span {
         match self {
             CoreAtomicTypeExpr::Identifier { span, .. }
+            | CoreAtomicTypeExpr::Function { span, .. }
             | CoreAtomicTypeExpr::FunctionAppl { span, .. }
             | CoreAtomicTypeExpr::Product { span, .. } => *span,
         }
@@ -386,22 +324,6 @@ impl CoreAtomicTypeExpr {
     }
 }
 
-impl CoreAtomicTypeExpr {
-    pub fn to_type_expr(self) -> CoreTypeExpr {
-        match self {
-            CoreAtomicTypeExpr::Identifier { name, span } => {
-                CoreTypeExpr::Identifier { name, span }
-            }
-
-            CoreAtomicTypeExpr::Product { types, span } => CoreTypeExpr::Product { types, span },
-
-            CoreAtomicTypeExpr::FunctionAppl { callee, arg, span } => {
-                CoreTypeExpr::FunctionAppl { callee, arg, span }
-            }
-        }
-    }
-}
-
 impl Display for CoreAtomicTypeExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -409,14 +331,24 @@ impl Display for CoreAtomicTypeExpr {
                 write!(f, "{name}")
             }
 
+            CoreAtomicTypeExpr::Function {
+                param_type,
+                return_type,
+                ..
+            } => {
+                fmt_parenthesized(f, param_type)?;
+                write!(f, " -> ")?;
+                fmt_parenthesized(f, return_type)
+            }
+
             CoreAtomicTypeExpr::Product { types, .. } => {
                 write!(f, "{}", format_joined(types, " * "))
             }
 
             CoreAtomicTypeExpr::FunctionAppl { callee, arg, .. } => {
-                fmt_parenthesized(f, callee.as_ref())?;
+                fmt_parenthesized(f, callee)?;
                 write!(f, " ")?;
-                fmt_parenthesized(f, arg.as_ref())
+                fmt_parenthesized(f, arg)
             }
         }
     }

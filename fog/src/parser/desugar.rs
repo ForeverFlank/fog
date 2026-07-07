@@ -11,7 +11,6 @@ use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
-use crate::parser::core_expr::CoreTypeExpr;
 use crate::parser::resolved_expr::ResolvedDeclPattern;
 use crate::parser::resolved_expr::ResolvedExpr;
 use crate::parser::resolved_expr::ResolvedMatchArmPattern;
@@ -23,7 +22,7 @@ enum DesugarResult {
     Declaration {
         pattern: ResolvedDeclPattern,
         expr: CoreExpr,
-        span: Span,
+        // span: Span,
     },
 }
 
@@ -288,7 +287,7 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
         ResolvedStatement::TypeDeclaration { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::TypeDeclaration {
                 name,
-                expr: desugar_type_expr(expr)?,
+                expr,
                 span,
             }))
         }
@@ -296,19 +295,15 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
         ResolvedStatement::TypeAnnotation { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::TypeAnnotation {
                 name,
-                expr: desugar_atomic_type_expr(expr)?,
+                expr,
                 span,
             }))
         }
 
-        ResolvedStatement::VarDeclaration {
-            pattern,
-            expr,
-            span,
-        } => Ok(DesugarResult::Declaration {
+        ResolvedStatement::VarDeclaration { pattern, expr, .. } => Ok(DesugarResult::Declaration {
             pattern,
             expr: desugar_expr(expr)?,
-            span,
+            // span,
         }),
 
         ResolvedStatement::Expression { expr, span } => {
@@ -369,83 +364,6 @@ fn desugar_match_arm_pattern(pattern: ResolvedMatchArmPattern) -> FogResult<Core
     }
 }
 
-fn desugar_type_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreTypeExpr> {
-    let span = resolved_expr.span();
-
-    if let Some(operands) = flatten_operator("+", &resolved_expr) {
-        return Ok(CoreTypeExpr::Sum {
-            ctors: operands
-                .into_iter()
-                .map(desugar_data_constructor)
-                .collect::<Result<_, _>>()?,
-            span,
-        });
-    }
-
-    if let Some(operands) = flatten_operator("*", &resolved_expr) {
-        return Ok(CoreTypeExpr::Product {
-            types: operands
-                .into_iter()
-                .map(|e| desugar_atomic_type_expr(e.clone()))
-                .collect::<Result<_, _>>()?,
-            span,
-        });
-    }
-
-    Ok(desugar_atomic_type_expr(resolved_expr)?.to_type_expr())
-}
-
-fn flatten_operator<'a>(op: &str, expr: &'a ResolvedExpr) -> Option<Vec<&'a ResolvedExpr>> {
-    let ResolvedExpr::FunctionAppl { .. } = expr else {
-        return None;
-    };
-    let (head, args) = expr.uncurry();
-    let ResolvedExpr::Identifier { name, .. } = head else {
-        return None;
-    };
-    if name != op || args.len() != 2 {
-        return None;
-    }
-
-    let mut operands = Vec::new();
-    for arg in args {
-        match flatten_operator(op, arg) {
-            Some(nested) => operands.extend(nested),
-            None => operands.push(arg),
-        }
-    }
-    Some(operands)
-}
-
-fn desugar_atomic_type_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreAtomicTypeExpr> {
-    match resolved_expr {
-        ResolvedExpr::Identifier { name, span } => {
-            Ok(CoreAtomicTypeExpr::Identifier { name, span })
-        }
-
-        ResolvedExpr::Tuple { items, span } => Ok(CoreAtomicTypeExpr::Product {
-            types: items
-                .into_iter()
-                .map(desugar_atomic_type_expr)
-                .collect::<Result<Vec<_>, _>>()?,
-            span,
-        }),
-
-        ResolvedExpr::FunctionAppl { callee, arg, span } => Ok(CoreAtomicTypeExpr::FunctionAppl {
-            callee: desugar_atomic_type_expr(*callee)?.into(),
-            arg: desugar_atomic_type_expr(*arg)?.into(),
-            span,
-        }),
-
-        ResolvedExpr::Block { span, .. }
-        | ResolvedExpr::Literal { span, .. }
-        | ResolvedExpr::Lambda { span, .. }
-        | ResolvedExpr::Match { span, .. } => {
-            Err(parse_error!(Some(span), "invalid type expression"))
-        }
-    }
-}
-
 fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
     match resolved_expr {
         ResolvedExpr::Block { statements, span } => Ok(desugar_block(statements, span).0?),
@@ -461,7 +379,7 @@ fn desugar_expr(resolved_expr: ResolvedExpr) -> FogResult<CoreExpr> {
             span,
         } => Ok(CoreExpr::Lambda {
             param_name,
-            param_type: desugar_atomic_type_expr(*param_type)?,
+            param_type,
             body: desugar_expr((*body).clone())?.into(),
             span,
         }),

@@ -7,8 +7,9 @@ use crate::lexer::token::Token;
 use crate::lexer::token::TokenKind;
 use crate::parse_error;
 use crate::parser::Literal;
-use crate::parser::core_expr::CoreDataConstructor;
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreKindExpr;
+use crate::parser::core_expr::CoreTypeExpr;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 
@@ -23,19 +24,19 @@ pub enum ParsedStatement {
     },
     TypeDeclaration {
         name: String,
-        expr: ParsedTypeExpr,
+        expr: CoreTypeExpr,
         span: Span,
     },
 
     TypeAnnotation {
         pattern: ParsedDeclPattern,
-        expr: ParsedAtomicTypeExpr,
+        expr: CoreAtomicTypeExpr,
         span: Span,
     },
     VarDeclaration {
         pattern: ParsedDeclPattern,
         expr: ParsedValueExpr,
-        span: Span,
+        // span: Span,
     },
 
     Expression {
@@ -172,133 +173,6 @@ impl OpKind {
 
 // --- expressions ---
 
-// -- type expresions
-
-#[derive(Clone)]
-pub enum ParsedTypeExpr {
-    Atomic(ParsedAtomicTypeExpr),
-    Sum {
-        ctors: Vec<ParsedDataConstructor>,
-        span: Span,
-    },
-}
-
-impl ParsedTypeExpr {
-    pub fn span(&self) -> Span {
-        match self {
-            ParsedTypeExpr::Atomic(expr) => expr.span(),
-            ParsedTypeExpr::Sum { span, .. } => *span,
-        }
-    }
-}
-
-impl Display for ParsedTypeExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ParsedTypeExpr::Atomic(expr) => write!(f, "{expr}"),
-            ParsedTypeExpr::Sum { ctors, .. } => write!(f, "{}", format_joined(ctors, " + ")),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ParsedDataConstructor {
-    pub tag: String,
-    pub types: Vec<ParsedAtomicTypeExpr>,
-}
-
-impl Display for ParsedDataConstructor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.tag)?;
-
-        for r#type in &self.types {
-            write!(f, " {}", r#type)?;
-        }
-
-        Ok(())
-    }
-}
-
-// -- type atom expresions
-
-#[derive(Clone)]
-pub enum ParsedAtomicTypeExpr {
-    Identifier {
-        name: String,
-        span: Span,
-    },
-    Function {
-        param_type: Box<ParsedAtomicTypeExpr>,
-        return_type: Box<ParsedAtomicTypeExpr>,
-        span: Span,
-    },
-    Product {
-        types: Vec<ParsedAtomicTypeExpr>,
-        span: Span,
-    },
-    FunctionAppl {
-        callee: Box<ParsedAtomicTypeExpr>,
-        arg: Box<ParsedAtomicTypeExpr>,
-        span: Span,
-    },
-}
-
-impl ParsedAtomicTypeExpr {
-    pub fn span(&self) -> Span {
-        match self {
-            ParsedAtomicTypeExpr::Identifier { span, .. }
-            | ParsedAtomicTypeExpr::Function { span, .. }
-            | ParsedAtomicTypeExpr::Product { span, .. }
-            | ParsedAtomicTypeExpr::FunctionAppl { span, .. } => *span,
-        }
-    }
-
-    pub fn uncurry(self) -> (ParsedAtomicTypeExpr, Vec<ParsedAtomicTypeExpr>) {
-        let mut args = Vec::new();
-        let mut head = self;
-
-        while let ParsedAtomicTypeExpr::FunctionAppl { callee, arg, .. } = head {
-            args.push(*arg);
-            head = *callee;
-        }
-
-        args.reverse();
-        (head, args)
-    }
-}
-
-impl Display for ParsedAtomicTypeExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ParsedAtomicTypeExpr::Identifier { name, .. } => {
-                write!(f, "{name}")
-            }
-
-            ParsedAtomicTypeExpr::Function {
-                param_type,
-                return_type,
-                ..
-            } => {
-                fmt_parenthesized(f, param_type)?;
-                write!(f, " -> ")?;
-                fmt_parenthesized(f, return_type)
-            }
-
-            ParsedAtomicTypeExpr::Product { types, .. } => {
-                write!(f, "{}", format_joined(types, " * "))
-            }
-
-            ParsedAtomicTypeExpr::FunctionAppl { callee, arg, .. } => {
-                fmt_parenthesized(f, callee)?;
-                write!(f, " ")?;
-                fmt_parenthesized(f, arg)
-            }
-        }
-    }
-}
-
-// -- value expresions
-
 #[derive(Clone)]
 pub enum ParsedValueExpr {
     Block {
@@ -319,7 +193,7 @@ pub enum ParsedValueExpr {
     },
     Lambda {
         param_name: String,
-        param_type: Box<ParsedAtomicTypeExpr>,
+        param_type: CoreAtomicTypeExpr,
         body: Box<ParsedValueExpr>,
         span: Span,
     },
