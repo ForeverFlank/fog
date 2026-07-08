@@ -81,6 +81,18 @@ pub enum CoreDeclPattern {
     },
 }
 
+impl CoreDeclPattern {
+    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        match self {
+            CoreDeclPattern::Identifier { name, .. } => Box::new(std::iter::once(name.as_str())),
+
+            CoreDeclPattern::Tuple { items, .. } => {
+                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
+            }
+        }
+    }
+}
+
 impl Display for CoreDeclPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -107,6 +119,20 @@ pub enum CoreTupleDeclPattern {
         items: Vec<CoreTupleDeclPattern>,
         span: Span,
     },
+}
+
+impl CoreTupleDeclPattern {
+    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        match self {
+            CoreTupleDeclPattern::Identifier { name, .. } => {
+                Box::new(std::iter::once(name.as_str()))
+            }
+
+            CoreTupleDeclPattern::Tuple { items, .. } => {
+                Box::new(items.iter().flat_map(|item| item.all_identifiers()))
+            }
+        }
+    }
 }
 
 impl Display for CoreTupleDeclPattern {

@@ -80,8 +80,8 @@ pub enum AtomicExpr {
         literal: Literal,
         span: Span,
     },
-    Identifier {
-        name: String,
+    Var {
+        var: ANFVar,
         span: Span,
     },
     Lambda {
@@ -105,7 +105,7 @@ impl AtomicExpr {
         match self {
             AtomicExpr::Block { span, .. }
             | AtomicExpr::Literal { span, .. }
-            | AtomicExpr::Identifier { span, .. }
+            | AtomicExpr::Var { span, .. }
             | AtomicExpr::Lambda { span, .. }
             | AtomicExpr::Tuple { span, .. }
             | AtomicExpr::Match { span, .. } => *span,
@@ -130,8 +130,8 @@ impl Display for AtomicExpr {
                 write!(f, "{literal}")
             }
 
-            AtomicExpr::Identifier { name, .. } => {
-                write!(f, "{name}")
+            AtomicExpr::Var { var, .. } => {
+                write!(f, "{var}")
             }
 
             AtomicExpr::Lambda {
