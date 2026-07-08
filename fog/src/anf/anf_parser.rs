@@ -8,15 +8,23 @@ use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 
 pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFExpr> {
-    let mut res = Vec::new();
+    let mut anfs = Vec::new();
     let mut var_counter = 0;
 
     for stmt in stmts {
-        collect_stmt_to_anf(stmt, &mut res, &mut var_counter);
+        collect_stmt_to_anf(stmt, &mut anfs, &mut var_counter);
     }
 
-    res
+    for anf in anfs {}
+
+    anfs
 }
+
+fn sort_anfs(anfs: Vec<ANFExpr>) -> Vec<ANFExpr> {
+    vec![]
+}
+
+// --- statement to ANFs ---
 
 fn collect_stmt_to_anf(
     stmt: &CoreStatement,
