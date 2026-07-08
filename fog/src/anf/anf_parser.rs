@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::anf::anf::ANFExpr;
 use crate::anf::anf::AtomicExpr;
 use crate::error::Span;
@@ -15,44 +17,81 @@ pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFExpr> {
         collect_stmt_to_anf(stmt, &mut anfs, &mut var_counter);
     }
 
-    // for anf in &mut anfs {
-    //     if let ANFExpr::Atomic(AtomicExpr::Block { anfs, .. }) = anf {
-    //         sort_anfs(anfs);
-    //     }
-    // }
+    for anf in &mut anfs {
+        if let ANFExpr::Atomic(AtomicExpr::Block { anfs, .. }) = anf {
+            sort_anfs(anfs);
+        }
+    }
 
     anfs
 }
 
-// fn sort_anfs(anfs: &mut Vec<ANFExpr>) {
-//     let num_nodes = anfs.len();
-//     let mut adj = vec![vec![]; num_nodes];
+fn sort_anfs(anfs: &mut Vec<ANFExpr>) {
+    let num_nodes = anfs.len();
+    let mut adj = vec![vec![]; num_nodes];
 
-//     for anf in anfs {
-//         match anf {
-//             ANFExpr::Atomic(atomic_expr) => match atomic_expr {
-//                 AtomicExpr::Block { anfs, .. } => todo!(),
+    for anf in anfs {
+        match anf {
+            ANFExpr::Atomic(atomic_expr) => match atomic_expr {
+                AtomicExpr::Block { anfs, .. } => {
+                    sort_anfs(anfs);
+                }
 
-//                 AtomicExpr::Literal { literal, .. } => todo!(),
+                AtomicExpr::Literal { literal, .. } => {}
 
-//                 AtomicExpr::Identifier { name, .. } => todo!(),
+                AtomicExpr::Identifier { name, .. } => todo!(),
 
-//                 AtomicExpr::Lambda {
-//                     param_name, body, ..
-//                 } => todo!(),
-//                 AtomicExpr::Tuple { items, .. } => todo!(),
+                AtomicExpr::Lambda {
+                    param_name, body, ..
+                } => todo!(),
+                AtomicExpr::Tuple { items, .. } => todo!(),
 
-//                 AtomicExpr::Match {
-//                     scrutinee, arms, ..
-//                 } => todo!(),
-//             },
+                AtomicExpr::Match {
+                    scrutinee, arms, ..
+                } => todo!(),
+            },
 
-//             ANFExpr::Declaration(core_decl_pattern, anfexpr) => todo!(),
+            ANFExpr::Declaration(core_decl_pattern, anfexpr) => todo!(),
 
-//             ANFExpr::FunctionAppl(atomic_expr, atomic_expr1) => todo!(),
-//         }
-//     }
-// }
+            ANFExpr::FunctionAppl(atomic_expr, atomic_expr1) => todo!(),
+        }
+    }
+}
+
+// --- scope ---
+
+struct Scope<'a> {
+    name_ids: HashMap<String, usize>,
+    parent: Option<&'a Scope<'a>>,
+}
+
+impl Scope<'_> {
+    fn root<'a>() -> Scope<'a> {
+        Scope {
+            name_ids: HashMap::new(),
+            parent: None,
+        }
+    }
+
+    fn child<'a>(parent: &'a Scope<'_>) -> Scope<'a> {
+        Scope {
+            name_ids: HashMap::new(),
+            parent: Some(parent),
+        }
+    }
+
+    fn register_name(&mut self, name: &str, id_counter: &mut usize) -> usize {
+        let id = *id_counter;
+        self.name_ids.insert(name.to_string(), id);
+        *id_counter += 1;
+
+        id
+    }
+
+    fn get_id(&self, name: &str) -> usize {
+        *self.name_ids.get(name).unwrap()
+    }
+}
 
 // --- statement to ANFs ---
 

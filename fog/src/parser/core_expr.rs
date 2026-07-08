@@ -89,7 +89,7 @@ impl Display for CoreDeclPattern {
             }
 
             CoreDeclPattern::Tuple { items, .. } => {
-                write!(f, "{}", format_joined(items, ", "))
+                write!(f, "({})", format_joined(items, ", "))
             }
         }
     }

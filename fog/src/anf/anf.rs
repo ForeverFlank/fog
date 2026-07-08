@@ -1,3 +1,4 @@
+use core::fmt;
 use std::fmt::Display;
 
 use crate::error::Span;
@@ -15,6 +16,10 @@ pub enum ANFExpr {
     FunctionAppl(AtomicExpr, AtomicExpr),
 }
 
+impl ANFExpr {
+    // pub fn declaration
+}
+
 impl Display for ANFExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -30,6 +35,38 @@ impl Display for ANFExpr {
                 fmt_parenthesized(f, arg)
             }
         }
+    }
+}
+
+#[derive(Clone)]
+pub enum ANFDeclPattern {
+    Single(ANFVar),
+    Tuple(Vec<ANFDeclPattern>),
+}
+
+impl Display for ANFDeclPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ANFDeclPattern::Single(var) => {
+                write!(f, "{var}")
+            }
+
+            ANFDeclPattern::Tuple(vars) => {
+                write!(f, "({})", format_joined(vars, ", "))
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct ANFVar {
+    pub id: usize,
+    pub name: String,
+}
+
+impl Display for ANFVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "t{}", self.id)
     }
 }
 
