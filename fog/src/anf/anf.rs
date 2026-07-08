@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use crate::error::Span;
 use crate::parser::Literal;
-use crate::parser::core_expr::CoreDeclPattern;
+// use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
@@ -12,7 +12,7 @@ use crate::util::indent;
 #[derive(Clone)]
 pub enum ANFExpr {
     Atomic(AtomicExpr),
-    Declaration(CoreDeclPattern, Box<ANFExpr>),
+    Declaration(ANFDeclPattern, Box<ANFExpr>),
     FunctionAppl(AtomicExpr, AtomicExpr),
 }
 
@@ -60,13 +60,17 @@ impl Display for ANFDeclPattern {
 
 #[derive(Clone)]
 pub struct ANFVar {
-    pub id: usize,
+    pub id: Option<usize>,
     pub name: String,
 }
 
 impl Display for ANFVar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "t{}", self.id)
+        if let Some(id) = self.id {
+            write!(f, "t{}", id)
+        } else {
+            write!(f, "{}", self.name)
+        }
     }
 }
 
@@ -85,7 +89,7 @@ pub enum AtomicExpr {
         span: Span,
     },
     Lambda {
-        param_name: String,
+        param: ANFVar,
         body: Box<ANFExpr>,
         span: Span,
     },
@@ -135,7 +139,9 @@ impl Display for AtomicExpr {
             }
 
             AtomicExpr::Lambda {
-                param_name, body, ..
+                param: param_name,
+                body,
+                ..
             } => {
                 write!(f, "{param_name} => {}", *body)
             }

@@ -1,6 +1,8 @@
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
+use crate::anf::anf::ANFDeclPattern;
 use crate::anf::anf::ANFExpr;
 use crate::anf::anf::ANFVar;
 use crate::anf::anf::AtomicExpr;
@@ -10,107 +12,59 @@ use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
+use crate::parser::core_expr::CoreTupleDeclPattern;
 
 pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFExpr> {
     let mut anfs = Vec::new();
 
-    let mut top_scope = Scope::new(None);
+    let mut top_scope = Scope::new_root();
     let mut var_counter = 0;
 
     collect_stmts_to_anf(stmts, &mut top_scope, &mut anfs, &mut var_counter);
 
-    for anf in &mut anfs {
-        if let ANFExpr::Atomic(AtomicExpr::Block { anfs, .. }) = anf {
-            sort_anfs(anfs);
-        }
-    }
-
     anfs
-}
-
-fn sort_anfs(anfs: &mut Vec<ANFExpr>) {
-    let num_nodes = anfs.len();
-    // let mut adj = vec![vec![]; num_nodes];
-
-    for anf in anfs {
-        match anf {
-            ANFExpr::Atomic(atomic_expr) => match atomic_expr {
-                AtomicExpr::Block { anfs, .. } => {
-                    sort_anfs(anfs);
-                }
-
-                AtomicExpr::Literal { literal, .. } => todo!(),
-
-                AtomicExpr::Var { var, .. } => {}
-
-                AtomicExpr::Lambda {
-                    param_name, body, ..
-                } => todo!(),
-                AtomicExpr::Tuple { items, .. } => todo!(),
-
-                AtomicExpr::Match {
-                    scrutinee, arms, ..
-                } => todo!(),
-            },
-
-            ANFExpr::Declaration(core_decl_pattern, anfexpr) => todo!(),
-
-            ANFExpr::FunctionAppl(atomic_expr, atomic_expr1) => todo!(),
-        }
-    }
 }
 
 // --- scope ---
 
-#[derive(Clone)]
-enum Scope {
-    Root {
-        name_ids: HashMap<String, usize>,
-        id_counter: RefCell<usize>,
-    },
-    Child {
-        name_ids: HashMap<String, usize>,
-        parent: Box<Scope>,
-    },
+struct Scope<'a> {
+    names: HashMap<String, usize>,
+    parent: Option<&'a Scope<'a>>,
+    counter: Rc<Cell<usize>>,
 }
 
-impl Scope {
-    fn new(parent: Option<Box<Scope>>) -> Scope {
-        match parent {
-            None => Scope::Root {
-                name_ids: HashMap::new(),
-                id_counter: 0.into(),
-            },
-            Some(parent) => Scope::Child {
-                name_ids: HashMap::new(),
-                parent,
-            },
+impl<'a> Scope<'a> {
+    fn new_root() -> Self {
+        Self {
+            names: HashMap::new(),
+            parent: None,
+            counter: Rc::new(Cell::new(0)),
         }
     }
 
-    fn name_ids(&mut self) -> &mut HashMap<String, usize> {
-        match self {
-            Self::Root { name_ids, .. } | Self::Child { name_ids, .. } => name_ids,
-        }
-    }
-
-    fn id(&mut self) -> &mut usize {
-        match self {
-            Scope::Root { id_counter, .. } => id_counter.get_mut(),
-            Scope::Child { parent, .. } => parent.id(),
+    fn new_child(parent: &'a Scope<'a>) -> Self {
+        Self {
+            names: HashMap::new(),
+            parent: Some(parent),
+            counter: Rc::clone(&parent.counter),
         }
     }
 
     fn register_name(&mut self, name: &str) -> usize {
-        let id = *self.id() as usize;
-        self.name_ids().insert(name.to_string(), id);
-        *self.id() += 1;
-
+        let id = self.counter.get();
+        self.counter.set(id + 1);
+        self.names.insert(name.to_string(), id);
         id
     }
 
-    fn get_id(&mut self, name: &str) -> usize {
-        *self.name_ids().get(name).unwrap()
+    fn get_id(&self, name: &str) -> Option<usize> {
+        if let Some(&id) = self.names.get(name) {
+            Some(id)
+        } else if let Some(parent) = self.parent {
+            parent.get_id(name)
+        } else {
+            None
+        }
     }
 }
 
@@ -155,7 +109,8 @@ fn collect_stmt_to_anf(
     match stmt {
         CoreStatement::VarDeclaration { pattern, expr, .. } => {
             let anf_expr = parse_expr_to_anf(expr, scope, collected_anf, var_counter);
-            let anf = ANFExpr::Declaration(pattern.clone(), anf_expr.into());
+            let anf_pattern = decl_pattern_to_anf(pattern, scope);
+            let anf = ANFExpr::Declaration(anf_pattern, anf_expr.into());
 
             collected_anf.push(anf);
         }
@@ -209,7 +164,7 @@ fn parse_expr_to_atomic(
         CoreExpr::Identifier { name, span } => AtomicExpr::Var {
             var: ANFVar {
                 id: scope.get_id(name),
-                name: *name,
+                name: name.to_string(),
             },
             span: *span,
         },
@@ -226,11 +181,18 @@ fn parse_expr_to_atomic(
             ..
         } => {
             let mut body_collected_anf = Vec::new();
-            let body_anf = parse_expr_to_anf(body, scope, &mut body_collected_anf, var_counter);
+            let mut body_scope = Scope::new_child(scope);
+            body_scope.register_name(param_name);
+
+            let body_anf =
+                parse_expr_to_anf(body, &mut body_scope, &mut body_collected_anf, var_counter);
             let body_anf = wrap_scoped_anf(body_collected_anf, body_anf, *span);
 
             AtomicExpr::Lambda {
-                param_name: param_name.clone(),
+                param: ANFVar {
+                    id: body_scope.get_id(param_name),
+                    name: param_name.to_string(),
+                },
                 body: body_anf.into(),
                 span: *span,
             }
@@ -292,17 +254,22 @@ fn parse_expr_to_atomic(
             let let_name = format!("$t{var_counter}");
             *var_counter += 1;
 
+            scope.register_name(&let_name);
+
             // declare it
-            let let_decl_pattern = CoreDeclPattern::Identifier {
+            let let_decl_pattern = ANFDeclPattern::Single(ANFVar {
+                id: scope.get_id(&let_name),
                 name: let_name.clone(),
-                span: *span,
-            };
+            });
             let let_expr = ANFExpr::Declaration(let_decl_pattern, anf.into());
             collected_anf.push(let_expr.clone());
 
             // return it
-            AtomicExpr::Identifier {
-                name: let_name,
+            AtomicExpr::Var {
+                var: ANFVar {
+                    id: scope.get_id(&let_name),
+                    name: let_name,
+                },
                 span: *span,
             }
         }
@@ -322,6 +289,38 @@ fn parse_match_arm(
     let arm_anf = wrap_scoped_anf(arm_collected_anf, arm_anf, *span);
 
     (pattern, arm_anf)
+}
+
+fn decl_pattern_to_anf(pattern: &CoreDeclPattern, scope: &Scope) -> ANFDeclPattern {
+    match pattern {
+        CoreDeclPattern::Identifier { name, .. } => ANFDeclPattern::Single(ANFVar {
+            id: scope.get_id(name),
+            name: name.clone(),
+        }),
+
+        CoreDeclPattern::Tuple { items, .. } => ANFDeclPattern::Tuple(
+            items
+                .iter()
+                .map(|item| tuple_decl_pattern_to_anf(item, scope))
+                .collect(),
+        ),
+    }
+}
+
+fn tuple_decl_pattern_to_anf(pattern: &CoreTupleDeclPattern, scope: &Scope) -> ANFDeclPattern {
+    match pattern {
+        CoreTupleDeclPattern::Identifier { name, .. } => ANFDeclPattern::Single(ANFVar {
+            id: scope.get_id(name),
+            name: name.clone(),
+        }),
+
+        CoreTupleDeclPattern::Tuple { items, .. } => ANFDeclPattern::Tuple(
+            items
+                .iter()
+                .map(|item| tuple_decl_pattern_to_anf(item, scope))
+                .collect(),
+        ),
+    }
 }
 
 fn wrap_scoped_anf(mut collected_anf: Vec<ANFExpr>, tail: ANFExpr, span: Span) -> ANFExpr {
