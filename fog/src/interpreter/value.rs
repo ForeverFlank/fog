@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
-use crate::interpreter::r#type::Type;
 use crate::parser::core_expr::CoreExpr;
 use crate::util::format_joined;
 
@@ -14,14 +13,11 @@ pub enum Value {
 
     Function {
         param_name: String,
-        param_type: Type,
-        return_type: Type,
         body: Rc<CoreExpr>,
         captured_env: Box<Environment<'static>>,
     },
+
     NativeFunction {
-        param_type: Type,
-        return_type: Type,
         function: Rc<dyn Fn(Value) -> FogResult<Value>>,
     },
 
@@ -30,31 +26,7 @@ pub enum Value {
     Constructor {
         tag: String,
         values: Vec<Value>,
-        r#type: Type,
     },
-}
-
-pub fn value_type_of(value: &Value) -> Type {
-    match value {
-        Value::Int32(_) => Type::Int32,
-        Value::Float32(_) => Type::Float32,
-
-        Value::Function {
-            param_type,
-            return_type,
-            ..
-        } => Type::function(param_type.clone(), return_type.clone()),
-
-        Value::NativeFunction {
-            param_type,
-            return_type,
-            ..
-        } => Type::function(param_type.clone(), return_type.clone()),
-
-        Value::Tuple(values) => Type::Product(values.iter().map(value_type_of).collect()),
-
-        Value::Constructor { r#type, .. } => r#type.clone(),
-    }
 }
 
 impl fmt::Display for Value {

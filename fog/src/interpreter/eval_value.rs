@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::anf::anf::ANFExpr;
+use crate::anf::anf::AtomicExpr;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
@@ -92,11 +94,11 @@ pub fn make_data_constructor_function(
 
 // --- value expression evaluator ---
 
-pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
+pub fn eval_value_expr(expr: &AtomicExpr, env: &Environment) -> FogResult<Value> {
     match expr {
-        CoreExpr::Block { statements, span } => eval_block(statements, span, env),
+        AtomicExpr::Block { anfs, span } => eval_block(anfs, span, env),
 
-        CoreExpr::Identifier { name, span } => {
+        AtomicExpr::Var { var, span } => {
             let var = env.get_value_var(name, span)?;
             var.value
                 .borrow()
@@ -104,12 +106,12 @@ pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
                 .ok_or_else(|| runtime_error!(Some(*span), "undeclared variable `{}`", name))
         }
 
-        CoreExpr::Literal { literal, .. } => match *literal {
+        AtomicExpr::Literal { literal, .. } => match *literal {
             Literal::Int32(value) => Ok(Value::Int32(value)),
             Literal::Float32(value) => Ok(Value::Float32(value)),
         },
 
-        CoreExpr::Lambda {
+        AtomicExpr::Lambda {
             param_name,
             param_type,
             body,
@@ -126,21 +128,21 @@ pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
             })
         }
 
-        CoreExpr::Tuple { items, .. } => Ok(Value::Tuple(
+        AtomicExpr::Tuple { items, .. } => Ok(Value::Tuple(
             items
                 .iter()
                 .map(|expr| eval_value_expr(expr, env))
                 .collect::<Result<Vec<Value>, FogError>>()?,
         )),
 
-        CoreExpr::FunctionAppl { callee, arg, span } => {
+        AtomicExpr::FunctionAppl { callee, arg, span } => {
             let function = eval_value_expr(callee, env)?;
             let argument = eval_value_expr(arg, env)?;
 
             eval_function_appl(function, argument, span)
         }
 
-        CoreExpr::Match {
+        AtomicExpr::Match {
             scrutinee,
             match_arms,
             span,
@@ -165,51 +167,9 @@ pub fn eval_value_expr(expr: &CoreExpr, env: &Environment) -> FogResult<Value> {
     }
 }
 
-pub fn eval_scope(
-    statements: &Vec<CoreStatement>,
-    env: &mut Environment,
-) -> FogResult<Option<Value>> {
-    // type's kind annotations
-    for stmt in statements {
-        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
-            if let Ok(Annotation::Kind(kind)) = eval_annotation_expr(expr, env) {
-                env.annotate_kind(name, kind, span)?;
-            }
-        }
-    }
-
-    // type definitions
-    for stmt in statements {
-        if let CoreStatement::Declaration { pattern, expr, .. } = stmt {
-            match pattern {
-                CoreDeclPattern::Identifier { name, span } => {
-                    // if env.types.contains_key(name) {
-                    let defined_type = eval_type_definition_expr(expr, env)?;
-                    env.declare_type(name, defined_type.clone(), span)?;
-
-                    if let Type::Sum(_) = &defined_type {
-                        register_data_constructors(env, &defined_type, span)?;
-                    }
-                    // }
-                }
-
-                _ => return Err(runtime_error!(Some(*span), "invalid type declaration")),
-            }
-        }
-    }
-
-    // variable's type annotations
-    for stmt in statements {
-        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
-            match eval_annotation_expr(expr, env)? {
-                Annotation::Type(r#type) => env.annotate_type(name, r#type, span)?,
-                _ => (),
-            }
-        }
-    }
-
+pub fn eval_scope(anfs: &Vec<ANFExpr>, env: &mut Environment) -> FogResult<Option<Value>> {
     // value declarations
-    for stmt in statements {
+    for stmt in anfs {
         if let CoreStatement::Declaration { pattern, expr, .. } = stmt {
             match pattern {
                 CoreDeclPattern::Identifier { name, span } => {
@@ -231,8 +191,8 @@ pub fn eval_scope(
     }
 
     // final expression (blocks only)
-    for stmt in statements {
-        if let CoreStatement::Expression { expr, .. } = stmt {
+    for stmt in anfs {
+        if let ANFExpr::Atomic(expr) = stmt {
             return Ok(Some(eval_value_expr(expr, env)?));
         }
     }

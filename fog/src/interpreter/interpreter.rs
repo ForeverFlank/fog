@@ -1,12 +1,11 @@
 use std::rc::Rc;
 
+use crate::anf::anf::ANFExpr;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::eval_scope;
 use crate::interpreter::value::Value;
-use crate::interpreter::variable::TypeVariable;
 use crate::interpreter::variable::ValueVariable;
-use crate::parser::core_expr::CoreStatement;
 use crate::runtime_error;
 
 fn create_top_env() -> Environment<'static> {
@@ -15,12 +14,8 @@ fn create_top_env() -> Environment<'static> {
     let var_add_int32 = ValueVariable::with_value(
         "addInt32",
         Value::NativeFunction {
-            param_type: Type::Int32,
-            return_type: Type::Function(Type::Int32.into(), Type::Int32.into()),
             function: Rc::new(|a: Value| match a {
                 Value::Int32(lhs) => Ok(Value::NativeFunction {
-                    param_type: Type::Int32,
-                    return_type: Type::Int32,
                     function: Rc::new(move |b: Value| match b {
                         Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
                         _ => Err(runtime_error!(None, "right operand is not an Int32")),
@@ -29,18 +24,13 @@ fn create_top_env() -> Environment<'static> {
                 _ => Err(runtime_error!(None, "left operand is not an Int32")),
             }),
         },
-        Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
     );
 
     let var_subtract_int32 = ValueVariable::with_value(
         "subtractInt32",
         Value::NativeFunction {
-            param_type: Type::Int32,
-            return_type: Type::Function(Type::Int32.into(), Type::Int32.into()),
             function: Rc::new(|a: Value| match a {
                 Value::Int32(lhs) => Ok(Value::NativeFunction {
-                    param_type: Type::Int32,
-                    return_type: Type::Int32,
                     function: Rc::new(move |b: Value| match b {
                         Value::Int32(rhs) => Ok(Value::Int32(lhs - rhs)),
                         _ => Err(runtime_error!(None, "right operand is not an Int32")),
@@ -49,14 +39,7 @@ fn create_top_env() -> Environment<'static> {
                 _ => Err(runtime_error!(None, "left operand is not an Int32")),
             }),
         },
-        Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
     );
-
-    vec![t_int32, t_float32, t_unit]
-        .iter()
-        .for_each(|type_var| {
-            env.types.insert(type_var.name.clone(), type_var.clone());
-        });
 
     vec![var_add_int32, var_subtract_int32]
         .iter()
@@ -67,12 +50,13 @@ fn create_top_env() -> Environment<'static> {
     env
 }
 
-pub fn interpret(statements: &Vec<CoreStatement>) -> FogResult<()> {
+pub fn interpret(statements: &Vec<ANFExpr>) -> FogResult<()> {
     // Top-level expressions are not allowed.
     for stmt in statements {
-        if let CoreStatement::Expression { span, .. } = stmt {
+        if let ANFExpr::Atomic(_) = stmt {
             return Err(runtime_error!(
-                Some(*span),
+                // Some(*span), // TODO span
+                None,
                 "cannot have final operand as a top-level statement"
             ));
         }
@@ -87,9 +71,8 @@ pub fn interpret(statements: &Vec<CoreStatement>) -> FogResult<()> {
     println!();
     for var in all_vars {
         println!(
-            "{} : {} = {}",
+            "{} = {}",
             var.name,
-            var.r#type.to_string(),
             match &*var.value.borrow() {
                 Some(value) => value.to_string(),
                 None => "[undefined]".to_string(),

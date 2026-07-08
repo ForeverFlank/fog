@@ -2,13 +2,14 @@ use std::env;
 use std::fs;
 
 use crate::error::*;
+use crate::interpreter::interpreter;
 use crate::lexer::token::*;
 use crate::lexer::*;
 use crate::parser::*;
 
 mod anf;
 mod error;
-// mod interpreter;
+mod interpreter;
 mod lexer;
 mod optimizer;
 mod parser;
@@ -64,17 +65,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // -- interpret
-    // let res = interpret(&optimized_top_stmts);
+    let res = interpreter::interpret(&anfs);
 
-    // if let Err(error) = res {
-    //     match error.span {
-    //         Some(span) => println!(
-    //             "runtime error ({}:{}): {}",
-    //             span.line, span.column, error.message
-    //         ),
-    //         None => println!("runtime error: {}", error.message),
-    //     }
-    // }
+    if let Err(error) = res {
+        match error.span {
+            Some(span) => println!(
+                "runtime error ({}:{}): {}",
+                span.line, span.column, error.message
+            ),
+            None => println!("runtime error: {}", error.message),
+        }
+    }
 
     Ok(())
 }
