@@ -15,14 +15,44 @@ pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFExpr> {
         collect_stmt_to_anf(stmt, &mut anfs, &mut var_counter);
     }
 
-    for anf in anfs {}
+    // for anf in &mut anfs {
+    //     if let ANFExpr::Atomic(AtomicExpr::Block { anfs, .. }) = anf {
+    //         sort_anfs(anfs);
+    //     }
+    // }
 
     anfs
 }
 
-fn sort_anfs(anfs: Vec<ANFExpr>) -> Vec<ANFExpr> {
-    vec![]
-}
+// fn sort_anfs(anfs: &mut Vec<ANFExpr>) {
+//     let num_nodes = anfs.len();
+//     let mut adj = vec![vec![]; num_nodes];
+
+//     for anf in anfs {
+//         match anf {
+//             ANFExpr::Atomic(atomic_expr) => match atomic_expr {
+//                 AtomicExpr::Block { anfs, .. } => todo!(),
+
+//                 AtomicExpr::Literal { literal, .. } => todo!(),
+
+//                 AtomicExpr::Identifier { name, .. } => todo!(),
+
+//                 AtomicExpr::Lambda {
+//                     param_name, body, ..
+//                 } => todo!(),
+//                 AtomicExpr::Tuple { items, .. } => todo!(),
+
+//                 AtomicExpr::Match {
+//                     scrutinee, arms, ..
+//                 } => todo!(),
+//             },
+
+//             ANFExpr::Declaration(core_decl_pattern, anfexpr) => todo!(),
+
+//             ANFExpr::FunctionAppl(atomic_expr, atomic_expr1) => todo!(),
+//         }
+//     }
+// }
 
 // --- statement to ANFs ---
 

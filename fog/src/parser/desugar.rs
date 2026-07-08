@@ -241,31 +241,14 @@ fn find_fn_clause_param_types(
             )
         };
 
-        let CoreAtomicTypeExpr::FunctionAppl {
-            callee,
-            arg: return_type,
+        let CoreAtomicTypeExpr::Function {
+            param_type,
+            return_type,
             ..
         } = remaining_type
         else {
             return Err(arity_error());
         };
-
-        let CoreAtomicTypeExpr::FunctionAppl {
-            callee: op,
-            arg: param_type,
-            ..
-        } = *callee
-        else {
-            return Err(arity_error());
-        };
-
-        let CoreAtomicTypeExpr::Identifier { name: op_name, .. } = *op else {
-            return Err(arity_error());
-        };
-
-        if op_name != "->" {
-            return Err(arity_error());
-        }
 
         param_types.push(*param_type);
         remaining_type = *return_type;
