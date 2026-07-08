@@ -23,11 +23,7 @@ impl ANFExpr {
 
             ANFExpr::Declaration(_, expr) => expr.all_ids(),
 
-            ANFExpr::FunctionAppl(callee, arg) => {
-                let mut ids = callee.all_ids();
-                ids.extend(arg.all_ids());
-                ids
-            }
+            ANFExpr::FunctionAppl(callee, arg) => appl_all_ids(callee, arg),
         }
     }
 }
@@ -41,11 +37,7 @@ impl Display for ANFExpr {
             ANFExpr::Declaration(pattern, expr, ..) => {
                 write!(f, "{pattern} = {}", *expr)
             }
-            ANFExpr::FunctionAppl(callee, arg, ..) => {
-                fmt_parenthesized(f, callee)?;
-                write!(f, " ")?;
-                fmt_parenthesized(f, arg)
-            }
+            ANFExpr::FunctionAppl(callee, arg, ..) => fmt_appl(f, callee, arg),
         }
     }
 }
@@ -64,9 +56,7 @@ impl ANFDeclPattern {
                 None => vec![],
             },
 
-            ANFDeclPattern::Tuple(vars) => {
-                Box::new(vars.iter().flat_map(|var| var.all_ids())).collect()
-            }
+            ANFDeclPattern::Tuple(vars) => vars.iter().flat_map(|var| var.all_ids()).collect(),
         }
     }
 }
@@ -96,11 +86,7 @@ impl ANFDeclExpr {
         match self {
             ANFDeclExpr::Atomic(expr) => expr.all_ids(),
 
-            ANFDeclExpr::FunctionAppl(callee, arg) => {
-                let mut ids = callee.all_ids();
-                ids.extend(arg.all_ids());
-                ids
-            }
+            ANFDeclExpr::FunctionAppl(callee, arg) => appl_all_ids(callee, arg),
         }
     }
 }
@@ -110,13 +96,21 @@ impl Display for ANFDeclExpr {
         match self {
             ANFDeclExpr::Atomic(expr) => write!(f, "{expr}"),
 
-            ANFDeclExpr::FunctionAppl(callee, arg) => {
-                fmt_parenthesized(f, callee)?;
-                write!(f, " ")?;
-                fmt_parenthesized(f, arg)
-            }
+            ANFDeclExpr::FunctionAppl(callee, arg) => fmt_appl(f, callee, arg),
         }
     }
+}
+
+fn appl_all_ids(callee: &AtomicExpr, arg: &AtomicExpr) -> Vec<usize> {
+    let mut ids = callee.all_ids();
+    ids.extend(arg.all_ids());
+    ids
+}
+
+fn fmt_appl(f: &mut fmt::Formatter<'_>, callee: &AtomicExpr, arg: &AtomicExpr) -> fmt::Result {
+    fmt_parenthesized(f, callee)?;
+    write!(f, " ")?;
+    fmt_parenthesized(f, arg)
 }
 
 impl From<ANFExpr> for ANFDeclExpr {

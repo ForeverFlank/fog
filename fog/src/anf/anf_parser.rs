@@ -17,11 +17,9 @@ use crate::parser::core_expr::CoreTupleDeclPattern;
 
 pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFExpr> {
     let mut anfs = Vec::new();
-
     let mut top_scope = Scope::new_root();
-    let mut var_counter = 0;
 
-    collect_stmts_to_anf(stmts, &mut top_scope, &mut anfs, &mut var_counter);
+    collect_stmts_to_anf(stmts, &mut top_scope, &mut anfs);
 
     anfs
 }
@@ -51,9 +49,14 @@ impl<'a> Scope<'a> {
         }
     }
 
-    fn register_name(&mut self, name: &str) -> usize {
+    fn next_id(&self) -> usize {
         let id = self.counter.get();
         self.counter.set(id + 1);
+        id
+    }
+
+    fn register_name(&mut self, name: &str) -> usize {
+        let id = self.next_id();
         self.names.insert(name.to_string(), id);
         id
     }
@@ -67,6 +70,14 @@ impl<'a> Scope<'a> {
             None
         }
     }
+
+    fn new_temp(&self) -> ANFVar {
+        let id = self.next_id();
+        ANFVar {
+            id: Some(id),
+            name: format!("$t{id}"),
+        }
+    }
 }
 
 // --- statement to ANFs ---
@@ -75,7 +86,6 @@ fn collect_stmts_to_anf(
     stmts: &Vec<CoreStatement>,
     scope: &mut Scope,
     collected_anf: &mut Vec<ANFExpr>,
-    var_counter: &mut i32,
 ) {
     for stmt in stmts {
         match stmt {
@@ -95,37 +105,45 @@ fn collect_stmts_to_anf(
     }
 
     for stmt in stmts {
-        collect_stmt_to_anf(stmt, scope, collected_anf, var_counter);
+        collect_stmt_to_anf(stmt, scope, collected_anf);
     }
 
-    let mut edges: Vec<(usize, usize)> = Vec::new();
+    // map declare LHS id(s) to their ANF expression
     let mut decl_stmt: HashMap<usize, usize> = HashMap::new();
 
     for (index, anf) in collected_anf.iter().enumerate() {
-        if let ANFExpr::Declaration(pattern, expr) = anf {
-            let expr_ids = expr.all_ids();
-
+        if let ANFExpr::Declaration(pattern, _) = anf {
             for id in pattern.all_ids() {
                 decl_stmt.insert(id, index);
-
-                for &used_id in &expr_ids {
-                    edges.push((id, used_id));
-                }
             }
         }
     }
 
-    let mut adj: HashMap<usize, Vec<usize>> =
+    // build the dependency graph
+    let mut dep_graph: HashMap<usize, Vec<usize>> =
         decl_stmt.keys().map(|&id| (id, Vec::new())).collect();
 
-    for (from, to) in edges {
-        if adj.contains_key(&to) {
-            adj.get_mut(&from).unwrap().push(to);
+    for anf in collected_anf.iter() {
+        if let ANFExpr::Declaration(pattern, expr) = anf {
+            let used_ids: Vec<usize> = expr
+                .all_ids()
+                .into_iter()
+                .filter(|id| decl_stmt.contains_key(id))
+                .collect();
+
+            for id in pattern.all_ids() {
+                dep_graph
+                    .get_mut(&id)
+                    .unwrap()
+                    .extend(used_ids.iter().copied());
+            }
         }
     }
 
-    let sccs = scc::tarjan_scc(adj);
+    // solve for SCCs of the dependency graph
+    let sccs = scc::tarjan_scc(dep_graph);
 
+    // reorder the statements according to the SCCs output
     let mut old_stmts: Vec<Option<ANFExpr>> = std::mem::take(collected_anf)
         .into_iter()
         .map(Some)
@@ -147,15 +165,10 @@ fn collect_stmts_to_anf(
     *collected_anf = reordered;
 }
 
-fn collect_stmt_to_anf(
-    stmt: &CoreStatement,
-    scope: &mut Scope,
-    collected_anf: &mut Vec<ANFExpr>,
-    var_counter: &mut i32,
-) {
+fn collect_stmt_to_anf(stmt: &CoreStatement, scope: &mut Scope, collected_anf: &mut Vec<ANFExpr>) {
     match stmt {
         CoreStatement::VarDeclaration { pattern, expr, .. } => {
-            let anf_expr = parse_expr_to_anf(expr, scope, collected_anf, var_counter);
+            let anf_expr = parse_expr_to_anf(expr, scope, collected_anf);
             let anf_pattern = decl_pattern_to_anf(pattern, scope);
             let anf = ANFExpr::Declaration(anf_pattern, anf_expr.into());
 
@@ -163,7 +176,7 @@ fn collect_stmt_to_anf(
         }
 
         CoreStatement::Expression { expr, .. } => {
-            parse_expr_to_anf(expr, scope, collected_anf, var_counter);
+            parse_expr_to_anf(expr, scope, collected_anf);
         }
 
         CoreStatement::KindAnnotation { .. }
@@ -176,7 +189,6 @@ fn parse_expr_to_anf(
     expr: &CoreExpr,
     scope: &mut Scope,
     collected_anf: &mut Vec<ANFExpr>,
-    var_counter: &mut i32,
 ) -> ANFExpr {
     match expr {
         CoreExpr::Block { .. }
@@ -184,16 +196,13 @@ fn parse_expr_to_anf(
         | CoreExpr::Literal { .. }
         | CoreExpr::Lambda { .. }
         | CoreExpr::Tuple { .. }
-        | CoreExpr::Match { .. } => ANFExpr::Atomic(parse_expr_to_atomic(
-            expr,
-            scope,
-            collected_anf,
-            var_counter,
-        )),
+        | CoreExpr::Match { .. } => {
+            ANFExpr::Atomic(parse_expr_to_atomic(expr, scope, collected_anf))
+        }
 
         CoreExpr::FunctionAppl { callee, arg, .. } => {
-            let callee = parse_expr_to_atomic(callee, scope, collected_anf, var_counter);
-            let arg = parse_expr_to_atomic(arg, scope, collected_anf, var_counter);
+            let callee = parse_expr_to_atomic(callee, scope, collected_anf);
+            let arg = parse_expr_to_atomic(arg, scope, collected_anf);
 
             ANFExpr::FunctionAppl(callee, arg)
         }
@@ -204,7 +213,6 @@ fn parse_expr_to_atomic(
     expr: &CoreExpr,
     scope: &mut Scope,
     collected_anf: &mut Vec<ANFExpr>,
-    var_counter: &mut i32,
 ) -> AtomicExpr {
     match expr {
         // atomic -- trivial parse
@@ -231,8 +239,7 @@ fn parse_expr_to_atomic(
             let mut body_scope = Scope::new_child(scope);
             body_scope.register_name(param_name);
 
-            let body_anf =
-                parse_expr_to_anf(body, &mut body_scope, &mut body_collected_anf, var_counter);
+            let body_anf = parse_expr_to_anf(body, &mut body_scope, &mut body_collected_anf);
             let body_anf = wrap_scoped_anf(body_collected_anf, body_anf, *span);
 
             AtomicExpr::Lambda {
@@ -248,7 +255,7 @@ fn parse_expr_to_atomic(
         CoreExpr::Tuple { items, span } => AtomicExpr::Tuple {
             items: items
                 .into_iter()
-                .map(|item| parse_expr_to_anf(item, scope, collected_anf, var_counter))
+                .map(|item| parse_expr_to_anf(item, scope, collected_anf))
                 .collect(),
             span: *span,
         },
@@ -258,10 +265,10 @@ fn parse_expr_to_atomic(
             arms,
             span,
         } => AtomicExpr::Match {
-            scrutinee: parse_expr_to_atomic(scrutinee, scope, collected_anf, var_counter).into(),
+            scrutinee: parse_expr_to_atomic(scrutinee, scope, collected_anf).into(),
             arms: arms
                 .iter()
-                .map(|arm| parse_match_arm(arm, scope, var_counter, span))
+                .map(|arm| parse_match_arm(arm, scope, span))
                 .collect::<Vec<(_, _)>>(),
             span: *span,
         },
@@ -272,7 +279,7 @@ fn parse_expr_to_atomic(
             let (last, stmts) = statements.split_last().unwrap();
 
             for stmt in stmts.iter() {
-                collect_stmt_to_anf(stmt, scope, &mut block_collected_anf, var_counter);
+                collect_stmt_to_anf(stmt, scope, &mut block_collected_anf);
             }
 
             let CoreStatement::Expression {
@@ -282,8 +289,7 @@ fn parse_expr_to_atomic(
                 unreachable!()
             };
 
-            let last_anf =
-                parse_expr_to_anf(last_expr, scope, &mut block_collected_anf, var_counter);
+            let last_anf = parse_expr_to_anf(last_expr, scope, &mut block_collected_anf);
             block_collected_anf.push(last_anf);
 
             AtomicExpr::Block {
@@ -293,32 +299,15 @@ fn parse_expr_to_atomic(
         }
 
         CoreExpr::FunctionAppl { callee, arg, span } => {
-            let callee = parse_expr_to_atomic(callee, scope, collected_anf, var_counter);
-            let arg = parse_expr_to_atomic(arg, scope, collected_anf, var_counter);
+            let callee = parse_expr_to_atomic(callee, scope, collected_anf);
+            let arg = parse_expr_to_atomic(arg, scope, collected_anf);
             let anf = ANFExpr::FunctionAppl(callee, arg);
 
-            // generate a new temporary variable name
-            let let_name = format!("$t{var_counter}");
-            *var_counter += 1;
+            let var = scope.new_temp();
+            let let_decl_pattern = ANFDeclPattern::Single(var.clone());
+            collected_anf.push(ANFExpr::Declaration(let_decl_pattern, anf.into()));
 
-            scope.register_name(&let_name);
-
-            // declare it
-            let let_decl_pattern = ANFDeclPattern::Single(ANFVar {
-                id: scope.get_id(&let_name),
-                name: let_name.clone(),
-            });
-            let let_expr = ANFExpr::Declaration(let_decl_pattern, anf.into());
-            collected_anf.push(let_expr.clone());
-
-            // return it
-            AtomicExpr::Var {
-                var: ANFVar {
-                    id: scope.get_id(&let_name),
-                    name: let_name,
-                },
-                span: *span,
-            }
+            AtomicExpr::Var { var, span: *span }
         }
     }
 }
@@ -326,13 +315,12 @@ fn parse_expr_to_atomic(
 fn parse_match_arm(
     arm: &CoreMatchArm,
     scope: &mut Scope,
-    var_counter: &mut i32,
     span: &Span,
 ) -> (CoreMatchArmPattern, ANFExpr) {
     let pattern = arm.pattern.clone();
 
     let mut arm_collected_anf = Vec::new();
-    let arm_anf = parse_expr_to_anf(&arm.value_expr, scope, &mut arm_collected_anf, var_counter);
+    let arm_anf = parse_expr_to_anf(&arm.value_expr, scope, &mut arm_collected_anf);
     let arm_anf = wrap_scoped_anf(arm_collected_anf, arm_anf, *span);
 
     (pattern, arm_anf)

@@ -1,0 +1,19 @@
+-- statements can be out of order!
+
+Z = Int32
+
+-- let
+y = f x
+
+-- where
+f : Z -> Z
+f x = addInt32 x c
+
+-- if
+c = 5
+
+-- and
+a = 10
+
+-- then y = 15.
+
