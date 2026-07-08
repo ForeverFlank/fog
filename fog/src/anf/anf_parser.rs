@@ -1,5 +1,6 @@
 use std::cell::Cell;
 use std::collections::HashMap;
+use std::convert::identity;
 use std::rc::Rc;
 
 use crate::anf::anf::ANFDeclPattern;
@@ -95,6 +96,23 @@ fn collect_stmts_to_anf(
 
     for stmt in stmts {
         collect_stmt_to_anf(stmt, scope, collected_anf, var_counter);
+    }
+
+    let mut edges = Vec::new();
+
+    for anf in collected_anf {
+        match anf {
+            ANFExpr::Declaration(pattern, expr) => {
+                for id in pattern.all_ids() {
+                    edges.push((id, ()))
+                }
+            }
+
+            ANFExpr::FunctionAppl(callee, arg) => {}
+
+            // this one's always the last in a scope
+            ANFExpr::Atomic(atomic_expr) => {}
+        }
     }
 
     // for id in scope.name_ids().values()

@@ -1,9 +1,9 @@
 use core::fmt;
 use std::fmt::Display;
+use std::vec;
 
 use crate::error::Span;
 use crate::parser::Literal;
-// use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
@@ -12,12 +12,18 @@ use crate::util::indent;
 #[derive(Clone)]
 pub enum ANFExpr {
     Atomic(AtomicExpr),
-    Declaration(ANFDeclPattern, Box<ANFExpr>),
+    Declaration(ANFDeclPattern, ANFDeclExpr),
     FunctionAppl(AtomicExpr, AtomicExpr),
 }
 
 impl ANFExpr {
-    // pub fn declaration
+    pub fn all_ids(&self) -> Vec<usize> {
+        match self {
+            ANFExpr::Atomic(expr) => expr.all_ids(),
+            ANFExpr::Declaration(pattern, expr) => todo!(),
+            ANFExpr::FunctionAppl(callee, arg) => todo!(),
+        }
+    }
 }
 
 impl Display for ANFExpr {
@@ -42,6 +48,21 @@ impl Display for ANFExpr {
 pub enum ANFDeclPattern {
     Single(ANFVar),
     Tuple(Vec<ANFDeclPattern>),
+}
+
+impl ANFDeclPattern {
+    pub fn all_ids(&self) -> Vec<usize> {
+        match self {
+            ANFDeclPattern::Single(var) => match var.id {
+                Some(id) => vec![id],
+                None => vec![],
+            },
+
+            ANFDeclPattern::Tuple(vars) => {
+                Box::new(vars.iter().flat_map(|var| var.all_ids())).collect()
+            }
+        }
+    }
 }
 
 impl Display for ANFDeclPattern {
