@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::collections::HashSet;
+
 // Tarjan's Strongly Connected Components algorithm
 // from https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
 
@@ -41,20 +44,18 @@
 //             while w ≠ v
 //             output the current strongly connected component
 
-fn tarjan_scc(adj: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
-    let num_indices = adj.len();
-
+pub fn tarjan_scc(adj: HashMap<usize, Vec<usize>>) -> Vec<Vec<usize>> {
     let mut index = 0usize;
     let mut stack: Vec<usize> = Vec::new();
 
-    let mut indices = vec![usize::MAX; num_indices];
-    let mut lowlinks = vec![usize::MAX; num_indices];
-    let mut on_stack = vec![false; num_indices];
+    let mut indices: HashMap<usize, usize> = HashMap::new();
+    let mut lowlinks: HashMap<usize, usize> = HashMap::new();
+    let mut on_stack: HashSet<usize> = HashSet::new();
 
     let mut sccs = Vec::new();
 
-    for v in 0..num_indices {
-        if indices[v] == usize::MAX {
+    for &v in adj.keys() {
+        if !indices.contains_key(&v) {
             strongconnect(
                 v,
                 &adj,
@@ -73,37 +74,35 @@ fn tarjan_scc(adj: Vec<Vec<usize>>) -> Vec<Vec<usize>> {
 
 fn strongconnect(
     v: usize,
-    adj: &Vec<Vec<usize>>,
+    adj: &HashMap<usize, Vec<usize>>,
     sccs: &mut Vec<Vec<usize>>,
     index: &mut usize,
-    indices: &mut Vec<usize>,
-    lowlinks: &mut Vec<usize>,
+    indices: &mut HashMap<usize, usize>,
+    lowlinks: &mut HashMap<usize, usize>,
     stack: &mut Vec<usize>,
-    on_stack: &mut Vec<bool>,
+    on_stack: &mut HashSet<usize>,
 ) {
-    indices[v] = *index;
-    lowlinks[v] = *index;
+    indices.insert(v, *index);
+    lowlinks.insert(v, *index);
     *index += 1;
     stack.push(v);
-    on_stack[v] = true;
+    on_stack.insert(v);
 
-    for w in adj[v].iter() {
-        let w = *w;
-
-        if indices[w] == usize::MAX {
+    for &w in adj.get(&v).into_iter().flatten() {
+        if !indices.contains_key(&w) {
             strongconnect(w, adj, sccs, index, indices, lowlinks, stack, on_stack);
-            lowlinks[v] = std::cmp::min(lowlinks[v], lowlinks[w]);
-        } else if on_stack[w] {
-            lowlinks[v] = std::cmp::min(lowlinks[v], indices[w]);
+            lowlinks.insert(v, std::cmp::min(lowlinks[&v], lowlinks[&w]));
+        } else if on_stack.contains(&w) {
+            lowlinks.insert(v, std::cmp::min(lowlinks[&v], indices[&w]));
         }
     }
 
-    if lowlinks[v] == indices[v] {
+    if lowlinks[&v] == indices[&v] {
         let mut scc = Vec::new();
 
         loop {
             let w = stack.pop().unwrap();
-            on_stack[w] = false;
+            on_stack.remove(&w);
             scc.push(w);
 
             if w == v {

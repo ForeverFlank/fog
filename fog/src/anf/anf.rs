@@ -20,8 +20,14 @@ impl ANFExpr {
     pub fn all_ids(&self) -> Vec<usize> {
         match self {
             ANFExpr::Atomic(expr) => expr.all_ids(),
-            ANFExpr::Declaration(pattern, expr) => todo!(),
-            ANFExpr::FunctionAppl(callee, arg) => todo!(),
+
+            ANFExpr::Declaration(_, expr) => expr.all_ids(),
+
+            ANFExpr::FunctionAppl(callee, arg) => {
+                let mut ids = callee.all_ids();
+                ids.extend(arg.all_ids());
+                ids
+            }
         }
     }
 }
@@ -75,6 +81,50 @@ impl Display for ANFDeclPattern {
             ANFDeclPattern::Tuple(vars) => {
                 write!(f, "({})", format_joined(vars, ", "))
             }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum ANFDeclExpr {
+    Atomic(AtomicExpr),
+    FunctionAppl(AtomicExpr, AtomicExpr),
+}
+
+impl ANFDeclExpr {
+    pub fn all_ids(&self) -> Vec<usize> {
+        match self {
+            ANFDeclExpr::Atomic(expr) => expr.all_ids(),
+
+            ANFDeclExpr::FunctionAppl(callee, arg) => {
+                let mut ids = callee.all_ids();
+                ids.extend(arg.all_ids());
+                ids
+            }
+        }
+    }
+}
+
+impl Display for ANFDeclExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ANFDeclExpr::Atomic(expr) => write!(f, "{expr}"),
+
+            ANFDeclExpr::FunctionAppl(callee, arg) => {
+                fmt_parenthesized(f, callee)?;
+                write!(f, " ")?;
+                fmt_parenthesized(f, arg)
+            }
+        }
+    }
+}
+
+impl From<ANFExpr> for ANFDeclExpr {
+    fn from(expr: ANFExpr) -> Self {
+        match expr {
+            ANFExpr::Atomic(atomic) => ANFDeclExpr::Atomic(atomic),
+            ANFExpr::FunctionAppl(callee, arg) => ANFDeclExpr::FunctionAppl(callee, arg),
+            ANFExpr::Declaration(..) => unreachable!(),
         }
     }
 }
@@ -134,6 +184,31 @@ impl AtomicExpr {
             | AtomicExpr::Lambda { span, .. }
             | AtomicExpr::Tuple { span, .. }
             | AtomicExpr::Match { span, .. } => *span,
+        }
+    }
+
+    pub fn all_ids(&self) -> Vec<usize> {
+        match self {
+            AtomicExpr::Block { anfs, .. } => anfs.iter().flat_map(ANFExpr::all_ids).collect(),
+
+            AtomicExpr::Literal { .. } => vec![],
+
+            AtomicExpr::Var { var, .. } => match var.id {
+                Some(id) => vec![id],
+                None => vec![],
+            },
+
+            AtomicExpr::Lambda { body, .. } => body.all_ids(),
+
+            AtomicExpr::Tuple { items, .. } => items.iter().flat_map(ANFExpr::all_ids).collect(),
+
+            AtomicExpr::Match {
+                scrutinee, arms, ..
+            } => {
+                let mut ids = scrutinee.all_ids();
+                ids.extend(arms.iter().flat_map(|(_, arm)| arm.all_ids()));
+                ids
+            }
         }
     }
 }

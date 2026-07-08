@@ -1,12 +1,12 @@
 use std::cell::Cell;
 use std::collections::HashMap;
-use std::convert::identity;
 use std::rc::Rc;
 
 use crate::anf::anf::ANFDeclPattern;
 use crate::anf::anf::ANFExpr;
 use crate::anf::anf::ANFVar;
 use crate::anf::anf::AtomicExpr;
+use crate::anf::scc;
 use crate::error::Span;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
@@ -98,24 +98,53 @@ fn collect_stmts_to_anf(
         collect_stmt_to_anf(stmt, scope, collected_anf, var_counter);
     }
 
-    let mut edges = Vec::new();
+    let mut edges: Vec<(usize, usize)> = Vec::new();
+    let mut decl_stmt: HashMap<usize, usize> = HashMap::new();
 
-    for anf in collected_anf {
-        match anf {
-            ANFExpr::Declaration(pattern, expr) => {
-                for id in pattern.all_ids() {
-                    edges.push((id, ()))
+    for (index, anf) in collected_anf.iter().enumerate() {
+        if let ANFExpr::Declaration(pattern, expr) = anf {
+            let expr_ids = expr.all_ids();
+
+            for id in pattern.all_ids() {
+                decl_stmt.insert(id, index);
+
+                for &used_id in &expr_ids {
+                    edges.push((id, used_id));
                 }
             }
-
-            ANFExpr::FunctionAppl(callee, arg) => {}
-
-            // this one's always the last in a scope
-            ANFExpr::Atomic(atomic_expr) => {}
         }
     }
 
-    // for id in scope.name_ids().values()
+    let mut adj: HashMap<usize, Vec<usize>> =
+        decl_stmt.keys().map(|&id| (id, Vec::new())).collect();
+
+    for (from, to) in edges {
+        if adj.contains_key(&to) {
+            adj.get_mut(&from).unwrap().push(to);
+        }
+    }
+
+    let sccs = scc::tarjan_scc(adj);
+
+    let mut old_stmts: Vec<Option<ANFExpr>> = std::mem::take(collected_anf)
+        .into_iter()
+        .map(Some)
+        .collect();
+    let mut reordered = Vec::new();
+
+    for scc in sccs {
+        for var in scc {
+            let stmt = decl_stmt[&var];
+
+            if let Some(anf) = old_stmts[stmt].take() {
+                reordered.push(anf);
+            }
+        }
+    }
+
+    reordered.extend(old_stmts.into_iter().flatten());
+
+    *collected_anf = reordered;
 }
 
 fn collect_stmt_to_anf(
