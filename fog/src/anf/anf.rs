@@ -10,34 +10,30 @@ use crate::util::format_joined;
 use crate::util::indent;
 
 #[derive(Clone)]
-pub enum ANFExpr {
-    Atomic(AtomicExpr),
-    Declaration(ANFDeclPattern, ANFValueExpr),
-    FunctionAppl(AtomicExpr, AtomicExpr),
+pub enum ANFStatement {
+    Declaration(ANFDeclPattern, ANFValue),
+    Value(ANFValue),
 }
 
-impl ANFExpr {
+impl ANFStatement {
     pub fn all_ids(&self) -> Vec<usize> {
         match self {
-            ANFExpr::Atomic(expr) => expr.all_ids(),
-
-            ANFExpr::Declaration(_, expr) => expr.all_ids(),
-
-            ANFExpr::FunctionAppl(callee, arg) => appl_all_ids(callee, arg),
+            ANFStatement::Declaration(_, value) => value.all_ids(),
+            ANFStatement::Value(value) => value.all_ids(),
         }
     }
 }
 
-impl Display for ANFExpr {
+impl Display for ANFStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ANFExpr::Atomic(expr) => {
-                write!(f, "{expr}")
+            ANFStatement::Declaration(pattern, value) => {
+                write!(f, "{pattern} = {value}")
             }
-            ANFExpr::Declaration(pattern, expr, ..) => {
-                write!(f, "{pattern} = {}", *expr)
+
+            ANFStatement::Value(value) => {
+                write!(f, "{value}")
             }
-            ANFExpr::FunctionAppl(callee, arg, ..) => fmt_appl(f, callee, arg),
         }
     }
 }
@@ -76,61 +72,39 @@ impl Display for ANFDeclPattern {
 }
 
 #[derive(Clone)]
-pub enum ANFValueExpr {
-    Atomic(AtomicExpr),
-    FunctionAppl(AtomicExpr, AtomicExpr),
+pub enum ANFValue {
+    Atomic(ANFAtomic),
+    FunctionAppl(ANFAtomic, ANFAtomic),
 }
 
-impl ANFValueExpr {
-    pub fn to_anf_expr(&self) -> ANFExpr {
+impl ANFValue {
+    pub fn all_ids(&self) -> Vec<usize> {
         match self {
-            ANFValueExpr::Atomic(expr) => ANFExpr::Atomic(expr.clone()),
+            ANFValue::Atomic(expr) => expr.all_ids(),
 
-            ANFValueExpr::FunctionAppl(callee, arg) => {
-                ANFExpr::FunctionAppl(callee.clone(), arg.clone())
+            ANFValue::FunctionAppl(callee, arg) => appl_all_ids(callee, arg),
+        }
+    }
+}
+
+impl Display for ANFValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ANFValue::Atomic(expr) => write!(f, "{expr}"),
+
+            ANFValue::FunctionAppl(callee, arg) => {
+                fmt_parenthesized(f, callee)?;
+                write!(f, " ")?;
+                fmt_parenthesized(f, arg)
             }
         }
     }
-
-    pub fn all_ids(&self) -> Vec<usize> {
-        match self {
-            ANFValueExpr::Atomic(expr) => expr.all_ids(),
-
-            ANFValueExpr::FunctionAppl(callee, arg) => appl_all_ids(callee, arg),
-        }
-    }
 }
 
-impl Display for ANFValueExpr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ANFValueExpr::Atomic(expr) => write!(f, "{expr}"),
-
-            ANFValueExpr::FunctionAppl(callee, arg) => fmt_appl(f, callee, arg),
-        }
-    }
-}
-
-fn appl_all_ids(callee: &AtomicExpr, arg: &AtomicExpr) -> Vec<usize> {
+fn appl_all_ids(callee: &ANFAtomic, arg: &ANFAtomic) -> Vec<usize> {
     let mut ids = callee.all_ids();
     ids.extend(arg.all_ids());
     ids
-}
-
-fn fmt_appl(f: &mut fmt::Formatter<'_>, callee: &AtomicExpr, arg: &AtomicExpr) -> fmt::Result {
-    fmt_parenthesized(f, callee)?;
-    write!(f, " ")?;
-    fmt_parenthesized(f, arg)
-}
-
-impl From<ANFExpr> for ANFValueExpr {
-    fn from(expr: ANFExpr) -> Self {
-        match expr {
-            ANFExpr::Atomic(atomic) => ANFValueExpr::Atomic(atomic),
-            ANFExpr::FunctionAppl(callee, arg) => ANFValueExpr::FunctionAppl(callee, arg),
-            ANFExpr::Declaration(..) => unreachable!(),
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -144,15 +118,15 @@ impl Display for ANFVar {
         if let Some(id) = self.id {
             write!(f, "t{}", id)
         } else {
-            write!(f, "<{}>", self.name)
+            write!(f, "{}", self.name)
         }
     }
 }
 
 #[derive(Clone)]
-pub enum AtomicExpr {
+pub enum ANFAtomic {
     Block {
-        anfs: Vec<ANFExpr>,
+        anfs: Vec<ANFStatement>,
         span: Span,
     },
     Literal {
@@ -165,50 +139,48 @@ pub enum AtomicExpr {
     },
     Lambda {
         param: ANFVar,
-        body: Box<ANFValueExpr>,
+        body: Box<ANFValue>,
         span: Span,
     },
     Tuple {
-        items: Vec<ANFValueExpr>,
+        items: Vec<ANFValue>,
         span: Span,
     },
     Match {
-        scrutinee: Box<AtomicExpr>,
-        arms: Vec<(CoreMatchArmPattern, ANFValueExpr)>,
+        scrutinee: Box<ANFAtomic>,
+        arms: Vec<(CoreMatchArmPattern, ANFValue)>,
         span: Span,
     },
 }
 
-impl AtomicExpr {
+impl ANFAtomic {
     pub fn span(&self) -> Span {
         match self {
-            AtomicExpr::Block { span, .. }
-            | AtomicExpr::Literal { span, .. }
-            | AtomicExpr::Var { span, .. }
-            | AtomicExpr::Lambda { span, .. }
-            | AtomicExpr::Tuple { span, .. }
-            | AtomicExpr::Match { span, .. } => *span,
+            ANFAtomic::Block { span, .. }
+            | ANFAtomic::Literal { span, .. }
+            | ANFAtomic::Var { span, .. }
+            | ANFAtomic::Lambda { span, .. }
+            | ANFAtomic::Tuple { span, .. }
+            | ANFAtomic::Match { span, .. } => *span,
         }
     }
 
     pub fn all_ids(&self) -> Vec<usize> {
         match self {
-            AtomicExpr::Block { anfs, .. } => anfs.iter().flat_map(ANFExpr::all_ids).collect(),
+            ANFAtomic::Block { anfs, .. } => anfs.iter().flat_map(ANFStatement::all_ids).collect(),
 
-            AtomicExpr::Literal { .. } => vec![],
+            ANFAtomic::Literal { .. } => vec![],
 
-            AtomicExpr::Var { var, .. } => match var.id {
+            ANFAtomic::Var { var, .. } => match var.id {
                 Some(id) => vec![id],
                 None => vec![],
             },
 
-            AtomicExpr::Lambda { body, .. } => body.all_ids(),
+            ANFAtomic::Lambda { body, .. } => body.all_ids(),
 
-            AtomicExpr::Tuple { items, .. } => {
-                items.iter().flat_map(ANFValueExpr::all_ids).collect()
-            }
+            ANFAtomic::Tuple { items, .. } => items.iter().flat_map(ANFValue::all_ids).collect(),
 
-            AtomicExpr::Match {
+            ANFAtomic::Match {
                 scrutinee, arms, ..
             } => {
                 let mut ids = scrutinee.all_ids();
@@ -219,10 +191,10 @@ impl AtomicExpr {
     }
 }
 
-impl Display for AtomicExpr {
+impl Display for ANFAtomic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AtomicExpr::Block { anfs, .. } => {
+            ANFAtomic::Block { anfs, .. } => {
                 write!(f, "{{\n")?;
 
                 for anf in anfs {
@@ -232,15 +204,15 @@ impl Display for AtomicExpr {
                 write!(f, "}}")
             }
 
-            AtomicExpr::Literal { literal, .. } => {
+            ANFAtomic::Literal { literal, .. } => {
                 write!(f, "{literal}")
             }
 
-            AtomicExpr::Var { var, .. } => {
+            ANFAtomic::Var { var, .. } => {
                 write!(f, "{var}")
             }
 
-            AtomicExpr::Lambda {
+            ANFAtomic::Lambda {
                 param: param_name,
                 body,
                 ..
@@ -248,11 +220,11 @@ impl Display for AtomicExpr {
                 write!(f, "{param_name} => {}", *body)
             }
 
-            AtomicExpr::Tuple { items, .. } => {
+            ANFAtomic::Tuple { items, .. } => {
                 write!(f, "({})", format_joined(items, ", "))
             }
 
-            AtomicExpr::Match {
+            ANFAtomic::Match {
                 scrutinee, arms, ..
             } => {
                 write!(f, "match {} {{\n", *scrutinee)?;

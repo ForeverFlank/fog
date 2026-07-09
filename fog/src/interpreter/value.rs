@@ -1,7 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
-use crate::anf::anf::ANFValueExpr;
+use crate::anf::anf::ANFValue;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::util::format_joined;
@@ -13,7 +13,7 @@ pub enum Value {
 
     Function {
         param: String,
-        body: Rc<ANFValueExpr>,
+        body: Rc<ANFValue>,
         captured_env: Box<Environment<'static>>,
     },
 

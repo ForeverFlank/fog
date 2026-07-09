@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::anf::anf::ANFExpr;
+use crate::anf::anf::ANFStatement;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::eval_scope;
@@ -50,10 +50,10 @@ fn create_top_env() -> Environment<'static> {
     env
 }
 
-pub fn interpret(anfs: &Vec<ANFExpr>) -> FogResult<()> {
+pub fn interpret(anfs: &Vec<ANFStatement>) -> FogResult<()> {
     // Top-level expressions are not allowed.
     for anf in anfs {
-        if let ANFExpr::Atomic(_) = anf {
+        if let ANFStatement::Value(_) = anf {
             return Err(runtime_error!(
                 // Some(*span), // TODO span
                 None,
