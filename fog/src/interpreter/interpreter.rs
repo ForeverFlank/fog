@@ -50,10 +50,10 @@ fn create_top_env() -> Environment<'static> {
     env
 }
 
-pub fn interpret(statements: &Vec<ANFExpr>) -> FogResult<()> {
+pub fn interpret(anfs: &Vec<ANFExpr>) -> FogResult<()> {
     // Top-level expressions are not allowed.
-    for stmt in statements {
-        if let ANFExpr::Atomic(_) = stmt {
+    for anf in anfs {
+        if let ANFExpr::Atomic(_) = anf {
             return Err(runtime_error!(
                 // Some(*span), // TODO span
                 None,
@@ -63,7 +63,7 @@ pub fn interpret(statements: &Vec<ANFExpr>) -> FogResult<()> {
     }
 
     let mut top_env = create_top_env();
-    eval_scope(statements, &mut top_env)?;
+    eval_scope(anfs, &mut top_env)?;
 
     let mut all_vars: Vec<ValueVariable> = top_env.variables.values().cloned().collect();
     all_vars.sort_by(|a, b| a.name.cmp(&b.name));

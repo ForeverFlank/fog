@@ -2,7 +2,6 @@ use std::env;
 use std::fs;
 
 use crate::error::*;
-use crate::interpreter::interpreter;
 use crate::lexer::token::*;
 use crate::lexer::*;
 use crate::parser::*;
@@ -49,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let anfs = anf::anf_parser::parse_anf(&top_stmts);
 
-    for anf in anfs {
+    for anf in anfs.as_slice() {
         println!("{anf}");
     }
 
@@ -71,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match error.span {
             Some(span) => println!(
                 "runtime error ({}:{}): {}",
-                span.line, span.column, error.message
+                span.start.line, span.start.column, error.message
             ),
             None => println!("runtime error: {}", error.message),
         }

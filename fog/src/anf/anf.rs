@@ -12,7 +12,7 @@ use crate::util::indent;
 #[derive(Clone)]
 pub enum ANFExpr {
     Atomic(AtomicExpr),
-    Declaration(ANFDeclPattern, ANFDeclExpr),
+    Declaration(ANFDeclPattern, ANFValueExpr),
     FunctionAppl(AtomicExpr, AtomicExpr),
 }
 
@@ -76,27 +76,37 @@ impl Display for ANFDeclPattern {
 }
 
 #[derive(Clone)]
-pub enum ANFDeclExpr {
+pub enum ANFValueExpr {
     Atomic(AtomicExpr),
     FunctionAppl(AtomicExpr, AtomicExpr),
 }
 
-impl ANFDeclExpr {
+impl ANFValueExpr {
+    pub fn to_anf_expr(&self) -> ANFExpr {
+        match self {
+            ANFValueExpr::Atomic(expr) => ANFExpr::Atomic(expr.clone()),
+
+            ANFValueExpr::FunctionAppl(callee, arg) => {
+                ANFExpr::FunctionAppl(callee.clone(), arg.clone())
+            }
+        }
+    }
+
     pub fn all_ids(&self) -> Vec<usize> {
         match self {
-            ANFDeclExpr::Atomic(expr) => expr.all_ids(),
+            ANFValueExpr::Atomic(expr) => expr.all_ids(),
 
-            ANFDeclExpr::FunctionAppl(callee, arg) => appl_all_ids(callee, arg),
+            ANFValueExpr::FunctionAppl(callee, arg) => appl_all_ids(callee, arg),
         }
     }
 }
 
-impl Display for ANFDeclExpr {
+impl Display for ANFValueExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ANFDeclExpr::Atomic(expr) => write!(f, "{expr}"),
+            ANFValueExpr::Atomic(expr) => write!(f, "{expr}"),
 
-            ANFDeclExpr::FunctionAppl(callee, arg) => fmt_appl(f, callee, arg),
+            ANFValueExpr::FunctionAppl(callee, arg) => fmt_appl(f, callee, arg),
         }
     }
 }
@@ -113,11 +123,11 @@ fn fmt_appl(f: &mut fmt::Formatter<'_>, callee: &AtomicExpr, arg: &AtomicExpr) -
     fmt_parenthesized(f, arg)
 }
 
-impl From<ANFExpr> for ANFDeclExpr {
+impl From<ANFExpr> for ANFValueExpr {
     fn from(expr: ANFExpr) -> Self {
         match expr {
-            ANFExpr::Atomic(atomic) => ANFDeclExpr::Atomic(atomic),
-            ANFExpr::FunctionAppl(callee, arg) => ANFDeclExpr::FunctionAppl(callee, arg),
+            ANFExpr::Atomic(atomic) => ANFValueExpr::Atomic(atomic),
+            ANFExpr::FunctionAppl(callee, arg) => ANFValueExpr::FunctionAppl(callee, arg),
             ANFExpr::Declaration(..) => unreachable!(),
         }
     }
@@ -155,16 +165,16 @@ pub enum AtomicExpr {
     },
     Lambda {
         param: ANFVar,
-        body: Box<ANFExpr>,
+        body: Box<ANFValueExpr>,
         span: Span,
     },
     Tuple {
-        items: Vec<ANFExpr>,
+        items: Vec<ANFValueExpr>,
         span: Span,
     },
     Match {
         scrutinee: Box<AtomicExpr>,
-        arms: Vec<(CoreMatchArmPattern, ANFExpr)>,
+        arms: Vec<(CoreMatchArmPattern, ANFValueExpr)>,
         span: Span,
     },
 }
@@ -194,7 +204,9 @@ impl AtomicExpr {
 
             AtomicExpr::Lambda { body, .. } => body.all_ids(),
 
-            AtomicExpr::Tuple { items, .. } => items.iter().flat_map(ANFExpr::all_ids).collect(),
+            AtomicExpr::Tuple { items, .. } => {
+                items.iter().flat_map(ANFValueExpr::all_ids).collect()
+            }
 
             AtomicExpr::Match {
                 scrutinee, arms, ..

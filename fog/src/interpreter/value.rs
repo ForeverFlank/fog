@@ -1,9 +1,9 @@
 use std::fmt;
 use std::rc::Rc;
 
+use crate::anf::anf::ANFValueExpr;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
-use crate::parser::core_expr::CoreExpr;
 use crate::util::format_joined;
 
 #[derive(Clone)]
@@ -12,8 +12,8 @@ pub enum Value {
     Float32(f32),
 
     Function {
-        param_name: String,
-        body: Rc<CoreExpr>,
+        param: String,
+        body: Rc<ANFValueExpr>,
         captured_env: Box<Environment<'static>>,
     },
 
@@ -35,9 +35,7 @@ impl fmt::Display for Value {
             Value::Int32(value) => write!(f, "{}", value),
             Value::Float32(value) => write!(f, "{}", value),
 
-            Value::Function {
-                param_name, body, ..
-            } => write!(f, "{} => {}", param_name, body),
+            Value::Function { param, body, .. } => write!(f, "{param} => {body}"),
 
             Value::NativeFunction { .. } => write!(f, "[native function]"),
 

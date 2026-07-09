@@ -7,6 +7,6 @@ pub mod interpreter;
 pub mod value;
 pub mod variable;
 
-pub fn interpret(statements: &Vec<ANFExpr>) -> FogResult<()> {
-    interpreter::interpret(statements)
+pub fn interpret(anfs: &Vec<ANFExpr>) -> FogResult<()> {
+    interpreter::interpret(anfs)
 }

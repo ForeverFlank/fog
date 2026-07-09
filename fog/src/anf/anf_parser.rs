@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use crate::anf::anf::ANFDeclPattern;
 use crate::anf::anf::ANFExpr;
+use crate::anf::anf::ANFValueExpr;
 use crate::anf::anf::ANFVar;
 use crate::anf::anf::AtomicExpr;
 use crate::anf::scc;
@@ -189,7 +190,7 @@ fn parse_expr_to_anf(
     expr: &CoreExpr,
     scope: &mut Scope,
     collected_anf: &mut Vec<ANFExpr>,
-) -> ANFExpr {
+) -> ANFValueExpr {
     match expr {
         CoreExpr::Block { .. }
         | CoreExpr::Identifier { .. }
@@ -197,14 +198,14 @@ fn parse_expr_to_anf(
         | CoreExpr::Lambda { .. }
         | CoreExpr::Tuple { .. }
         | CoreExpr::Match { .. } => {
-            ANFExpr::Atomic(parse_expr_to_atomic(expr, scope, collected_anf))
+            ANFValueExpr::Atomic(parse_expr_to_atomic(expr, scope, collected_anf))
         }
 
         CoreExpr::FunctionAppl { callee, arg, .. } => {
             let callee = parse_expr_to_atomic(callee, scope, collected_anf);
             let arg = parse_expr_to_atomic(arg, scope, collected_anf);
 
-            ANFExpr::FunctionAppl(callee, arg)
+            ANFValueExpr::FunctionAppl(callee, arg)
         }
     }
 }
@@ -290,7 +291,7 @@ fn parse_expr_to_atomic(
             };
 
             let last_anf = parse_expr_to_anf(last_expr, scope, &mut block_collected_anf);
-            block_collected_anf.push(last_anf);
+            block_collected_anf.push(last_anf.to_anf_expr());
 
             AtomicExpr::Block {
                 anfs: block_collected_anf,
@@ -316,7 +317,7 @@ fn parse_match_arm(
     arm: &CoreMatchArm,
     scope: &mut Scope,
     span: &Span,
-) -> (CoreMatchArmPattern, ANFExpr) {
+) -> (CoreMatchArmPattern, ANFValueExpr) {
     let pattern = arm.pattern.clone();
 
     let mut arm_collected_anf = Vec::new();
@@ -358,13 +359,17 @@ fn tuple_decl_pattern_to_anf(pattern: &CoreTupleDeclPattern, scope: &Scope) -> A
     }
 }
 
-fn wrap_scoped_anf(mut collected_anf: Vec<ANFExpr>, tail: ANFExpr, span: Span) -> ANFExpr {
+fn wrap_scoped_anf(
+    mut collected_anf: Vec<ANFExpr>,
+    tail: ANFValueExpr,
+    span: Span,
+) -> ANFValueExpr {
     if collected_anf.is_empty() {
         tail
     } else {
-        collected_anf.push(tail);
+        collected_anf.push(tail.to_anf_expr());
 
-        ANFExpr::Atomic(AtomicExpr::Block {
+        ANFValueExpr::Atomic(AtomicExpr::Block {
             anfs: collected_anf,
             span,
         })

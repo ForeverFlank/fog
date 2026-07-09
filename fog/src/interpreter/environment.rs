@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::error::FogResult;
-use crate::error::Span;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::ValueVariable;
 use crate::runtime_error;
@@ -38,17 +37,18 @@ impl<'a> Environment<'a> {
 
     // --- getters ---
 
-    pub fn get_value_var(&self, name: &str, span: &Span) -> FogResult<ValueVariable> {
+    pub fn get_value_var(&self, name: &str) -> FogResult<ValueVariable> {
         if let Some(var) = self.variables.get(name) {
             return Ok(var.clone());
         }
 
         if let Some(parent) = &self.parent {
-            return parent.get_value_var(name, span);
+            return parent.get_value_var(name);
         }
 
         Err(runtime_error!(
-            Some(*span),
+            // Some(*span),
+            None,
             "variable `{}` not found in the current scope",
             name
         ))
@@ -58,7 +58,7 @@ impl<'a> Environment<'a> {
 
     // -- declare
 
-    pub fn declare_value(&mut self, name: &str, value: Value, span: &Span) -> FogResult<()> {
+    pub fn declare_value(&mut self, name: &str, value: Value) -> FogResult<()> {
         if name == "_" {
             return Ok(());
         }
@@ -66,7 +66,8 @@ impl<'a> Environment<'a> {
         if let Some(var) = self.variables.get(name) {
             if var.value.borrow().is_some() {
                 return Err(runtime_error!(
-                    Some(*span),
+                    // Some(*span),
+                    None,
                     "variable `{}` already declared in the current scope",
                     name
                 ));
