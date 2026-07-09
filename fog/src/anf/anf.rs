@@ -144,7 +144,7 @@ impl Display for ANFVar {
         if let Some(id) = self.id {
             write!(f, "t{}", id)
         } else {
-            write!(f, "{}", self.name)
+            write!(f, "<{}>", self.name)
         }
     }
 }

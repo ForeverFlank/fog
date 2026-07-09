@@ -13,7 +13,7 @@ f x = addInt32 x c
 c = 5
 
 -- and
-a = 10
+x = 10
 
 -- then y = 15.
 

@@ -56,7 +56,7 @@ pub fn eval_atomic_expr(expr: &AtomicExpr, env: &Environment) -> FogResult<Value
             captured_env: env.flatten().into(),
         }),
 
-        AtomicExpr::Tuple { items, span } => Ok(Value::Tuple(
+        AtomicExpr::Tuple { items, .. } => Ok(Value::Tuple(
             items
                 .iter()
                 .map(|expr| eval_value_expr(expr, env))
@@ -91,8 +91,8 @@ pub fn eval_atomic_expr(expr: &AtomicExpr, env: &Environment) -> FogResult<Value
 
 pub fn eval_scope(anfs: &Vec<ANFExpr>, env: &mut Environment) -> FogResult<Option<Value>> {
     // value declarations
-    for stmt in anfs {
-        if let ANFExpr::Declaration(pattern, expr) = stmt {
+    for anf in anfs {
+        if let ANFExpr::Declaration(pattern, expr) = anf {
             match pattern {
                 ANFDeclPattern::Single(var) => {
                     let value = eval_value_expr(expr, env)?;
@@ -108,9 +108,18 @@ pub fn eval_scope(anfs: &Vec<ANFExpr>, env: &mut Environment) -> FogResult<Optio
     }
 
     // final expression (blocks only)
-    for stmt in anfs {
-        if let ANFExpr::Atomic(expr) = stmt {
+    for anf in anfs {
+        println!(": {anf}");
+
+        if let ANFExpr::Atomic(expr) = anf {
             return Ok(Some(eval_atomic_expr(expr, env)?));
+        }
+
+        if let ANFExpr::FunctionAppl(callee, arg) = anf {
+            return Ok(Some(eval_value_expr(
+                &ANFValueExpr::FunctionAppl(callee.clone(), arg.clone()),
+                env,
+            )?));
         }
     }
 
