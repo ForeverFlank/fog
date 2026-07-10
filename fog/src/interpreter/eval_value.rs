@@ -122,6 +122,14 @@ pub fn eval_atomic(expr: &ANFAtomic, env: &Environment) -> FogResult<Value> {
 
             Err(runtime_error!(Some(*span), "match expression not covered"))
         }
+
+        ANFAtomic::Constructor { tag, items, .. } => Ok(Value::Constructor {
+            tag: tag.to_string(),
+            values: items
+                .into_iter()
+                .map(|item| eval_value(item, env))
+                .collect::<Result<Vec<_>, _>>()?,
+        }),
     }
 }
 

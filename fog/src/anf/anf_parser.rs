@@ -99,6 +99,7 @@ fn collect_stmts_to_anf(
             CoreStatement::Expression { .. } => {}
 
             // for data constructors
+            // collect sum type tags here
             CoreStatement::TypeDeclaration { .. } => {}
 
             // types erased -- no works needed!

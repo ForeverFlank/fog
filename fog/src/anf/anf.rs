@@ -151,6 +151,11 @@ pub enum ANFAtomic {
         arms: Vec<(CoreMatchArmPattern, ANFValue)>,
         span: Span,
     },
+    Constructor {
+        tag: String,
+        items: Vec<ANFValue>,
+        span: Span,
+    },
 }
 
 impl ANFAtomic {
@@ -161,15 +166,14 @@ impl ANFAtomic {
             | ANFAtomic::Var { span, .. }
             | ANFAtomic::Lambda { span, .. }
             | ANFAtomic::Tuple { span, .. }
-            | ANFAtomic::Match { span, .. } => *span,
+            | ANFAtomic::Match { span, .. }
+            | ANFAtomic::Constructor { span, .. } => *span,
         }
     }
 
     pub fn all_ids(&self) -> Vec<usize> {
         match self {
             ANFAtomic::Block { anfs, .. } => anfs.iter().flat_map(ANFStatement::all_ids).collect(),
-
-            ANFAtomic::Literal { .. } => vec![],
 
             ANFAtomic::Var { var, .. } => match var.id {
                 Some(id) => vec![id],
@@ -187,6 +191,9 @@ impl ANFAtomic {
                 ids.extend(arms.iter().flat_map(|(_, arm)| arm.all_ids()));
                 ids
             }
+
+            ANFAtomic::Literal { .. } => vec![],
+            ANFAtomic::Constructor { .. } => vec![],
         }
     }
 }
@@ -228,10 +235,22 @@ impl Display for ANFAtomic {
                 scrutinee, arms, ..
             } => {
                 write!(f, "match {} {{\n", *scrutinee)?;
+
                 for arm in arms {
                     write!(f, "{}\n", indent(&format!("{} => {}", arm.0, arm.1)))?;
                 }
+
                 write!(f, "}}")
+            }
+
+            ANFAtomic::Constructor { tag, items, .. } => {
+                write!(f, "{tag}")?;
+
+                for item in items {
+                    fmt_parenthesized(f, item)?;
+                }
+
+                Ok(())
             }
         }
     }
