@@ -5,7 +5,7 @@
 -- this is a barebone example
 
 Bool : Type
-Bool = True + False
+Bool = True | False
 
 and : Bool -> Bool -> Bool
 and = b1 : Bool => b2 : Bool => match (b1, b2) {

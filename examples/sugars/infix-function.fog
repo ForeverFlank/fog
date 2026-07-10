@@ -1,5 +1,5 @@
 Bool : Type
-Bool = True + False
+Bool = True | False
 
 -- style 1
 -- infix name left|right precedence

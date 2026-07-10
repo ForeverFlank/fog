@@ -1,5 +1,5 @@
 List : Type -> Type
-List t = Nil + Cons t (List t)
+List t = Nil | Cons t (List t)
 
 map : (a -> b) -> List a -> List b
 map f (Cons x xs) = Cons (f x) (map f xs)

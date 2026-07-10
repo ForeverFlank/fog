@@ -1,5 +1,5 @@
 GradeLetter : Type
-GradeLetter = A + B + C + D + F + S + U
+GradeLetter = A | B | C | D | F | S | U
 
 isPassed : GradeLetter -> Bool
 isPassed grade =

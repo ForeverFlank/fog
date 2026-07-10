@@ -7,7 +7,6 @@ use crate::anf::anf::ANFStatement;
 use crate::anf::anf::ANFValue;
 use crate::error::FogError;
 use crate::error::FogResult;
-use crate::error::Span;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::value::Value;
 use crate::interpreter::variable::ValueVariable;

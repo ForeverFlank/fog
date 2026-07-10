@@ -1,5 +1,5 @@
 Bool : Type
-Bool = True + False
+Bool = True | False
 
 not : Bool -> Bool
 not b = match b {

@@ -1,7 +1,7 @@
 -- matching sum types
 
 Bool : Type
-Bool = True + False
+Bool = True | False
 
 and : Bool -> Bool -> Bool
 and = b1 : Bool => b2 : Bool => match b1 {

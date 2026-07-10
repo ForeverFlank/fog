@@ -1,44 +1,39 @@
 -- product types
 -- also known as tuples
 
-tuple : Int32 * Float32
-tuple = (10, 2.4f)
+tuple : Int32 * Int32
+tuple = (10, 20)
 
-num1 = tuple[0]   -- 10
-num2 = tuple[1]   -- 2.4f
-
-
--- records
-
-Person : Type
-Person = { name : String, age : Int32 }
-
-alice : Person
-alice = { name = "Alice", age = 67 }
-
+(num1, num2) = tuple
 
 -- sum types
 
 Bool : Type
-Bool = False + True
+Bool = False | True
 
 Shape : Type
 Shape =
-    Circle    { radius : Float32 }
-  + Rectangle { width : Float32, height : Float32 }
-  + Triangle  { width : Float32, height : Float32 }
+  | Circle    { radius : Float32 }
+  | Rectangle { width : Float32, height : Float32 }
+  | Triangle  { width : Float32, height : Float32 }
 
+-- records
+
+Person : Type
+Person = Person { name : String, age : Int32 }
+
+alice = Person { name = "Alice", age = 67 }
 
 -- parametric types
 
 Option : Type -> Type
-Option t = Some t + None
+Option t = Some t | None
 
 Result : Type -> Type
-Result t e = Ok t + Error e
+Result t e = Ok t | Error e
 
 List : Type -> Type
-List t = Nil + Cons t (List t)
+List t = Nil | Cons t (List t)
 
 UserId : Type
 UserId = UserId Int32   -- sum type with only one tag

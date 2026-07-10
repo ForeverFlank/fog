@@ -1,5 +1,5 @@
 Option : Type -> Type
-Option t = Some t + None
+Option t = Some t | None
 
 isSome : Option t -> Bool
 isSome (Some _) = True

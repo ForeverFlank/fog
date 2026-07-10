@@ -2,7 +2,7 @@
 
 -- shape type, described by side lengths
 Shape : Type
-Shape = Tri Int32 Int32 Int32 + Quad Int32 Int32 Int32 Int32
+Shape = Tri Int32 Int32 Int32 | Quad Int32 Int32 Int32 Int32
 
 perimeter : Shape -> Int32
 perimeter = shape : Shape => match shape {

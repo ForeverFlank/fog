@@ -5,7 +5,7 @@
 -- in mainstream programming languages
 
 OptionInt32 : Type
-OptionInt32 = Some Int32 + None
+OptionInt32 = Some Int32 | None
 
 someInt : OptionInt32
 someInt = Some 100
