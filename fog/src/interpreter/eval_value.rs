@@ -111,7 +111,7 @@ pub fn eval_atomic(expr: &ANFAtomic, env: &Environment) -> FogResult<Value> {
                     for (name, val) in &bindings {
                         arm_env
                             .variables
-                            .insert(name.clone(), ValueVariable::with_value(name, val.clone()));
+                            .insert(name.clone(), ValueVariable::new(name, val.clone()));
                     }
 
                     return eval_value(expr, &arm_env);
@@ -178,7 +178,7 @@ fn eval_function_appl(function: Value, argument: Value) -> FogResult<Value> {
 
             child_env
                 .variables
-                .insert(param.clone(), ValueVariable::with_value(&param, argument));
+                .insert(param.clone(), ValueVariable::new(&param, argument));
 
             eval_value(&body, &child_env)
         }

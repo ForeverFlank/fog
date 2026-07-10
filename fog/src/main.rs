@@ -12,6 +12,7 @@ mod interpreter;
 mod lexer;
 mod optimizer;
 mod parser;
+mod prelude;
 mod static_check;
 mod util;
 

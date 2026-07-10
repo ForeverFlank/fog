@@ -76,7 +76,7 @@ impl<'a> Environment<'a> {
             *var.value.borrow_mut() = Some(value);
         } else {
             self.variables
-                .insert(name.to_string(), ValueVariable::with_value(name, value));
+                .insert(name.to_string(), ValueVariable::new(name, value));
         }
 
         Ok(())

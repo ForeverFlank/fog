@@ -10,14 +10,7 @@ pub struct ValueVariable {
 }
 
 impl ValueVariable {
-    pub fn without_value(name: &str) -> Self {
-        ValueVariable {
-            name: name.to_string(),
-            value: Rc::new(RefCell::new(None)),
-        }
-    }
-
-    pub fn with_value(name: &str, value: Value) -> Self {
+    pub fn new(name: &str, value: Value) -> Self {
         ValueVariable {
             name: name.to_string(),
             value: Rc::new(RefCell::new(Some(value))),

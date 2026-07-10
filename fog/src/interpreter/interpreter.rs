@@ -11,7 +11,7 @@ use crate::runtime_error;
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
 
-    let var_add_int32 = ValueVariable::with_value(
+    let var_add_int32 = ValueVariable::new(
         "addInt32",
         Value::NativeFunction {
             function: Rc::new(|a: Value| match a {
@@ -26,7 +26,7 @@ fn create_top_env() -> Environment<'static> {
         },
     );
 
-    let var_subtract_int32 = ValueVariable::with_value(
+    let var_subtract_int32 = ValueVariable::new(
         "subtractInt32",
         Value::NativeFunction {
             function: Rc::new(|a: Value| match a {
