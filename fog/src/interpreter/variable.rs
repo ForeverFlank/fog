@@ -1,9 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::error::FogResult;
 use crate::interpreter::value::Value;
-use crate::runtime_error;
 
 #[derive(Clone)]
 pub struct ValueVariable {

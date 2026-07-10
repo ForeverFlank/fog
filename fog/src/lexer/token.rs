@@ -12,9 +12,11 @@ pub enum TokenKind {
     Identifier(String),
     Equal,
     Colon,
+
     Arrow,
     FatArrow,
     Comma,
+    Bar,
 
     // parentheses
     LeftParenthesis,
@@ -49,6 +51,8 @@ pub fn match_one_char_token(ch: char) -> Option<TokenKind> {
         ':' => Some(TokenKind::Colon),
         '=' => Some(TokenKind::Equal),
         ',' => Some(TokenKind::Comma),
+        '|' => Some(TokenKind::Bar),
+
         '(' => Some(TokenKind::LeftParenthesis),
         ')' => Some(TokenKind::RightParenthesis),
         '{' => Some(TokenKind::LeftBrace),
@@ -112,6 +116,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Arrow => write!(f, "Arrow"),
             TokenKind::FatArrow => write!(f, "FatArrow"),
             TokenKind::Comma => write!(f, "Comma"),
+            TokenKind::Bar => write!(f, "Bar"),
 
             TokenKind::LeftParenthesis => write!(f, "LeftParenthesis"),
             TokenKind::RightParenthesis => write!(f, "RightParenthesis"),

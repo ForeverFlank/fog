@@ -497,14 +497,17 @@ impl Parser<'_> {
 
     fn parse_type_expr(&mut self) -> FogResult<CoreTypeExpr> {
         let start_span = self.peek().span;
+
+        // TODO: leading bar |
+
         let first = self.parse_atomic_type_expr()?;
 
-        if let TokenKind::Plus = self.peek().kind {
+        if let TokenKind::Bar = self.peek().kind {
             // expression is a sum type declaration
 
             let mut ctors = vec![first];
 
-            while let TokenKind::Plus = self.peek().kind {
+            while let TokenKind::Bar = self.peek().kind {
                 self.next();
                 ctors.push(self.parse_atomic_type_expr()?);
             }
