@@ -34,8 +34,6 @@ pub fn eval_scope(anfs: &Vec<ANFStatement>, env: &mut Environment) -> FogResult<
 
     // final expression (blocks only)
     for anf in anfs {
-        println!(": {anf}");
-
         if let ANFStatement::Value(value) = anf {
             return Ok(Some(eval_value(value, env)?));
         }

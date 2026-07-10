@@ -193,7 +193,10 @@ impl ANFAtomic {
             }
 
             ANFAtomic::Literal { .. } => vec![],
-            ANFAtomic::Constructor { .. } => vec![],
+
+            ANFAtomic::Constructor { items, .. } => {
+                items.iter().flat_map(ANFValue::all_ids).collect()
+            }
         }
     }
 }
@@ -247,6 +250,7 @@ impl Display for ANFAtomic {
                 write!(f, "{tag}")?;
 
                 for item in items {
+                    write!(f, " ")?;
                     fmt_parenthesized(f, item)?;
                 }
 

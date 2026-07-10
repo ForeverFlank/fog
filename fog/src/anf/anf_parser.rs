@@ -9,21 +9,14 @@ use crate::anf::anf::ANFValue;
 use crate::anf::anf::ANFVar;
 use crate::anf::scc;
 use crate::error::Span;
+use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
 use crate::parser::core_expr::CoreMatchArm;
 use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::parser::core_expr::CoreStatement;
 use crate::parser::core_expr::CoreTupleDeclPattern;
-
-pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFStatement> {
-    let mut anfs = Vec::new();
-    let mut top_scope = Scope::new_root();
-
-    collect_stmts_to_anf(stmts, &mut top_scope, &mut anfs);
-
-    anfs
-}
+use crate::parser::core_expr::CoreTypeExpr;
 
 // --- scope ---
 
@@ -83,11 +76,24 @@ impl<'a> Scope<'a> {
 
 // --- statement to ANFs ---
 
+pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFStatement> {
+    let mut anfs = Vec::new();
+    let mut top_scope = Scope::new_root();
+
+    // TODO: put built-in functions here. add extra ANF kind for built-in functions
+
+    collect_stmts_to_anf(stmts, &mut top_scope, &mut anfs);
+
+    anfs
+}
+
 fn collect_stmts_to_anf(
     stmts: &Vec<CoreStatement>,
     scope: &mut Scope,
     collected_anf: &mut Vec<ANFStatement>,
 ) {
+    // -- name collection prepass
+
     for stmt in stmts {
         match stmt {
             CoreStatement::VarDeclaration { pattern, .. } => {
@@ -96,22 +102,24 @@ fn collect_stmts_to_anf(
                 }
             }
 
-            CoreStatement::Expression { .. } => {}
+            CoreStatement::TypeDeclaration {
+                expr: CoreTypeExpr::Sum { ctors, span },
+                ..
+            } => register_sum_type_ctors(ctors, scope, collected_anf, *span),
 
-            // for data constructors
-            // collect sum type tags here
-            CoreStatement::TypeDeclaration { .. } => {}
-
-            // types erased -- no works needed!
-            CoreStatement::KindAnnotation { .. } | CoreStatement::TypeAnnotation { .. } => {}
+            _ => {}
         }
     }
+
+    // -- actual place where statements turn into ANFs
 
     for stmt in stmts {
         collect_stmt_to_anf(stmt, scope, collected_anf);
     }
 
-    // map declare LHS id(s) to their ANF expression
+    // -- Tarjan's SCC
+
+    // map declare LHS ids to their ANF expression
     let mut decl_stmt: HashMap<usize, usize> = HashMap::new();
 
     for (index, anf) in collected_anf.iter().enumerate() {
@@ -166,6 +174,45 @@ fn collect_stmts_to_anf(
     reordered.extend(old_stmts.into_iter().flatten());
 
     *collected_anf = reordered;
+}
+
+fn register_sum_type_ctors(
+    ctors: &Vec<CoreDataConstructor>,
+    scope: &mut Scope,
+    collected_anf: &mut Vec<ANFStatement>,
+    span: Span,
+) {
+    for ctor in ctors {
+        let tag = ctor.tag.clone();
+        let id = scope.register_name(&tag);
+
+        let params: Vec<ANFVar> = ctor.types.iter().map(|_| scope.new_temp()).collect();
+
+        let mut ctor_value = ANFValue::Atomic(ANFAtomic::Constructor {
+            tag: tag.clone(),
+            items: params
+                .iter()
+                .cloned()
+                .map(|var| ANFValue::Atomic(ANFAtomic::Var { var, span }))
+                .collect(),
+            span,
+        });
+
+        for param in params.into_iter().rev() {
+            ctor_value = ANFValue::Atomic(ANFAtomic::Lambda {
+                param,
+                body: Box::new(ctor_value),
+                span,
+            });
+        }
+
+        let ctor_decl_pattern = ANFDeclPattern::Single(ANFVar {
+            id: Some(id),
+            name: tag,
+        });
+
+        collected_anf.push(ANFStatement::Declaration(ctor_decl_pattern, ctor_value));
+    }
 }
 
 fn collect_stmt_to_anf(

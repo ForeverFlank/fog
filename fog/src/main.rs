@@ -48,9 +48,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let anfs = anf::anf_parser::parse_anf(&top_stmts);
 
-    for anf in anfs.as_slice() {
-        println!("{anf}");
-    }
+    // for anf in anfs.as_slice() {
+    //     println!("{anf}");
+    // }
 
     // -- optimize
 
@@ -68,11 +68,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Err(error) = res {
         match error.span {
-            Some(span) => println!(
+            Some(span) => eprintln!(
                 "runtime error ({}:{}): {}",
                 span.start.line, span.start.column, error.message
             ),
-            None => println!("runtime error: {}", error.message),
+            None => eprintln!("runtime error: {}", error.message),
         }
     }
 
