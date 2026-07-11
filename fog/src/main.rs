@@ -41,6 +41,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (top_stmts, parser_errors) = parse_program(&tokens);
     print_errors(&parser_errors);
 
+    for stmt in top_stmts.as_slice() {
+        println!("{stmt}");
+    }
+
     // -- static check
     let static_check_errors = static_check::static_check(&top_stmts);
     print_errors(&static_check_errors);

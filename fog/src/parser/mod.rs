@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use crate::error::FogError;
 use crate::lexer::token::Token;
-use crate::parser::core_expr::CoreExpr;
 
 pub mod core_expr;
 pub mod desugar;

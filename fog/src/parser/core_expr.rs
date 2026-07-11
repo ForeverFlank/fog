@@ -181,15 +181,6 @@ impl CoreMatchArmPattern {
             | CoreMatchArmPattern::DataConstructor { span, .. } => span,
         }
     }
-
-    pub fn all_identifiers(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        match self {
-            CoreMatchArmPattern::Literal { literal, .. } => todo!(),
-            CoreMatchArmPattern::Tuple { items, .. } => todo!(),
-            CoreMatchArmPattern::Identifier { name, .. } => todo!(),
-            CoreMatchArmPattern::DataConstructor { name, args, .. } => todo!(),
-        }
-    }
 }
 
 impl Display for CoreMatchArmPattern {

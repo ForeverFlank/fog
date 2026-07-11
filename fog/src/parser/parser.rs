@@ -232,6 +232,11 @@ impl Parser<'_> {
                 span,
             }),
 
+            TokenKind::CharLiteral(value) => Ok(ParsedValueExpr::Literal {
+                literal: Literal::Char(value),
+                span,
+            }),
+
             TokenKind::StringLiteral(value) => Ok(ParsedValueExpr::Literal {
                 literal: Literal::String(value),
                 span,

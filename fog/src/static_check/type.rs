@@ -1,8 +1,6 @@
-use std::collections::HashSet;
 use std::fmt;
-use std::hash::Hash;
-use std::hash::Hasher;
 
+use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::static_check::kind::Kind;
 use crate::util::format_joined;
 
@@ -21,7 +19,7 @@ pub enum Type {
 
     // ADTs
     Product(Vec<Type>),
-    Sum(Vec<DataConstructor>),
+    Sum(String), // nominally-typed
 }
 
 impl Type {
@@ -46,34 +44,9 @@ impl PartialEq for Type {
 
             (Type::Product(types_1), Type::Product(types_2)) => types_1 == types_2,
 
-            (Type::Sum(ctors_1), Type::Sum(ctors_2)) => {
-                let s1: HashSet<_> = ctors_1.iter().collect();
-                let s2: HashSet<_> = ctors_2.iter().collect();
-                s1 == s2
-            }
+            (Type::Sum(name_1), Type::Sum(name_2)) => name_1 == name_2,
 
             _ => false,
-        }
-    }
-}
-
-impl Hash for Type {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self).hash(state);
-        match self {
-            Type::Function(param_type, return_type) => {
-                param_type.hash(state);
-                return_type.hash(state);
-            }
-
-            Type::Product(types) => types.hash(state),
-
-            Type::Sum(ctors) => {
-                let mut sorted: Vec<_> = ctors.iter().collect();
-                sorted.sort_by(|a, b| a.tag.cmp(&b.tag));
-                sorted.hash(state);
-            }
-            _ => {}
         }
     }
 }
@@ -99,17 +72,17 @@ impl fmt::Display for Type {
                 }
             }
 
-            Type::Sum(ctors) => write!(f, "{}", format_joined(ctors, " + ")),
+            Type::Sum(name) => write!(f, "{}", name),
         }
     }
 }
 
 // --- data constructor ---
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub struct DataConstructor {
     pub tag: String,
-    pub types: Vec<Type>,
+    pub types: Vec<CoreAtomicTypeExpr>,
 }
 
 impl fmt::Display for DataConstructor {

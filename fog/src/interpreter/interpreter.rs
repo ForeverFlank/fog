@@ -3,8 +3,6 @@ use crate::core::get_interpreter_variables;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::eval_scope;
-use crate::interpreter::variable::ValueVariable;
-use crate::runtime_error;
 
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);

@@ -1,0 +1,21 @@
+-- Natural number, per Peano axioms
+
+-- a natual number is either zero,
+-- or a successor of another natural number.
+
+Nat : Type
+Nat = Zero | Succ Nat
+
+add : Nat -> Nat -> Nat
+add a Zero     = a                  -- a + 0 = a
+add a (Succ b) = Succ (add a b)     -- a + S(b) = S(a + b)
+
+three : Nat
+three = Succ (Succ (Succ Zero))
+
+two : Nat
+two = Succ (Succ Zero)
+
+five : Nat
+five = add three two
+

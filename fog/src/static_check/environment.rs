@@ -36,6 +36,8 @@ impl<'a> Environment<'a> {
             return parent.get_value_var(name, span);
         }
 
+        panic!();
+
         Err(static_check_error!(
             Some(*span),
             "variable `{}` not found in the current scope",

@@ -1,3 +1,5 @@
+use std::vec;
+
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::parser::core_expr::CoreAtomicTypeExpr;
@@ -29,9 +31,13 @@ pub fn eval_kind_expr(expr: &CoreKindExpr) -> FogResult<Kind> {
     }
 }
 
-pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type> {
+pub fn eval_type_expr(
+    name: &str,
+    expr: &CoreTypeExpr,
+    env: &Environment,
+) -> FogResult<(Type, Vec<DataConstructor>)> {
     match expr {
-        CoreTypeExpr::Atomic(expr) => eval_atomic_type_expr(expr, env),
+        CoreTypeExpr::Atomic(expr) => Ok((eval_atomic_type_expr(expr, env)?, vec![])),
 
         CoreTypeExpr::Sum { ctors, .. } => {
             let ctors = ctors
@@ -39,7 +45,7 @@ pub fn eval_type_expr(expr: &CoreTypeExpr, env: &Environment) -> FogResult<Type>
                 .map(|ctor| eval_data_constructor(ctor, env))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(Type::Sum(ctors))
+            Ok((Type::Sum(name.to_string()), ctors))
         }
     }
 }
@@ -48,15 +54,15 @@ fn eval_data_constructor(
     ctor: &CoreDataConstructor,
     env: &Environment,
 ) -> FogResult<DataConstructor> {
-    let types = ctor
-        .types
-        .iter()
-        .map(|t| eval_atomic_type_expr(t, env))
-        .collect::<Result<Vec<_>, _>>()?;
+    // let types = ctor
+    //     .types
+    //     .iter()
+    //     .map(|t| eval_atomic_type_expr(t, env))
+    //     .collect::<Result<Vec<_>, _>>()?;
 
     Ok(DataConstructor {
         tag: ctor.tag.clone(),
-        types,
+        types: ctor.types.clone(),
     })
 }
 
@@ -68,6 +74,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
                 Ok(r#type)
             } else {
+                // panic!();
                 Err(static_check_error!(Some(span), "undeclared type `{name}`"))
             }
         }
@@ -150,35 +157,4 @@ pub fn apply_type_level_function(
     }
 
     Ok(current)
-}
-
-// --- data constructors ---
-
-pub fn register_data_constructors(
-    env: &mut Environment,
-    parent_sum_type: &Type,
-    span: &Span,
-) -> FogResult<()> {
-    let Type::Sum(ctors) = parent_sum_type else {
-        return Err(static_check_error!(
-            Some(*span),
-            "cannot register data constructors from a non-sum type `{}`",
-            parent_sum_type.to_string()
-        ));
-    };
-
-    for ctor in ctors {
-        let ctor_type = nest_function_types(&ctor.types, parent_sum_type.clone());
-
-        env.annotate_type(&ctor.tag, ctor_type.clone(), span)?;
-        env.declare_var(&ctor.tag, ctor_type, span)?;
-    }
-
-    Ok(())
-}
-
-pub fn nest_function_types(field_types: &Vec<Type>, return_type: Type) -> Type {
-    field_types.iter().rev().fold(return_type, |ret, ft| {
-        Type::Function(ft.clone().into(), ret.into())
-    })
 }
