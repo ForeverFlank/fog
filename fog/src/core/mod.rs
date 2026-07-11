@@ -1,7 +1,9 @@
 use std::rc::Rc;
 
+use crate::interpreter;
 use crate::interpreter::value::Value;
 use crate::runtime_error;
+use crate::static_check;
 use crate::static_check::r#type::Type;
 
 struct BuiltInVariable {
@@ -9,8 +11,6 @@ struct BuiltInVariable {
     r#type: Type,
     value: Value,
 }
-
-// TODO: move stuff from static_check and interpreter to here
 
 fn get_builtin_variables() -> Vec<BuiltInVariable> {
     let var_add_int32 = BuiltInVariable {
@@ -46,4 +46,38 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
     };
 
     vec![var_add_int32, var_subtract_int32]
+}
+
+pub fn get_static_check_types() -> Vec<static_check::variable::TypeVariable> {
+    let type_int32 = static_check::variable::TypeVariable {
+        name: "Int32".to_string(),
+        r#type: Some(Type::Int32),
+        kind: static_check::kind::Kind::Type,
+    };
+
+    let type_unit = static_check::variable::TypeVariable {
+        name: "Unit".to_string(),
+        r#type: Some(Type::Product(Vec::new())),
+        kind: static_check::kind::Kind::Type,
+    };
+
+    vec![type_int32, type_unit]
+}
+
+pub fn get_static_check_variables() -> Vec<static_check::variable::ValueVariable> {
+    get_builtin_variables()
+        .iter()
+        .map(|var| static_check::variable::ValueVariable {
+            name: var.name.clone(),
+            r#type: var.r#type.clone(),
+            declared: true,
+        })
+        .collect()
+}
+
+pub fn get_interpreter_variables() -> Vec<interpreter::variable::ValueVariable> {
+    get_builtin_variables()
+        .into_iter()
+        .map(|var| interpreter::variable::ValueVariable::new(&var.name, var.value))
+        .collect()
 }

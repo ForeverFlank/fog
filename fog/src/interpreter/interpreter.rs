@@ -1,57 +1,24 @@
-use std::rc::Rc;
-
 use crate::anf::anf::ANFStatement;
+use crate::core::get_interpreter_variables;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::eval_scope;
-use crate::interpreter::value::Value;
 use crate::interpreter::variable::ValueVariable;
 use crate::runtime_error;
 
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
 
-    let var_add_int32 = ValueVariable::new(
-        "addInt32",
-        Value::NativeFunction {
-            function: Rc::new(|a: Value| match a {
-                Value::Int32(lhs) => Ok(Value::NativeFunction {
-                    function: Rc::new(move |b: Value| match b {
-                        Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
-                        _ => Err(runtime_error!(None, "right operand is not an Int32")),
-                    }),
-                }),
-                _ => Err(runtime_error!(None, "left operand is not an Int32")),
-            }),
-        },
-    );
-
-    let var_subtract_int32 = ValueVariable::new(
-        "subtractInt32",
-        Value::NativeFunction {
-            function: Rc::new(|a: Value| match a {
-                Value::Int32(lhs) => Ok(Value::NativeFunction {
-                    function: Rc::new(move |b: Value| match b {
-                        Value::Int32(rhs) => Ok(Value::Int32(lhs - rhs)),
-                        _ => Err(runtime_error!(None, "right operand is not an Int32")),
-                    }),
-                }),
-                _ => Err(runtime_error!(None, "left operand is not an Int32")),
-            }),
-        },
-    );
-
-    vec![var_add_int32, var_subtract_int32]
-        .iter()
-        .for_each(|var| {
-            env.variables.insert(var.name.clone(), var.clone());
-        });
+    for var in get_interpreter_variables() {
+        env.variables.insert(var.name.clone(), var);
+    }
 
     env
 }
 
 pub fn interpret(anfs: &Vec<ANFStatement>) -> FogResult<()> {
-    // Top-level expressions are not allowed.
+    // check for final operand in the top-level statement
+    // will replace this when we have actual main function
     for anf in anfs {
         if let ANFStatement::Value(_) = anf {
             return Err(runtime_error!(

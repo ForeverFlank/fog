@@ -375,9 +375,9 @@ fn parse_match_arm(
 
     let mut arm_collected_anf = Vec::new();
     let arm_anf = parse_expr_to_anf(&arm.value_expr, scope, &mut arm_collected_anf);
-    let arm_anf = wrap_scoped_anf(arm_collected_anf, arm_anf, *span);
+    let wrapped_arm_anf = wrap_scoped_anf(arm_collected_anf, arm_anf, *span);
 
-    (pattern, arm_anf)
+    (pattern, wrapped_arm_anf)
 }
 
 fn decl_pattern_to_anf(pattern: &CoreDeclPattern, scope: &Scope) -> ANFDeclPattern {

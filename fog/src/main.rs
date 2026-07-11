@@ -7,12 +7,12 @@ use crate::lexer::*;
 use crate::parser::*;
 
 mod anf;
+mod core;
 mod error;
 mod interpreter;
 mod lexer;
 mod optimizer;
 mod parser;
-mod prelude;
 mod static_check;
 mod util;
 
@@ -49,9 +49,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let anfs = anf::anf_parser::parse_anf(&top_stmts);
 
-    // for anf in anfs.as_slice() {
-    //     println!("{anf}");
-    // }
+    println!("anf ---");
+    for anf in anfs.as_slice() {
+        println!("{anf}");
+    }
+    println!("anf ---");
 
     // -- optimize
 

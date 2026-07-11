@@ -1,3 +1,5 @@
+use crate::core::get_static_check_types;
+use crate::core::get_static_check_variables;
 use crate::error::FogError;
 use crate::error::FogResult;
 use crate::error::Span;
@@ -13,11 +15,8 @@ use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
 use crate::static_check::eval::register_data_constructors;
-use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
-use crate::static_check::variable::TypeVariable;
-use crate::static_check::variable::ValueVariable;
 use crate::static_check_error;
 
 // --- type check ---
@@ -34,41 +33,13 @@ pub fn check(stmts: &Vec<CoreStatement>) -> Vec<FogError> {
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
 
-    env.types.insert(
-        "Int32".to_string(),
-        TypeVariable {
-            name: "Int32".to_string(),
-            r#type: Some(Type::Int32),
-            kind: Kind::Type,
-        },
-    );
+    for r#type in get_static_check_types() {
+        env.types.insert(r#type.name.clone(), r#type);
+    }
 
-    env.types.insert(
-        "Unit".to_string(),
-        TypeVariable {
-            name: "Unit".to_string(),
-            r#type: Some(Type::Product(Vec::new())),
-            kind: Kind::Type,
-        },
-    );
-
-    let var_add_int32 = ValueVariable::new(
-        "addInt32",
-        Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
-        true,
-    );
-
-    let var_subtract_int32 = ValueVariable::new(
-        "subtractInt32",
-        Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
-        true,
-    );
-
-    vec![var_add_int32, var_subtract_int32]
-        .into_iter()
-        .for_each(|var| {
-            env.variables.insert(var.name.clone(), var);
-        });
+    for var in get_static_check_variables() {
+        env.variables.insert(var.name.clone(), var);
+    }
 
     env
 }

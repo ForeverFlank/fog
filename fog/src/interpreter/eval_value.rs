@@ -17,6 +17,22 @@ use crate::runtime_error;
 pub fn eval_scope(anfs: &Vec<ANFStatement>, env: &mut Environment) -> FogResult<Option<Value>> {
     // value declarations
     for anf in anfs {
+        let mut all_vars: Vec<ValueVariable> = env.variables.values().cloned().collect();
+        all_vars.sort_by(|a, b| a.name.cmp(&b.name));
+
+        println!("...");
+        for var in all_vars {
+            println!(
+                "{} = {}",
+                var.name,
+                match &*var.value.borrow() {
+                    Some(value) => value.to_string(),
+                    None => "[undefined]".to_string(),
+                }
+            );
+        }
+        println!("...");
+
         if let ANFStatement::Declaration(pattern, expr) = anf {
             match pattern {
                 ANFDeclPattern::Single(var) => {
