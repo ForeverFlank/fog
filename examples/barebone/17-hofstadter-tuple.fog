@@ -1,0 +1,16 @@
+f : Int32 -> Int32
+m : Int32 -> Int32
+
+(f, m) = (n : Int32 => match n {
+        0 => 1
+        n => subtractInt32 n (m (f (subtractInt32 n 1)))
+    }, n : Int32 => match n {
+        0 => 0
+        n => subtractInt32 n (f (m (subtractInt32 n 1)))
+    }) 
+
+f_7 : Int32
+f_7 = f 7    -- 5
+
+m_7 : Int32
+m_7 = m 7    -- 4

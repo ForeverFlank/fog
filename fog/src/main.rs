@@ -49,11 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let anfs = anf::anf_parser::parse_anf(&top_stmts);
 
-    println!("anf ---");
-    for anf in anfs.as_slice() {
-        println!("{anf}");
-    }
-    println!("anf ---");
+    // for anf in anfs.as_slice() {
+    //     println!("{anf}");
+    // }
 
     // -- optimize
 

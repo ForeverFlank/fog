@@ -16,4 +16,11 @@ impl ValueVariable {
             value: Rc::new(RefCell::new(Some(value))),
         }
     }
+
+    pub fn new_uninitialized(name: &str) -> Self {
+        ValueVariable {
+            name: name.to_string(),
+            value: Rc::new(RefCell::new(None)),
+        }
+    }
 }

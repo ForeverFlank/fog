@@ -15,33 +15,24 @@ use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::runtime_error;
 
 pub fn eval_scope(anfs: &Vec<ANFStatement>, env: &mut Environment) -> FogResult<Option<Value>> {
+    // predeclare variable names
+    for anf in anfs {
+        if let ANFStatement::Declaration(pattern, _) = anf {
+            predeclare_pattern(pattern, env);
+        }
+    }
+
     // value declarations
     for anf in anfs {
-        let mut all_vars: Vec<ValueVariable> = env.variables.values().cloned().collect();
-        all_vars.sort_by(|a, b| a.name.cmp(&b.name));
-
-        println!("...");
-        for var in all_vars {
-            println!(
-                "{} = {}",
-                var.name,
-                match &*var.value.borrow() {
-                    Some(value) => value.to_string(),
-                    None => "[undefined]".to_string(),
-                }
-            );
-        }
-        println!("...");
-
         if let ANFStatement::Declaration(pattern, expr) = anf {
+            let value = eval_value(expr, env)?;
+
             match pattern {
                 ANFDeclPattern::Single(var) => {
-                    let value = eval_value(expr, env)?;
                     env.declare_value(&format!("{var}"), value)?;
                 }
 
                 ANFDeclPattern::Tuple(vars) => {
-                    let value = eval_value(expr, env)?;
                     eval_tuple_items_declaration(vars, value, env)?;
                 }
             }
@@ -144,6 +135,17 @@ pub fn eval_atomic(expr: &ANFAtomic, env: &Environment) -> FogResult<Value> {
                 .map(|item| eval_value(item, env))
                 .collect::<Result<Vec<_>, _>>()?,
         }),
+    }
+}
+
+fn predeclare_pattern(pattern: &ANFDeclPattern, env: &mut Environment) {
+    match pattern {
+        ANFDeclPattern::Single(var) => env.predeclare(&format!("{var}")),
+        ANFDeclPattern::Tuple(vars) => {
+            for var in vars {
+                predeclare_pattern(var, env);
+            }
+        }
     }
 }
 

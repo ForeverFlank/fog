@@ -56,7 +56,15 @@ impl<'a> Environment<'a> {
 
     // --- setters ---
 
-    // -- declare
+    pub fn predeclare(&mut self, name: &str) {
+        if name == "_" {
+            return;
+        }
+
+        self.variables
+            .entry(name.to_string())
+            .or_insert_with(|| ValueVariable::new_uninitialized(name));
+    }
 
     pub fn declare_value(&mut self, name: &str, value: Value) -> FogResult<()> {
         if name == "_" {

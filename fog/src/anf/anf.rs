@@ -1,4 +1,5 @@
 use core::fmt;
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::vec;
 
@@ -8,6 +9,13 @@ use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 use crate::util::indent;
+
+fn dedup_ids(ids: impl IntoIterator<Item = usize>) -> Vec<usize> {
+    ids.into_iter()
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect()
+}
 
 #[derive(Clone)]
 pub enum ANFStatement {
@@ -19,6 +27,7 @@ impl ANFStatement {
     pub fn all_ids(&self) -> Vec<usize> {
         match self {
             ANFStatement::Declaration(_, value) => value.all_ids(),
+
             ANFStatement::Value(value) => value.all_ids(),
         }
     }
@@ -52,7 +61,7 @@ impl ANFDeclPattern {
                 None => vec![],
             },
 
-            ANFDeclPattern::Tuple(vars) => vars.iter().flat_map(|var| var.all_ids()).collect(),
+            ANFDeclPattern::Tuple(vars) => dedup_ids(vars.iter().flat_map(|var| var.all_ids())),
         }
     }
 }
@@ -173,7 +182,7 @@ impl ANFAtomic {
 
     pub fn all_ids(&self) -> Vec<usize> {
         match self {
-            ANFAtomic::Block { anfs, .. } => anfs.iter().flat_map(ANFStatement::all_ids).collect(),
+            ANFAtomic::Block { anfs, .. } => dedup_ids(anfs.iter().flat_map(ANFStatement::all_ids)),
 
             ANFAtomic::Var { var, .. } => match var.id {
                 Some(id) => vec![id],
@@ -182,7 +191,7 @@ impl ANFAtomic {
 
             ANFAtomic::Lambda { body, .. } => body.all_ids(),
 
-            ANFAtomic::Tuple { items, .. } => items.iter().flat_map(ANFValue::all_ids).collect(),
+            ANFAtomic::Tuple { items, .. } => dedup_ids(items.iter().flat_map(ANFValue::all_ids)),
 
             ANFAtomic::Match {
                 scrutinee, arms, ..
