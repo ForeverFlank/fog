@@ -16,6 +16,8 @@ pub enum Type {
     Int32,
     Float32,
     Char,
+    String,
+    IOUnit, // HACK super temporary hack; to be replaced with actual IO monad!
 
     // ADTs
     Product(Vec<Type>),
@@ -38,6 +40,9 @@ impl PartialEq for Type {
 
             (Type::Int32, Type::Int32) => true,
             (Type::Float32, Type::Float32) => true,
+            (Type::Char, Type::Char) => true,
+            (Type::String, Type::String) => true,
+            (Type::IOUnit, Type::IOUnit) => true,
 
             (Type::Product(types_1), Type::Product(types_2)) => types_1 == types_2,
 
@@ -56,11 +61,13 @@ impl Hash for Type {
     fn hash<H: Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
         match self {
-            Type::Function(p, r) => {
-                p.hash(state);
-                r.hash(state);
+            Type::Function(param_type, return_type) => {
+                param_type.hash(state);
+                return_type.hash(state);
             }
+
             Type::Product(types) => types.hash(state),
+
             Type::Sum(ctors) => {
                 let mut sorted: Vec<_> = ctors.iter().collect();
                 sorted.sort_by(|a, b| a.tag.cmp(&b.tag));
@@ -81,6 +88,8 @@ impl fmt::Display for Type {
             Type::Int32 => write!(f, "Int32"),
             Type::Float32 => write!(f, "Float32"),
             Type::Char => write!(f, "Char"),
+            Type::String => write!(f, "String"),
+            Type::IOUnit => write!(f, "IO"),
 
             Type::Product(types) => {
                 if types.is_empty() {

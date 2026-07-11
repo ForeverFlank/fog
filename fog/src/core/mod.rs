@@ -47,7 +47,21 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         },
     };
 
-    vec![var_add_int32, var_subtract_int32]
+    let var_print_line = BuiltInVariable {
+        name: "printLine".to_string(),
+        r#type: Type::function(Type::String, Type::IOUnit),
+        value: Value::NativeFunction {
+            function: Rc::new(|str: Value| match str {
+                Value::String(str) => Ok({
+                    println!("{str}");
+                    Value::IOUnitUnit
+                }),
+                _ => Err(runtime_error!(None, "argument is not a String")),
+            }),
+        },
+    };
+
+    vec![var_add_int32, var_subtract_int32, var_print_line]
 }
 
 pub fn get_static_check_types() -> Vec<static_check::variable::TypeVariable> {

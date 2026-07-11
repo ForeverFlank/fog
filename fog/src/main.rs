@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !lexer_errors.is_empty() || !parser_errors.is_empty() || !static_check_errors.is_empty()
     /* || !optimizer_errors.is_empty() */
     {
-        return Err("syntax error".into());
+        return Err("syntax error found".into());
     }
 
     // -- interpret

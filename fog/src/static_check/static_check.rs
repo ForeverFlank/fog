@@ -237,7 +237,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
             Literal::Int32(_) => Ok(Type::Int32),
             Literal::Float32(_) => Ok(Type::Float32),
             Literal::Char(_) => Ok(Type::Char),
-            Literal::String(_) => Ok(todo!()), // required: List type!
+            Literal::String(_) => Ok(Type::String),
         },
 
         CoreExpr::Lambda {
@@ -247,11 +247,23 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
             expr_type_of(body, env)?.into(),
         )),
 
-        CoreExpr::FunctionAppl { callee, .. } => {
+        CoreExpr::FunctionAppl { callee, arg, .. } => {
             let callee_type = expr_type_of(callee, env)?;
 
             match callee_type {
-                Type::Function(_, return_type) => Ok(*return_type),
+                Type::Function(param_type, return_type) => {
+                    let arg_type = expr_type_of(arg, env)?;
+
+                    if *param_type != arg_type {
+                        return Err(static_check_error!(
+                            Some(span),
+                            "expected argument of type `{param_type}`, found `{arg_type}`"
+                        ));
+                    }
+
+                    Ok(*return_type)
+                }
+
                 _ => Err(static_check_error!(
                     Some(span),
                     "{} is not a function type",

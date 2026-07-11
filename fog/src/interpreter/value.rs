@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, write};
 use std::rc::Rc;
 
 use crate::anf::anf::ANFValue;
@@ -11,6 +11,9 @@ pub enum Value {
     Int32(i32),
     Float32(f32),
     Char(char),
+    String(String),
+
+    IOUnitUnit, // HACK super temporary; this is the only element of type IOUnit
 
     Function {
         param: String,
@@ -35,7 +38,8 @@ impl fmt::Display for Value {
         match self {
             Value::Int32(value) => write!(f, "{}", value),
             Value::Float32(value) => write!(f, "{}", value),
-            Value::Char(value) => write!(f, "{}", value),
+            Value::Char(value) => write!(f, "{:?}", value),
+            Value::String(value) => write!(f, "{:?}", value),
 
             Value::Function { param, body, .. } => write!(f, "{param} => {body}"),
 
@@ -50,6 +54,8 @@ impl fmt::Display for Value {
                     write!(f, "{} {}", tag, format_joined(values, " "))
                 }
             }
+
+            Value::IOUnitUnit => write!(f, "IOUnitUnit"),
         }
     }
 }
