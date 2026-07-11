@@ -27,7 +27,8 @@ pub enum TokenKind {
     // literals
     Int32Literal(i32),
     Float32Literal(f32),
-    // StringLiteral(String),
+    CharLiteral(char),
+    StringLiteral(String),
 
     // operators
     Plus,
@@ -110,7 +111,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Eof => write!(f, "Eof"),
             TokenKind::Newline => write!(f, "Newline"),
 
-            TokenKind::Identifier(val) => write!(f, "Identifier ({})", val),
+            TokenKind::Identifier(value) => write!(f, "Identifier ({})", value),
             TokenKind::Equal => write!(f, "Equal"),
             TokenKind::Colon => write!(f, "Colon"),
             TokenKind::Arrow => write!(f, "Arrow"),
@@ -123,9 +124,11 @@ impl fmt::Display for TokenKind {
             TokenKind::LeftBrace => write!(f, "LeftBrace"),
             TokenKind::RightBrace => write!(f, "RightBrace"),
 
-            TokenKind::Int32Literal(val) => write!(f, "Int32 ({})", val),
-            TokenKind::Float32Literal(val) => write!(f, "Float32 ({})", val),
-            // TokenKind::StringLiteral(val) => write!(f, "String ({})", val),
+            TokenKind::Int32Literal(value) => write!(f, "Int32 ({})", value),
+            TokenKind::Float32Literal(value) => write!(f, "Float32 ({})", value),
+            TokenKind::CharLiteral(value) => write!(f, "Char ({})", value),
+            TokenKind::StringLiteral(value) => write!(f, "String ({})", value),
+
             TokenKind::Plus => write!(f, "Plus"),
             TokenKind::Minus => write!(f, "Minus"),
             TokenKind::Star => write!(f, "Star"),

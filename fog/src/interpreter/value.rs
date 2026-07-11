@@ -10,6 +10,7 @@ use crate::util::format_joined;
 pub enum Value {
     Int32(i32),
     Float32(f32),
+    Char(char),
 
     Function {
         param: String,
@@ -34,6 +35,7 @@ impl fmt::Display for Value {
         match self {
             Value::Int32(value) => write!(f, "{}", value),
             Value::Float32(value) => write!(f, "{}", value),
+            Value::Char(value) => write!(f, "{}", value),
 
             Value::Function { param, body, .. } => write!(f, "{param} => {body}"),
 

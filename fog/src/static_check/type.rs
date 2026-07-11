@@ -15,6 +15,7 @@ pub enum Type {
     // primitive types
     Int32,
     Float32,
+    Char,
 
     // ADTs
     Product(Vec<Type>),
@@ -79,6 +80,7 @@ impl fmt::Display for Type {
 
             Type::Int32 => write!(f, "Int32"),
             Type::Float32 => write!(f, "Float32"),
+            Type::Char => write!(f, "Char"),
 
             Type::Product(types) => {
                 if types.is_empty() {

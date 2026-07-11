@@ -219,35 +219,31 @@ impl Parser<'_> {
         let token = self.peek().clone();
         let span = token.span;
 
-        match token.kind {
-            TokenKind::Int32Literal(value) => {
-                self.next();
-                Ok(ParsedValueExpr::Literal {
-                    literal: Literal::Int32(value),
-                    span,
-                })
-            }
+        self.next();
 
-            TokenKind::Float32Literal(value) => {
-                self.next();
-                Ok(ParsedValueExpr::Literal {
-                    literal: Literal::Float32(value),
-                    span,
-                })
-            }
+        match token.kind {
+            TokenKind::Int32Literal(value) => Ok(ParsedValueExpr::Literal {
+                literal: Literal::Int32(value),
+                span,
+            }),
+
+            TokenKind::Float32Literal(value) => Ok(ParsedValueExpr::Literal {
+                literal: Literal::Float32(value),
+                span,
+            }),
+
+            TokenKind::StringLiteral(value) => Ok(ParsedValueExpr::Literal {
+                literal: Literal::String(value),
+                span,
+            }),
 
             // unary minus (negation)
-            TokenKind::Minus => {
-                self.next();
-                Ok(ParsedValueExpr::Op {
-                    kind: OpKind::Minus,
-                    span,
-                })
-            }
+            TokenKind::Minus => Ok(ParsedValueExpr::Op {
+                kind: OpKind::Minus,
+                span,
+            }),
 
             TokenKind::Identifier(name) => {
-                self.next();
-
                 // check for lambda with type annotation
                 if let TokenKind::Colon = self.peek().kind {
                     self.next();
@@ -280,8 +276,6 @@ impl Parser<'_> {
 
             // tuple
             TokenKind::LeftParenthesis => {
-                self.next();
-
                 if let TokenKind::RightParenthesis = self.peek().kind {
                     let close_span = self.peek().span;
                     self.next();
@@ -327,7 +321,6 @@ impl Parser<'_> {
 
             // block statement
             TokenKind::LeftBrace => {
-                self.next();
                 let (statements, close_span) = self.parse_block()?;
                 Ok(ParsedValueExpr::Block {
                     statements,
@@ -337,8 +330,6 @@ impl Parser<'_> {
 
             // match
             TokenKind::Match => {
-                self.next();
-
                 let scrutinee = Box::new(self.parse_expr()?);
 
                 let TokenKind::LeftBrace = self.peek().kind else {
@@ -355,11 +346,7 @@ impl Parser<'_> {
                 })
             }
 
-            _ => {
-                self.next();
-
-                Err(parse_error!(Some(span), "atomic expression parsing error"))
-            }
+            _ => Err(parse_error!(Some(span), "atomic expression parsing error")),
         }
     }
 

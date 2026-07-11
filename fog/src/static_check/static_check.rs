@@ -236,6 +236,8 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
         CoreExpr::Literal { literal, .. } => match literal {
             Literal::Int32(_) => Ok(Type::Int32),
             Literal::Float32(_) => Ok(Type::Float32),
+            Literal::Char(_) => Ok(Type::Char),
+            Literal::String(_) => Ok(todo!()), // required: List type!
         },
 
         CoreExpr::Lambda {

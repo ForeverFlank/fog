@@ -6,6 +6,8 @@ use crate::runtime_error;
 use crate::static_check;
 use crate::static_check::r#type::Type;
 
+// TODO: refactor to consts
+
 struct BuiltInVariable {
     name: String,
     r#type: Type,

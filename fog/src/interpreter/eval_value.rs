@@ -80,6 +80,8 @@ pub fn eval_atomic(expr: &ANFAtomic, env: &Environment) -> FogResult<Value> {
         ANFAtomic::Literal { literal, .. } => match *literal {
             Literal::Int32(value) => Ok(Value::Int32(value)),
             Literal::Float32(value) => Ok(Value::Float32(value)),
+            Literal::Char(value) => Ok(Value::Char(value)),
+            Literal::String(_) => todo!(),
         },
 
         ANFAtomic::Var { var, span } => {

@@ -61,6 +61,8 @@ impl Lexer {
                 .parse_newline(start)
                 .or_else(|| lexer.parse_word(start))
                 .or_else(|| lexer.parse_number(start))
+                .or_else(|| lexer.parse_char(start))
+                .or_else(|| lexer.parse_string(start))
                 .or_else(|| lexer.parse_two_char_symbol(start))
                 .or_else(|| lexer.parse_one_char_symbol(start));
 
@@ -168,6 +170,94 @@ impl Lexer {
                 }
             }
         };
+
+        Some(Ok(Token { kind, span }))
+    }
+
+    fn parse_char(&mut self, start: Pos) -> Option<FogResult<Token>> {
+        let span = Span::new(start, start);
+
+        let ch = self.peek()?;
+
+        if ch != '\'' {
+            return None;
+        }
+
+        self.next();
+
+        let res_ch = if self.peek()? == '\\' {
+            self.next();
+
+            match self.peek()? {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                '0' => '\0',
+                '\'' => '\'',
+                '\"' => '\"',
+                '\\' => '\\',
+
+                ch => {
+                    return Some(Err(lex_error!(
+                        Some(span),
+                        "invalid escape sequence `\\{ch}`"
+                    )));
+                }
+            }
+        } else if self.peek()? == '\'' {
+            return Some(Err(lex_error!(Some(span), "char literal cannot be empty")));
+        } else {
+            self.peek()?
+        };
+
+        self.next();
+
+        let kind = TokenKind::CharLiteral(res_ch);
+
+        Some(Ok(Token { kind, span }))
+    }
+
+    fn parse_string(&mut self, start: Pos) -> Option<FogResult<Token>> {
+        let span = Span::new(start, start);
+
+        let ch = self.peek()?;
+
+        if ch != '\"' {
+            return None;
+        }
+
+        self.next();
+
+        let mut str = String::new();
+        let mut escaping = false;
+
+        while let Some(ch) = self.peek() {
+            self.next();
+
+            match (escaping, ch) {
+                (false, '\"') => break,
+                (false, '\\') => escaping = true,
+
+                (false, ch) => str.push(ch),
+
+                (true, 'n') => str.push('\n'),
+                (true, 'r') => str.push('\r'),
+                (true, 't') => str.push('\t'),
+                (true, '0') => str.push('\0'),
+                (true, '\'') => str.push('\''),
+                (true, '\"') => str.push('\"'),
+                (true, '\\') => str.push('\\'),
+
+                (true, ch) => {
+                    return Some(Err(lex_error!(
+                        Some(span),
+                        "invalid escape sequence `\\{ch}`"
+                    )));
+                }
+            }
+        }
+
+        let kind = TokenKind::StringLiteral(str);
 
         Some(Ok(Token { kind, span }))
     }

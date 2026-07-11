@@ -14,13 +14,17 @@ mod resolver;
 pub enum Literal {
     Int32(i32),
     Float32(f32),
+    Char(char),
+    String(String),
 }
 
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Int32(value) => write!(f, "{value}"),
-            Literal::Float32(value) => write!(f, "{value}"),
+            Literal::Int32(value) => write!(f, "{}", value),
+            Literal::Float32(value) => write!(f, "{}", value),
+            Literal::Char(value) => write!(f, "{}", value),
+            Literal::String(value) => write!(f, "{}", value),
         }
     }
 }
