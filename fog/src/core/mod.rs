@@ -61,7 +61,24 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         },
     };
 
-    vec![var_add_int32, var_subtract_int32, var_print_line]
+    // HACK this will be implemented in prelude
+    let var_to_string = BuiltInVariable {
+        name: "toString".to_string(),
+        r#type: Type::function(Type::Int32, Type::String),
+        value: Value::NativeFunction {
+            function: Rc::new(|val: Value| match val {
+                Value::Int32(val) => Ok(Value::String(format!("{val}"))),
+                _ => Err(runtime_error!(None, "argument is not a String")),
+            }),
+        },
+    };
+
+    vec![
+        var_add_int32,
+        var_subtract_int32,
+        var_print_line,
+        var_to_string,
+    ]
 }
 
 pub fn get_static_check_types() -> Vec<static_check::variable::TypeVariable> {

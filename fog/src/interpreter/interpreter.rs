@@ -1,4 +1,5 @@
 use crate::anf::anf::ANFStatement;
+use crate::anf::anf_parser::ANFMetaData;
 use crate::core::get_interpreter_variables;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
@@ -14,7 +15,7 @@ fn create_top_env() -> Environment<'static> {
     env
 }
 
-pub fn interpret(anfs: &Vec<ANFStatement>) -> FogResult<()> {
+pub fn interpret(anfs: &Vec<ANFStatement>, _anf_metadata: &ANFMetaData) -> FogResult<()> {
     // check for final operand in the top-level statement
     // will replace this when we have actual main function
     // for anf in anfs {

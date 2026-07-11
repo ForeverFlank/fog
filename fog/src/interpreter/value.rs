@@ -1,4 +1,4 @@
-use std::fmt::{self, write};
+use std::fmt;
 use std::rc::Rc;
 
 use crate::anf::anf::ANFValue;

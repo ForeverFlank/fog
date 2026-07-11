@@ -36,7 +36,7 @@ impl<'a> Environment<'a> {
             return parent.get_value_var(name, span);
         }
 
-        panic!();
+        // panic!();
 
         Err(static_check_error!(
             Some(*span),

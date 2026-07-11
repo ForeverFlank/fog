@@ -1,4 +1,5 @@
 use core::fmt;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::vec;
@@ -9,13 +10,6 @@ use crate::parser::core_expr::CoreMatchArmPattern;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 use crate::util::indent;
-
-fn dedup_ids(ids: impl IntoIterator<Item = usize>) -> Vec<usize> {
-    ids.into_iter()
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect()
-}
 
 #[derive(Clone)]
 pub enum ANFStatement {
@@ -267,4 +261,11 @@ impl Display for ANFAtomic {
             }
         }
     }
+}
+
+fn dedup_ids(ids: impl IntoIterator<Item = usize>) -> Vec<usize> {
+    ids.into_iter()
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect()
 }

@@ -74,9 +74,15 @@ impl<'a> Scope<'a> {
     }
 }
 
+// --- metadata ---
+
+pub struct ANFMetaData {
+    pub name_by_id: HashMap<usize, String>,
+}
+
 // --- statement to ANFs ---
 
-pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFStatement> {
+pub fn parse_anf(stmts: &Vec<CoreStatement>) -> (Vec<ANFStatement>, ANFMetaData) {
     let mut collected_anfs = Vec::new();
     let mut top_scope = Scope::new_root();
 
@@ -84,7 +90,11 @@ pub fn parse_anf(stmts: &Vec<CoreStatement>) -> Vec<ANFStatement> {
 
     collect_stmts_to_anf(stmts, &mut top_scope, &mut collected_anfs);
 
-    collected_anfs
+    let metadata = ANFMetaData {
+        name_by_id: top_scope.names.into_iter().map(|(k, v)| (v, k)).collect(),
+    };
+
+    (collected_anfs, metadata)
 }
 
 fn collect_stmts_to_anf(
