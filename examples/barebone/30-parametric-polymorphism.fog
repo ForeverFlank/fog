@@ -1,7 +1,7 @@
 -- parametric polymorphism
 -- commonly known as generics
 
-id : a -> a
+id : forall a. a -> a
 id x = x
 
 num1 : Int32

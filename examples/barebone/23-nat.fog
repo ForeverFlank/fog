@@ -1,4 +1,4 @@
--- Natural number, per Peano axioms
+-- natural number, per Peano axioms
 
 -- a natual number is either zero, or
 -- a successor of another natural number.
@@ -18,10 +18,6 @@ three = Succ (Succ (Succ Zero))
 two = Succ (Succ Zero)
 
 five = add three two
-
-
-
-
 
 
 toInt32 : Nat -> Int32

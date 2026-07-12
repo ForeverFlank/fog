@@ -42,7 +42,7 @@ pub fn eval_type_expr(
         CoreTypeExpr::Sum { ctors, .. } => {
             let ctors = ctors
                 .iter()
-                .map(|ctor| eval_data_constructor(ctor, env))
+                .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
             Ok((Type::Sum(name.to_string()), ctors))
@@ -50,16 +50,7 @@ pub fn eval_type_expr(
     }
 }
 
-fn eval_data_constructor(
-    ctor: &CoreDataConstructor,
-    env: &Environment,
-) -> FogResult<DataConstructor> {
-    // let types = ctor
-    //     .types
-    //     .iter()
-    //     .map(|t| eval_atomic_type_expr(t, env))
-    //     .collect::<Result<Vec<_>, _>>()?;
-
+fn eval_data_constructor(ctor: &CoreDataConstructor) -> FogResult<DataConstructor> {
     Ok(DataConstructor {
         tag: ctor.tag.clone(),
         types: ctor.types.clone(),
@@ -71,10 +62,13 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
 
     match expr {
         CoreAtomicTypeExpr::Identifier { name, .. } => {
-            if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
+            let first_ch = name.chars().next().unwrap();
+
+            if first_ch.is_lowercase() {
+                Ok(todo!())
+            } else if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
                 Ok(r#type)
             } else {
-                // panic!();
                 Err(static_check_error!(Some(span), "undeclared type `{name}`"))
             }
         }
