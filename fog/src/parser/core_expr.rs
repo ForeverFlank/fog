@@ -313,6 +313,11 @@ pub enum CoreAtomicTypeExpr {
         arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
+    ForAll {
+        var_name: String,
+        r#type: Box<CoreAtomicTypeExpr>,
+        span: Span,
+    },
 }
 
 impl CoreAtomicTypeExpr {
@@ -321,7 +326,8 @@ impl CoreAtomicTypeExpr {
             CoreAtomicTypeExpr::Identifier { span, .. }
             | CoreAtomicTypeExpr::Function { span, .. }
             | CoreAtomicTypeExpr::FunctionAppl { span, .. }
-            | CoreAtomicTypeExpr::Product { span, .. } => *span,
+            | CoreAtomicTypeExpr::Product { span, .. }
+            | CoreAtomicTypeExpr::ForAll { span, .. } => *span,
         }
     }
 
@@ -365,6 +371,12 @@ impl Display for CoreAtomicTypeExpr {
                 fmt_parenthesized(f, callee)?;
                 write!(f, " ")?;
                 fmt_parenthesized(f, arg)
+            }
+
+            CoreAtomicTypeExpr::ForAll {
+                var_name, r#type, ..
+            } => {
+                write!(f, "forall {}. {}", var_name, r#type)
             }
         }
     }

@@ -1,0 +1,20 @@
+-- parametric polymorphism
+-- commonly known as generics
+
+id : forall a. a -> a
+id = x : forall a. a => x
+
+num1 : Int32
+num1 = 5
+
+num2 : Int32
+num2 = id num1      -- 5
+
+fn1 : Int32 -> Int32
+fn1 = x : Int32 => addInt32 x 1
+
+fn2 : Int32 -> Int32
+fn2 = id fn1        -- x => x + 1
+
+num3 : Int32
+num3 = fn2 num2     -- 6

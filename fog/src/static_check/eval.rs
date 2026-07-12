@@ -65,7 +65,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             let first_ch = name.chars().next().unwrap();
 
             if first_ch.is_lowercase() {
-                Ok(todo!())
+                Ok(Type::Variable(name.to_string()))
             } else if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
                 Ok(r#type)
             } else {
@@ -113,6 +113,14 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
                     expr.to_string()
                 )),
             }
+        }
+
+        CoreAtomicTypeExpr::ForAll {
+            var_name, r#type, ..
+        } => {
+            let r#type = eval_atomic_type_expr(r#type, env)?;
+
+            Ok(Type::ForAll(var_name.clone(), r#type.into()))
         }
     }
 }

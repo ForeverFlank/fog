@@ -44,6 +44,7 @@ pub enum TokenKind {
 
     // keywords
     Match,
+    ForAll,
     // If,
 }
 
@@ -87,6 +88,7 @@ pub fn match_two_char_token(s: &str) -> Option<TokenKind> {
 pub fn match_keyword(str: &str) -> Option<TokenKind> {
     match str {
         "match" => Some(TokenKind::Match),
+        "forall" => Some(TokenKind::ForAll),
 
         _ => None,
     }
@@ -141,6 +143,7 @@ impl fmt::Display for TokenKind {
             TokenKind::RightComposition => write!(f, "RightComposition"),
 
             TokenKind::Match => write!(f, "Match"),
+            TokenKind::ForAll => write!(f, "ForAll"),
             // TokenKind::If => write!(f, "If"),
         }
     }
