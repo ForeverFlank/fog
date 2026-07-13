@@ -4,19 +4,18 @@
 id : a -> a
 id = x : a => x
 
-num1 : Int32
-num1 = 5
+num : Int32
+num = id 5
 
-num2 : Int32
-num2 = id num1      -- 5
+f : Int32 -> (a -> a) -> Int32
+f = n : Int32 => g : a -> a => g (addInt32 n 1)
 
-fn1 : Int32 -> Int32
-fn1 = x : Int32 => addInt32 x 1
+g : a -> a
+g = x : a => {
+    y : a
+    y = x
 
-fn2 : Int32 -> Int32
-fn2 = id fn1        -- x => x + 1
+    y
+}
 
-num3 : Int32
-num3 = fn2 num2     -- 6
-
-main = printLine (toString (num3))
+main = printLine (toString ((id f) num (g id)))
