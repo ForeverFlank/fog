@@ -294,26 +294,33 @@ pub fn expr_type_of(expr: &CoreExpr, env: &mut Environment) -> FogResult<Type> {
         CoreExpr::FunctionAppl { callee, arg, .. } => {
             let callee_type = expr_type_of(callee, env)?;
 
-            match callee_type {
-                Type::Function(param_type, return_type) => {
-                    let arg_type = expr_type_of(arg, env)?;
-
-                    if *param_type != arg_type {
-                        return Err(static_check_error!(
-                            Some(arg.span()),
-                            "expected argument of type `{param_type}`, found `{arg_type}`"
-                        ));
-                    }
-
-                    Ok(*return_type)
-                }
-
-                _ => Err(static_check_error!(
+            let Type::Function(param_type, return_type) = callee_type else {
+                return Err(static_check_error!(
                     Some(span),
                     "{} is not a function type",
-                    callee_type.to_string()
-                )),
+                    callee_type
+                ));
+            };
+
+            let arg_type = expr_type_of(arg, env)?;
+
+            let (param_type, return_type) = if let Type::Variable(ref name) = *param_type {
+                (
+                    (*param_type).substitute_var(name, &arg_type),
+                    (&return_type).substitute_var(name, &arg_type),
+                )
+            } else {
+                (*param_type, *return_type)
+            };
+
+            if param_type != arg_type {
+                return Err(static_check_error!(
+                    Some(arg.span()),
+                    "expected argument of type `{param_type}`, found `{arg_type}`"
+                ));
             }
+
+            Ok(return_type)
         }
 
         CoreExpr::Tuple { items, .. } => Ok(Type::Product(

@@ -18,3 +18,5 @@ fn2 = id fn1        -- x => x + 1
 
 num3 : Int32
 num3 = fn2 num2     -- 6
+
+main = printLine (toString (num3))

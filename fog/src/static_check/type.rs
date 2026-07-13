@@ -70,7 +70,7 @@ fn eq_type(type_1: &Type, type_2: &Type, var_type_map: &mut HashMap<String, Stri
 }
 
 impl Type {
-    fn substitute_var(&self, name: &str, r#type: &Type) -> Type {
+    pub fn substitute_var(&self, name: &str, r#type: &Type) -> Type {
         match self {
             Type::Variable(name_2) if name_2 == name => r#type.clone(),
 
