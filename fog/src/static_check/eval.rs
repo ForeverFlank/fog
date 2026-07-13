@@ -114,14 +114,6 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
                 )),
             }
         }
-
-        CoreAtomicTypeExpr::ForAll {
-            var_name, r#type, ..
-        } => {
-            let r#type = eval_atomic_type_expr(r#type, env)?;
-
-            Ok(Type::ForAll(var_name.clone(), r#type.into()))
-        }
     }
 }
 

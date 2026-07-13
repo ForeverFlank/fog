@@ -15,7 +15,6 @@ use crate::static_check::environment::Environment;
 use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
-use crate::static_check::r#type;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
@@ -171,7 +170,6 @@ fn check_type_annotation(
     env.annotate_type(name, r#type, span)
 }
 
-// validate and sometimes annotate types of declaration statements
 fn check_declaration(
     pattern: &CoreDeclPattern,
     expr: &CoreExpr,
@@ -262,7 +260,7 @@ fn bind_tuple_decl_pattern_item(
 
 // --- type of ---
 
-pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
+pub fn expr_type_of(expr: &CoreExpr, env: &mut Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
@@ -288,7 +286,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
             let mut body_env = Environment::new(Some(env));
             body_env.declare_var(param_name, param_type.clone(), &span)?;
 
-            let return_type = expr_type_of(body, &body_env)?;
+            let return_type = expr_type_of(body, &mut body_env)?;
 
             Ok(Type::Function(param_type.into(), return_type.into()))
         }
@@ -302,7 +300,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
 
                     if *param_type != arg_type {
                         return Err(static_check_error!(
-                            Some(span),
+                            Some(arg.span()),
                             "expected argument of type `{param_type}`, found `{arg_type}`"
                         ));
                     }
@@ -337,7 +335,7 @@ pub fn expr_type_of(expr: &CoreExpr, env: &Environment) -> FogResult<Type> {
                 let mut arm_env = Environment::new(Some(env));
                 bind_match_arm_pattern(&arm.pattern, &scrutinee_type, &mut arm_env)?;
 
-                let arm_type = expr_type_of(&arm.value_expr, &arm_env)?;
+                let arm_type = expr_type_of(&arm.value_expr, &mut arm_env)?;
 
                 match res_type {
                     None => res_type = Some(arm_type),
@@ -505,7 +503,7 @@ fn block_expr_type_of(
             } => check_declaration(pattern, expr, span, &mut block_env)?,
 
             CoreStatement::Expression { expr, .. } => {
-                return expr_type_of(expr, &block_env);
+                return expr_type_of(expr, &mut block_env);
             }
         }
     }

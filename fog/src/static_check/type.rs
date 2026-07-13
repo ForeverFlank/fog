@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt;
 
 use crate::parser::core_expr::CoreAtomicTypeExpr;
@@ -19,7 +21,6 @@ pub enum Type {
     Sum(String), // nominally-typed
 
     // parametric polymorphism
-    ForAll(String, Box<Type>),
     Variable(String),
 }
 
@@ -31,11 +32,11 @@ impl Type {
 
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
-        eq_type(self, other, &mut 0)
+        eq_type(self, other, &mut HashMap::new())
     }
 }
 
-fn eq_type(type_1: &Type, type_2: &Type, counter: &mut i32) -> bool {
+fn eq_type(type_1: &Type, type_2: &Type, var_type_map: &mut HashMap<String, String>) -> bool {
     match (type_1, type_2) {
         (Type::Int32, Type::Int32) => true,
         (Type::Float32, Type::Float32) => true,
@@ -44,27 +45,25 @@ fn eq_type(type_1: &Type, type_2: &Type, counter: &mut i32) -> bool {
         (Type::IOUnit, Type::IOUnit) => true,
 
         (Type::Function(p1, r1), Type::Function(p2, r2)) => {
-            eq_type(p1, p2, counter) && eq_type(r1, r2, counter)
+            eq_type(p1, p2, var_type_map) && eq_type(r1, r2, var_type_map)
         }
 
         (Type::Product(types_1), Type::Product(types_2)) => types_1
             .iter()
             .zip(types_2)
-            .all(|(t1, t2)| eq_type(t1, t2, counter)),
+            .all(|(t1, t2)| eq_type(t1, t2, var_type_map)),
 
         (Type::Sum(name_1), Type::Sum(name_2)) => name_1 == name_2,
 
-        (Type::ForAll(name_1, type_1), Type::ForAll(name_2, type_2)) => {
-            let tmp_type = Type::Variable(format!("$type{}", counter));
-            *counter += 1;
-
-            let substituted_1 = type_1.substitute_var(name_1, &tmp_type);
-            let substituted_2 = type_2.substitute_var(name_2, &tmp_type);
-
-            eq_type(&substituted_1, &substituted_2, counter)
+        (Type::Variable(name_1), Type::Variable(name_2)) => {
+            match var_type_map.entry(name_1.to_string()) {
+                Entry::Occupied(entry) => entry.get() == name_2,
+                Entry::Vacant(entry) => {
+                    entry.insert(name_2.to_string());
+                    true
+                }
+            }
         }
-
-        (Type::Variable(name_1), Type::Variable(name_2)) => name_1 == name_2,
 
         _ => false,
     }
@@ -85,11 +84,6 @@ impl Type {
                     .iter()
                     .map(|t| t.substitute_var(name, r#type))
                     .collect(),
-            ),
-
-            Type::ForAll(name_2, type_2) => Type::ForAll(
-                name_2.to_string(),
-                type_2.substitute_var(name, r#type).into(),
             ),
 
             _ => self.clone(),
@@ -120,10 +114,6 @@ impl fmt::Display for Type {
 
             Type::Sum(name) => {
                 write!(f, "{}", name)
-            }
-
-            Type::ForAll(name, r#type) => {
-                write!(f, "∀{} {}", name, r#type)
             }
 
             Type::Variable(name) => write!(f, "{}", name),

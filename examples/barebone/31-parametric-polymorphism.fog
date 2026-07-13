@@ -1,8 +1,8 @@
 -- parametric polymorphism
 -- commonly known as generics
 
-id : forall a. a -> a
-id = x : forall a. a => x
+id : a -> a
+id = x : a => x
 
 num1 : Int32
 num1 = 5
