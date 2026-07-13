@@ -528,7 +528,7 @@ fn unify_type(to: &Type, from: &Type, type_var_subst: &mut HashMap<String, Type>
         return Ok(());
     }
 
-    let to = substitute_types(to, type_var_subst);
+    // let to = substitute_types(to, type_var_subst);
     let from = substitute_types(from, type_var_subst);
 
     match (&to, &from) {
@@ -537,11 +537,10 @@ fn unify_type(to: &Type, from: &Type, type_var_subst: &mut HashMap<String, Type>
             Ok(())
         }
 
-        (_, Type::Variable(name)) => {
-            type_var_subst.insert(name.clone(), to);
-            Ok(())
-        }
-
+        // (_, Type::Variable(name)) => {
+        //     type_var_subst.insert(name.clone(), to);
+        //     Ok(())
+        // }
         (Type::Function(p1, r1), Type::Function(p2, r2)) => {
             unify_type(p1, p2, type_var_subst)?;
             unify_type(r1, r2, type_var_subst)
@@ -554,7 +553,7 @@ fn unify_type(to: &Type, from: &Type, type_var_subst: &mut HashMap<String, Type>
                 .try_for_each(|(a, b)| unify_type(a, b, type_var_subst))
         }
 
-        _ if to == from => Ok(()),
+        _ if *to == from => Ok(()),
 
         _ => Err(todo!()), // TODO error message here
     }

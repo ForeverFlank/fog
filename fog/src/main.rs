@@ -53,9 +53,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (anfs, anf_metadata) = anf::anf_parser::parse_anf(&top_stmts);
 
-    // for anf in anfs.as_slice() {
-    //     println!("{anf}");
-    // }
+    for anf in anfs.as_slice() {
+        println!("{anf}");
+    }
+
+    // TODO it's an interpreter causing stack overflow??
 
     // -- optimize
 
