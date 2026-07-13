@@ -4,7 +4,7 @@ use std::fmt;
 
 use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::static_check::kind::Kind;
-use crate::util::format_joined;
+use crate::util::{fmt_parenthesized, format_joined};
 
 // --- type ---
 
@@ -48,10 +48,13 @@ fn eq_type(type_1: &Type, type_2: &Type, var_type_map: &mut HashMap<String, Stri
             eq_type(p1, p2, var_type_map) && eq_type(r1, r2, var_type_map)
         }
 
-        (Type::Product(types_1), Type::Product(types_2)) => types_1
-            .iter()
-            .zip(types_2)
-            .all(|(t1, t2)| eq_type(t1, t2, var_type_map)),
+        (Type::Product(types_1), Type::Product(types_2)) => {
+            types_1.len() == types_2.len()
+                && types_1
+                    .iter()
+                    .zip(types_2)
+                    .all(|(t1, t2)| eq_type(t1, t2, var_type_map))
+        }
 
         (Type::Sum(name_1), Type::Sum(name_2)) => name_1 == name_2,
 
@@ -101,7 +104,8 @@ impl fmt::Display for Type {
             Type::IOUnit => write!(f, "IO"),
 
             Type::Function(param_type, return_type) => {
-                write!(f, "{} -> {}", param_type, return_type)
+                fmt_parenthesized(f, param_type)?;
+                write!(f, " -> {}", return_type)
             }
 
             Type::Product(types) => {

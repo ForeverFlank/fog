@@ -18,4 +18,16 @@ g = x : a => {
     y
 }
 
-main = printLine (toString ((id f) num (g id)))
+fix : (a -> a) -> a
+fix = f : a -> a => f (fix f)
+
+sum : Int32 -> Int32
+sum = {
+    s : (Int32 -> Int32) -> (Int32 -> Int32)
+    s f 0 = 0
+    s f n = addInt32 n (f (subtractInt32 n 1))
+
+    fix s
+}
+
+main = printLine (toString (fix id))
