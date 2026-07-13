@@ -10,16 +10,8 @@ num = id 5
 f : Int32 -> (a -> a) -> Int32
 f = n : Int32 => g : a -> a => g (addInt32 n 1)
 
-g : a -> a
-g = x : a => {
-    y : a
-    y = x
-
-    y
-}
-
 fix : (a -> a) -> a
-fix = f : a -> a => f (fix f)
+fix f = f (fix f)
 
 sum : Int32 -> Int32
 sum = {
@@ -30,4 +22,4 @@ sum = {
     fix s
 }
 
-main = printLine (toString (fix id))
+main = printLine (toString (sum num))

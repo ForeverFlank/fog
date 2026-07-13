@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::core::get_static_check_types;
 use crate::core::get_static_check_variables;
 use crate::error::FogError;
@@ -97,7 +99,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
             span,
         } = stmt
         {
-            if let Err(error) = check_declaration(pattern, expr, span, env) {
+            if let Err(error) = check_declaration(pattern, expr, span, env, &mut HashMap::new()) {
                 all_errors.push(error);
             }
         }
@@ -106,7 +108,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     // -- expressions
     for stmt in stmts {
         if let CoreStatement::Expression { expr, .. } = stmt {
-            if let Err(error) = expr_type_of(expr, env) {
+            if let Err(error) = expr_type_of(expr, env, &mut HashMap::new()) {
                 all_errors.push(error);
             }
         }
@@ -175,15 +177,16 @@ fn check_declaration(
     expr: &CoreExpr,
     span: &Span,
     env: &mut Environment,
+    type_var_subst: &mut HashMap<String, Type>,
 ) -> FogResult<()> {
     match pattern {
         CoreDeclPattern::Identifier { name, .. } => {
-            let expr_type = expr_type_of(expr, env)?;
+            let expr_type = expr_type_of(expr, env, type_var_subst)?;
             env.declare_var(name, expr_type, span)
         }
 
         CoreDeclPattern::Tuple { items, .. } => {
-            let expr_type = expr_type_of(expr, env)?;
+            let expr_type = expr_type_of(expr, env, type_var_subst)?;
             bind_tuple_decl_pattern(items, &expr_type, pattern, expr, span, env)
         }
     }
@@ -260,11 +263,17 @@ fn bind_tuple_decl_pattern_item(
 
 // --- type of ---
 
-pub fn expr_type_of(expr: &CoreExpr, env: &mut Environment) -> FogResult<Type> {
+pub fn expr_type_of(
+    expr: &CoreExpr,
+    env: &mut Environment,
+    type_var_subst: &mut HashMap<String, Type>,
+) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
-        CoreExpr::Block { statements, .. } => block_expr_type_of(env, span, statements),
+        CoreExpr::Block { statements, .. } => {
+            block_expr_type_of(env, statements, type_var_subst, span)
+        }
 
         CoreExpr::Identifier { name, .. } => Ok(env.get_value_var(name, &span)?.r#type),
 
@@ -286,13 +295,13 @@ pub fn expr_type_of(expr: &CoreExpr, env: &mut Environment) -> FogResult<Type> {
             let mut body_env = Environment::new(Some(env));
             body_env.declare_var(param_name, param_type.clone(), &span)?;
 
-            let return_type = expr_type_of(body, &mut body_env)?;
+            let return_type = expr_type_of(body, &mut body_env, type_var_subst)?;
 
             Ok(Type::Function(param_type.into(), return_type.into()))
         }
 
         CoreExpr::FunctionAppl { callee, arg, .. } => {
-            let callee_type = expr_type_of(callee, env)?;
+            let callee_type = expr_type_of(callee, env, type_var_subst)?;
 
             let Type::Function(param_type, return_type) = callee_type else {
                 return Err(static_check_error!(
@@ -302,31 +311,17 @@ pub fn expr_type_of(expr: &CoreExpr, env: &mut Environment) -> FogResult<Type> {
                 ));
             };
 
-            let arg_type = expr_type_of(arg, env)?;
+            let arg_type = expr_type_of(arg, env, type_var_subst)?;
 
-            let (param_type, return_type) = if let Type::Variable(ref name) = *param_type {
-                (
-                    (*param_type).substitute_var(name, &arg_type),
-                    (&return_type).substitute_var(name, &arg_type),
-                )
-            } else {
-                (*param_type, *return_type)
-            };
+            unify_type(&param_type, &arg_type, type_var_subst)?;
 
-            if param_type != arg_type {
-                return Err(static_check_error!(
-                    Some(arg.span()),
-                    "expected argument of type `{param_type}`, found `{arg_type}`"
-                ));
-            }
-
-            Ok(return_type)
+            Ok(substitute_types(&return_type, type_var_subst))
         }
 
         CoreExpr::Tuple { items, .. } => Ok(Type::Product(
             items
                 .iter()
-                .map(|expr| expr_type_of(expr, env))
+                .map(|expr| expr_type_of(expr, env, type_var_subst))
                 .collect::<Result<Vec<Type>, FogError>>()?,
         )),
 
@@ -335,14 +330,14 @@ pub fn expr_type_of(expr: &CoreExpr, env: &mut Environment) -> FogResult<Type> {
             arms,
             span,
         } => {
-            let scrutinee_type = expr_type_of(scrutinee, env)?;
+            let scrutinee_type = expr_type_of(scrutinee, env, type_var_subst)?;
             let mut res_type = None;
 
             for arm in arms {
                 let mut arm_env = Environment::new(Some(env));
                 bind_match_arm_pattern(&arm.pattern, &scrutinee_type, &mut arm_env)?;
 
-                let arm_type = expr_type_of(&arm.value_expr, &mut arm_env)?;
+                let arm_type = expr_type_of(&arm.value_expr, &mut arm_env, type_var_subst)?;
 
                 match res_type {
                     None => res_type = Some(arm_type),
@@ -483,8 +478,9 @@ fn uncurry_function_type(r#type: &Type, arity: usize) -> (Vec<Type>, Type) {
 
 fn block_expr_type_of(
     env: &Environment<'_>,
-    span: Span,
     statements: &Vec<CoreStatement>,
+    type_var_subst: &mut HashMap<String, Type>,
+    span: Span,
 ) -> FogResult<Type> {
     let mut block_env = Environment::new(Some(env));
 
@@ -507,10 +503,10 @@ fn block_expr_type_of(
                 pattern,
                 expr,
                 span,
-            } => check_declaration(pattern, expr, span, &mut block_env)?,
+            } => check_declaration(pattern, expr, span, &mut block_env, type_var_subst)?,
 
             CoreStatement::Expression { expr, .. } => {
-                return expr_type_of(expr, &mut block_env);
+                return expr_type_of(expr, &mut block_env, type_var_subst);
             }
         }
     }
@@ -519,4 +515,78 @@ fn block_expr_type_of(
         Some(span),
         "final operand not found in block statement"
     ))
+}
+
+fn unify_type(to: &Type, from: &Type, type_var_subst: &mut HashMap<String, Type>) -> FogResult<()> {
+    println!("matching {to} and {from}");
+
+    if let Type::Variable(name_1) = to
+        && let Type::Variable(name_2) = from
+        && name_1 == name_2
+    {
+        println!("lgtm");
+        return Ok(());
+    }
+
+    let to = substitute_types(to, type_var_subst);
+    let from = substitute_types(from, type_var_subst);
+
+    match (&to, &from) {
+        (Type::Variable(name), _) => {
+            type_var_subst.insert(name.clone(), from);
+            Ok(())
+        }
+
+        (_, Type::Variable(name)) => {
+            type_var_subst.insert(name.clone(), to);
+            Ok(())
+        }
+
+        (Type::Function(p1, r1), Type::Function(p2, r2)) => {
+            unify_type(p1, p2, type_var_subst)?;
+            unify_type(r1, r2, type_var_subst)
+        }
+
+        (Type::Product(types_1), Type::Product(types_2)) if types_1.len() == types_2.len() => {
+            types_1
+                .iter()
+                .zip(types_2)
+                .try_for_each(|(a, b)| unify_type(a, b, type_var_subst))
+        }
+
+        _ if to == from => Ok(()),
+
+        _ => Err(todo!()), // TODO error message here
+    }
+}
+
+fn substitute_types(r#type: &Type, type_var_subst: &HashMap<String, Type>) -> Type {
+    println!("subst'ing {}", r#type);
+    for (k, v) in type_var_subst {
+        println!("  {} --> {}", k, v);
+    }
+
+    match r#type {
+        Type::Variable(name) => type_var_subst
+            .get(name)
+            .map(|t2| {
+                // println!(": t2");
+                substitute_types(t2, type_var_subst)
+                // r#type.clone()
+            })
+            .unwrap_or_else(|| r#type.clone()),
+
+        Type::Function(p, r) => Type::function(
+            substitute_types(p, type_var_subst),
+            substitute_types(r, type_var_subst),
+        ),
+
+        Type::Product(ts) => Type::Product(
+            ts.iter()
+                .map(|t| substitute_types(t, type_var_subst))
+                .collect(),
+        ),
+
+        _ => r#type.clone(),
+    }
 }

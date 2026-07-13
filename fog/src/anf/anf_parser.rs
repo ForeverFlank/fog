@@ -8,7 +8,9 @@ use crate::anf::anf::ANFStatement;
 use crate::anf::anf::ANFValue;
 use crate::anf::anf::ANFVar;
 use crate::anf::scc;
+use crate::error::FogResult;
 use crate::error::Span;
+use crate::parse_error;
 use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
@@ -340,15 +342,28 @@ fn parse_expr_to_atomic(
         CoreExpr::Block { statements, span } => {
             let mut block_collected_anf = Vec::new();
 
-            let (last, stmts) = statements.split_last().unwrap();
+            let last_index = statements
+                .iter()
+                .position(|stmt| matches!(stmt, CoreStatement::Expression { .. }))
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "missing final operand in `{}`. this should be catched in static check",
+                        expr
+                    )
+                });
 
-            for stmt in stmts.iter() {
+            for stmt in statements
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != last_index)
+                .map(|(_, stmt)| stmt)
+            {
                 collect_stmt_to_anf(stmt, scope, &mut block_collected_anf);
             }
 
             let CoreStatement::Expression {
                 expr: last_expr, ..
-            } = last
+            } = &statements[last_index]
             else {
                 unreachable!()
             };
