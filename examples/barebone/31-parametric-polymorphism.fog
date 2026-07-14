@@ -10,16 +10,4 @@ num = id 5
 f : Int32 -> (a -> a) -> Int32
 f = n : Int32 => g : a -> a => g (addInt32 n 1)
 
-fix : (a -> a) -> a
-fix f = f (fix f)
-
-sum : Int32 -> Int32
-sum = {
-    s : (Int32 -> Int32) -> (Int32 -> Int32)
-    s f 0 = 0
-    s f n = addInt32 n (f (subtractInt32 n 1))
-
-    fix s
-}
-
-main = printLine (toString (sum num))
+main = printLine (toString (f num id))

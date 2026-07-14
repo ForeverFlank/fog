@@ -1,0 +1,18 @@
+compose : (b -> c) -> (a -> b) -> (a -> c)
+compose f g = x : a => f (g x)
+
+fn1 : Int32 * Int32 -> Int32
+fn1 (x, y) = addInt32 x y
+
+fn2 : Int32 -> Int32 * Int32 * Int32
+fn2 x = (subtractInt32 x 1, x, addInt32 x 1)
+
+
+num = (compose fn2 fn1) (3, 4)
+
+main = {
+    (num0, num1, num2) = num
+
+    printLine (toString num2)
+}
+

@@ -300,12 +300,12 @@ pub fn expr_type_of(
             Ok(Type::Function(param_type.into(), return_type.into()))
         }
 
-        CoreExpr::FunctionAppl { callee, arg, .. } => {
+        CoreExpr::FunctionAppl { callee, arg, span } => {
             let callee_type = expr_type_of(callee, env, type_var_subst)?;
 
             let Type::Function(param_type, return_type) = callee_type else {
                 return Err(static_check_error!(
-                    Some(span),
+                    Some(*span),
                     "{} is not a function type",
                     callee_type
                 ));
@@ -313,7 +313,7 @@ pub fn expr_type_of(
 
             let arg_type = expr_type_of(arg, env, type_var_subst)?;
 
-            unify_type(&param_type, &arg_type, type_var_subst)?;
+            unify_type(&param_type, &arg_type, type_var_subst, span)?;
 
             Ok(substitute_types(&return_type, type_var_subst))
         }
@@ -517,7 +517,12 @@ fn block_expr_type_of(
     ))
 }
 
-fn unify_type(to: &Type, from: &Type, type_var_subst: &mut HashMap<String, Type>) -> FogResult<()> {
+fn unify_type(
+    to: &Type,
+    from: &Type,
+    type_var_subst: &mut HashMap<String, Type>,
+    span: &Span,
+) -> FogResult<()> {
     println!("matching {to} and {from}");
 
     if let Type::Variable(name_1) = to
@@ -542,20 +547,25 @@ fn unify_type(to: &Type, from: &Type, type_var_subst: &mut HashMap<String, Type>
         //     Ok(())
         // }
         (Type::Function(p1, r1), Type::Function(p2, r2)) => {
-            unify_type(p1, p2, type_var_subst)?;
-            unify_type(r1, r2, type_var_subst)
+            unify_type(p1, p2, type_var_subst, span)?;
+            unify_type(r1, r2, type_var_subst, span)
         }
 
         (Type::Product(types_1), Type::Product(types_2)) if types_1.len() == types_2.len() => {
             types_1
                 .iter()
                 .zip(types_2)
-                .try_for_each(|(a, b)| unify_type(a, b, type_var_subst))
+                .try_for_each(|(a, b)| unify_type(a, b, type_var_subst, span))
         }
 
         _ if *to == from => Ok(()),
 
-        _ => Err(todo!()), // TODO error message here
+        _ => Err(static_check_error!(
+            Some(*span),
+            "cannot unify type {} and {}",
+            to,
+            from
+        )), // TODO error message here
     }
 }
 
