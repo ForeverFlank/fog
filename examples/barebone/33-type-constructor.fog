@@ -3,19 +3,18 @@
 Option : Type -> Type
 Option a = Some a | None
 
-orElse : Option a -> Option a
-orElse =
-    lhs : Option a =>
-    rhs : Option a =>
-    match lhs {
-        Some item => item
-        None      => match rhs {
-            Some item => item
-            None      => None
-        }
-    }
+orElse : Option a -> Option a -> Option a
+orElse (Some item) _           = Some item
+orElse None        (Some item) = Some item
+orElse None        None        = None
 
 
 a = None
 b = Some 20
 c = orElse a b  -- 20
+
+
+main = match c {
+    Some num => printLine (toString num)
+    None     => printLine "none"
+}

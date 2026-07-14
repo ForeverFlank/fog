@@ -523,13 +523,13 @@ fn unify_type(
     type_var_subst: &mut HashMap<String, Type>,
     span: &Span,
 ) -> FogResult<()> {
-    println!("matching {to} and {from}");
+    // println!("matching {to} and {from}");
 
     if let Type::Variable(name_1) = to
         && let Type::Variable(name_2) = from
         && name_1 == name_2
     {
-        println!("lgtm");
+        // println!("lgtm");
         return Ok(());
     }
 
@@ -570,10 +570,10 @@ fn unify_type(
 }
 
 fn substitute_types(r#type: &Type, type_var_subst: &HashMap<String, Type>) -> Type {
-    println!("subst'ing {}", r#type);
-    for (k, v) in type_var_subst {
-        println!("  {} --> {}", k, v);
-    }
+    // println!("subst'ing {}", r#type);
+    // for (k, v) in type_var_subst {
+    //     println!("  {} --> {}", k, v);
+    // }
 
     match r#type {
         Type::Variable(name) => type_var_subst
