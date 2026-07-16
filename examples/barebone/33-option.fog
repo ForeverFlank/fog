@@ -4,14 +4,13 @@ Option : Type -> Type
 Option a = Some a | None
 
 orElse : Option a -> Option a -> Option a
-orElse (Some item) _           = Some item
-orElse None        (Some item) = Some item
-orElse None        None        = None
+orElse (Some item) _   = Some item
+orElse None        rhs = rhs
 
 
 a = None
 b = Some 20
-c = orElse a b  -- 20
+c = orElse a b  -- Some 20
 
 
 main = match c {

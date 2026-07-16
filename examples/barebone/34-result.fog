@@ -1,0 +1,9 @@
+-- Result type
+-- from Rust's Result<T, E>
+
+Result : Type -> Type -> Type
+Result t e = Ok t | Error e
+
+orElse : Result t e -> Result t e -> Result t e
+orElse (Ok t)    _    = Ok t
+orElse (Error _) item = item
