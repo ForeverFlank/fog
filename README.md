@@ -8,10 +8,11 @@ Final state of the project should be able to run something like
 
 ```fog
 fib : Int32 -> Int32
-fib n =
+fib n = {
     if n == 0, 0
     if n == 1, 1
     else,      fib (n - 1) + fib (n - 2)
+}
 
 num : Int32
 num = fib 6
@@ -23,18 +24,18 @@ main = num |> toString |> printLine
 
 - Purely functional
 - Eagerly evaluated
-- Imperative-like syntaxes
+- Imperative-like syntaxes (I tried, I swear)
 - Strict type system, possibly statically typed with full type erasure
 
 ## Progress
 
-| Feature          | Status         |
-|------------------|----------------|
-| Lexer            | ✅ Done        |
-| AST Parser       | ✅ Done        |
-| Interpreter      | ⏳ In progress |
-| Compiler (LLVM?) | 💤 Pending     |
-| Toolings         | 💤 Pending     |
+| Feature                     | Status         |
+|-----------------------------|----------------|
+| Lexer                       | ✅ Done        |
+| AST Parser                  | ✅ Done        |
+| Interpreter                 | ⏳ In progress |
+| Compiler (LLVM? Cranelift?) | 💤 Pending     |
+| Toolings                    | 💤 Pending     |
 
 ## Why name it fog?
 
@@ -56,7 +57,6 @@ cargo build
 ### Arguments
 
 - `--print-tokens` – will print the tokens produced by the lexer.
-- `--emit-ast` – will emit the AST in PlantUML format.
 
 ## License
 
