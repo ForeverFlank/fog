@@ -267,13 +267,17 @@ fn desugar_statement(stmt: ResolvedStatement) -> FogResult<DesugarResult> {
             }))
         }
 
-        ResolvedStatement::TypeDeclaration { name, expr, span } => {
-            Ok(DesugarResult::Statement(CoreStatement::TypeDeclaration {
-                name,
-                expr,
-                span,
-            }))
-        }
+        ResolvedStatement::TypeDeclaration {
+            name,
+            params,
+            expr,
+            span,
+        } => Ok(DesugarResult::Statement(CoreStatement::TypeDeclaration {
+            name,
+            params,
+            expr,
+            span,
+        })),
 
         ResolvedStatement::TypeAnnotation { name, expr, span } => {
             Ok(DesugarResult::Statement(CoreStatement::TypeAnnotation {

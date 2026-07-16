@@ -22,6 +22,7 @@ pub enum ResolvedStatement {
     },
     TypeDeclaration {
         name: String,
+        params: Vec<String>,
         expr: CoreTypeExpr,
         span: Span,
     },

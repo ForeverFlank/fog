@@ -18,6 +18,7 @@ pub enum CoreStatement {
     },
     TypeDeclaration {
         name: String,
+        params: Vec<String>,
         expr: CoreTypeExpr,
         span: Span,
     },

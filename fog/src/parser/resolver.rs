@@ -136,9 +136,17 @@ impl Resolver {
                 Ok(ResolvedStatement::TypeAnnotation { name, expr, span })
             }
 
-            ParsedStatement::TypeDeclaration { name, expr, span } => {
-                Ok(ResolvedStatement::TypeDeclaration { name, expr, span })
-            }
+            ParsedStatement::TypeDeclaration {
+                name,
+                params,
+                expr,
+                span,
+            } => Ok(ResolvedStatement::TypeDeclaration {
+                name,
+                params,
+                expr,
+                span,
+            }),
 
             ParsedStatement::VarDeclaration { pattern, expr, .. } => {
                 Ok(ResolvedStatement::VarDeclaration {

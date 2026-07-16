@@ -117,6 +117,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
 
 fn check_type_declaration(
     name: &str,
+    params: &Vec<String>,
     expr: &CoreTypeExpr,
     span: &Span,
     env: &mut Environment,
@@ -491,8 +492,13 @@ fn block_expr_type_of(
                 block_env.annotate_kind(name, kind, span)?;
             }
 
-            CoreStatement::TypeDeclaration { name, expr, span } => {
-                check_type_declaration(name, expr, span, &mut block_env)?;
+            CoreStatement::TypeDeclaration {
+                name,
+                params,
+                expr,
+                span,
+            } => {
+                check_type_declaration(name, params, expr, span, &mut block_env)?;
             }
 
             CoreStatement::TypeAnnotation { name, expr, span } => {

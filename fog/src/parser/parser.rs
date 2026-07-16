@@ -139,7 +139,12 @@ impl Parser<'_> {
                     let expr = self.parse_type_expr()?;
                     let span = Span::merge(start_span, expr.span());
 
-                    Ok(ParsedStatement::TypeDeclaration { name, expr, span })
+                    Ok(ParsedStatement::TypeDeclaration {
+                        name,
+                        params: Vec::new(),
+                        expr,
+                        span,
+                    })
                 } else {
                     let expr = self.parse_expr()?;
                     // let span = Span::merge(start_span, expr.span());
@@ -155,8 +160,8 @@ impl Parser<'_> {
                 }
             }
 
-            // either a tuple assignemt, a function clause,
-            // or an final operand expression
+            // either a tuple declaration, a function clause,
+            // a type constructor, or a final operand expression
             _ => {
                 let expr = self.parse_expr()?;
 
@@ -164,6 +169,45 @@ impl Parser<'_> {
                     self.next();
 
                     let pattern = expr.into_decl_pattern()?;
+
+                    // check if declaration is a type constructor declaration
+
+                    if let ParsedDeclPattern::Collection { ref items, .. } = pattern {
+                        let Some(ParsedDeclPattern::Identifier {
+                            name: first_name,
+                            span,
+                        }) = items.first()
+                        else {
+                            unreachable!("collection declaration pattern cannot be empty");
+                        };
+
+                        let is_type_decl = is_type_name(first_name);
+
+                        let params = items[1..]
+                            .iter()
+                            .map(|item| match item {
+                                ParsedDeclPattern::Identifier { name, .. }
+                                    if name.chars().next().is_some_and(char::is_lowercase) =>
+                                {
+                                    Some(name.to_string())
+                                }
+                                _ => None,
+                            })
+                            .collect::<Option<Vec<_>>>();
+
+                        if is_type_decl && let Some(params) = params {
+                            let expr = self.parse_type_expr()?;
+
+                            return Ok(ParsedStatement::TypeDeclaration {
+                                name: first_name.to_string(),
+                                params,
+                                expr,
+                                span: *span,
+                            });
+                        }
+                    }
+
+                    // if not, treat as a value declaration
                     let expr = self.parse_expr()?;
                     // let span = Span::merge(pattern.span(), expr.span());
 
