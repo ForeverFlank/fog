@@ -106,26 +106,41 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             Ok(Type::Product(types))
         }
 
-        CoreAtomicTypeExpr::FunctionAppl { .. } => {
-            let (head, args) = expr.uncurry();
+        CoreAtomicTypeExpr::FunctionAppl { callee, arg, span } => {
+            let callee_type = eval_atomic_type_expr(callee, env)?;
 
-            let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
+            let Type::TypeConstructor(param, r#type) = callee_type else {
                 return Err(static_check_error!(
-                    Some(span),
-                    "cannot type annotate a value with data constructor `{}`",
-                    expr.to_string()
+                    Some(*span),
+                    "`{}` is not a valid type constructor",
+                    callee_type.to_string()
                 ));
             };
 
-            match (name.as_str(), args.as_slice()) {
-                _ if env.contains_type(name) => apply_type_function(name, &args, env, &span),
+            let arg_type = eval_atomic_type_expr(arg, env)?;
+            let res_type = (*r#type).substitute_var(&param, &arg_type);
 
-                _ => Err(static_check_error!(
-                    Some(span),
-                    "cannot type annotate a value with data constructor `{}`",
-                    expr.to_string()
-                )),
-            }
+            Ok(res_type)
+
+            // let (head, args) = expr.uncurry();
+
+            // let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
+            //     return Err(static_check_error!(
+            //         Some(span),
+            //         "cannot type annotate a value with data constructor `{}`",
+            //         expr.to_string()
+            //     ));
+            // };
+
+            // match (name.as_str(), args.as_slice()) {
+            //     _ if env.contains_type(name) => apply_type_function(name, &args, env, &span),
+
+            //     _ => Err(static_check_error!(
+            //         Some(span),
+            //         "cannot type annotate a value with data constructor `{}`",
+            //         expr.to_string()
+            //     )),
+            // }
         }
     }
 }
@@ -153,4 +168,43 @@ pub fn apply_type_function(
     }
 
     Ok(current)
+}
+
+// --- tests ---
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Pos;
+
+    const SPAN: Span = Span {
+        start: Pos {
+            line: 0usize,
+            column: 0usize,
+        },
+        end: Pos {
+            line: 0usize,
+            column: 0usize,
+        },
+    };
+
+    #[test]
+    fn test_eval_kind_expr() {
+        let expr_1 = CoreKindExpr::Type { span: SPAN };
+
+        let expr_2 = CoreKindExpr::Constraint { span: SPAN };
+
+        let expr_3 = CoreKindExpr::Function {
+            param_kind: CoreKindExpr::Type { span: SPAN }.into(),
+            return_kind: CoreKindExpr::Type { span: SPAN }.into(),
+            span: SPAN,
+        };
+
+        assert!(matches!(eval_kind_expr(&expr_1), Ok(Kind::Type)));
+        assert!(matches!(eval_kind_expr(&expr_2), Ok(Kind::Constraint)));
+        assert!(matches!(
+            eval_kind_expr(&expr_3),
+            Ok(Kind::Function(p, r)) if *p == Kind::Type && *r == Kind::Type
+        ));
+    }
 }

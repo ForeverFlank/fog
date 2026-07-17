@@ -535,7 +535,10 @@ fn unify_type(
     type_var_subst: &mut HashMap<String, Type>,
     span: &Span,
 ) -> FogResult<()> {
-    // println!("matching {to} and {from}");
+    // println!(
+    //     "unifying {to} and {from} at {}:{}",
+    //     span.start.line, span.start.column
+    // );
 
     if let Type::Variable(name_1) = to
         && let Type::Variable(name_2) = from
