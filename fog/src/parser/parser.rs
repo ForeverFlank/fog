@@ -414,6 +414,7 @@ impl Parser<'_> {
             if let TokenKind::RightBrace = self.peek().kind {
                 let close_span = self.peek().span;
                 self.next();
+
                 return Ok((arms, close_span));
             }
 

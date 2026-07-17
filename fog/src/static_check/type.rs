@@ -4,7 +4,8 @@ use std::fmt;
 
 use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::static_check::kind::Kind;
-use crate::util::{fmt_parenthesized, format_joined};
+use crate::util::fmt_parenthesized;
+use crate::util::format_joined;
 
 // --- type ---
 
@@ -18,10 +19,12 @@ pub enum Type {
 
     Function(Box<Type>, Box<Type>),
     Product(Vec<Type>),
-    Sum(String), // nominally-typed
+    Named(String, Vec<Type>), // sum type and stuff
 
     // parametric polymorphism
     Variable(String),
+
+    TypeConstructor(String, Box<Type>),
 }
 
 impl Type {
@@ -55,7 +58,17 @@ fn eq_type(type_1: &Type, type_2: &Type, var_type_map: &mut HashMap<String, Stri
                 .all(|(t1, t2)| eq_type(t1, t2, var_type_map))
         }
 
-        (Type::Sum(name_1), Type::Sum(name_2)) => name_1 == name_2,
+        (Type::Named(name_1, args_1), Type::Named(name_2, args_2)) => {
+            let are_names_equal = name_1 == name_2;
+
+            let are_args_equal = args_1.len() == args_2.len()
+                && args_1
+                    .iter()
+                    .zip(args_2)
+                    .all(|(t1, t2)| eq_type(t1, t2, var_type_map));
+
+            are_names_equal && are_args_equal
+        }
 
         (Type::Variable(name_1), Type::Variable(name_2)) => {
             match var_type_map.entry(name_1.to_string()) {
@@ -65,6 +78,20 @@ fn eq_type(type_1: &Type, type_2: &Type, var_type_map: &mut HashMap<String, Stri
                     true
                 }
             }
+        }
+
+        (Type::TypeConstructor(param_1, type_1), Type::TypeConstructor(param_2, type_2)) => {
+            let are_params_substitutable = match var_type_map.entry(param_1.to_string()) {
+                Entry::Occupied(entry) => entry.get() == param_2,
+                Entry::Vacant(entry) => {
+                    entry.insert(param_2.to_string());
+                    true
+                }
+            };
+
+            let are_types_equal = eq_type(type_1, type_2, var_type_map);
+
+            are_params_substitutable && are_types_equal
         }
 
         _ => false,
@@ -115,11 +142,23 @@ impl fmt::Display for Type {
                 }
             }
 
-            Type::Sum(name) => {
-                write!(f, "{}", name)
+            Type::Named(name, args) => {
+                write!(f, "{}", name)?;
+
+                for arg in args {
+                    fmt_parenthesized(f, arg)?;
+                }
+
+                Ok(())
             }
 
             Type::Variable(name) => write!(f, "{}", name),
+
+            Type::TypeConstructor(param, body) => {
+                write!(f, "{} => {}", param, body)?;
+
+                Ok(())
+            }
         }
     }
 }
@@ -148,10 +187,7 @@ impl fmt::Display for DataConstructor {
 
 pub fn kind_of(r#type: &Type) -> Kind {
     match r#type {
-        Type::Function(_, _) => Kind::Function(
-            Kind::Type.into(),
-            Kind::Function(Kind::Type.into(), Kind::Type.into()).into(),
-        ),
+        Type::TypeConstructor(_, _) => Kind::Function(Kind::Type.into(), Kind::Type.into()),
         _ => Kind::Type,
     }
 }

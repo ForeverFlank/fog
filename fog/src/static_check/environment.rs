@@ -176,7 +176,7 @@ impl<'a> Environment<'a> {
         if kind_of_type != kind_of_declared_type {
             return Err(static_check_error!(
                 Some(*span),
-                "kind mismatch when assigning to type `{}`\n\
+                "kind mismatch when declaring type `{}`\n\
                  expected `{}`, found `{}`",
                 name,
                 kind_of_declared_type.to_string(),

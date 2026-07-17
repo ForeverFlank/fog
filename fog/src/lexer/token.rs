@@ -100,6 +100,8 @@ impl TokenKind {
             TokenKind::Identifier(_)
             | TokenKind::Int32Literal(_)
             | TokenKind::Float32Literal(_)
+            | TokenKind::CharLiteral(_)
+            | TokenKind::StringLiteral(_)
             | TokenKind::LeftParenthesis
             | TokenKind::Minus => true,
             _ => false,
@@ -128,8 +130,8 @@ impl fmt::Display for TokenKind {
 
             TokenKind::Int32Literal(value) => write!(f, "Int32 ({})", value),
             TokenKind::Float32Literal(value) => write!(f, "Float32 ({})", value),
-            TokenKind::CharLiteral(value) => write!(f, "Char ({})", value),
-            TokenKind::StringLiteral(value) => write!(f, "String ({})", value),
+            TokenKind::CharLiteral(value) => write!(f, "Char (\'{}\')", value),
+            TokenKind::StringLiteral(value) => write!(f, "String (\"{}\")", value),
 
             TokenKind::Plus => write!(f, "Plus"),
             TokenKind::Minus => write!(f, "Minus"),

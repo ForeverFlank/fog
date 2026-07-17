@@ -33,11 +33,12 @@ pub fn eval_kind_expr(expr: &CoreKindExpr) -> FogResult<Kind> {
 
 pub fn eval_type_expr(
     name: &str,
+    params: &Vec<String>,
     expr: &CoreTypeExpr,
     env: &Environment,
 ) -> FogResult<(Type, Vec<DataConstructor>)> {
-    match expr {
-        CoreTypeExpr::Atomic(expr) => Ok((eval_atomic_type_expr(expr, env)?, vec![])),
+    let (r#type, ctors) = match expr {
+        CoreTypeExpr::Atomic(expr) => (eval_atomic_type_expr(expr, env)?, vec![]),
 
         CoreTypeExpr::Sum { ctors, .. } => {
             let ctors = ctors
@@ -45,8 +46,20 @@ pub fn eval_type_expr(
                 .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok((Type::Sum(name.to_string()), ctors))
+            (Type::Named(name.to_string(), vec![]), ctors)
         }
+    };
+
+    if params.is_empty() {
+        Ok((r#type, ctors))
+    } else {
+        let mut r#type = r#type;
+
+        for param in params {
+            r#type = Type::TypeConstructor(param.to_string(), r#type.into())
+        }
+
+        Ok((r#type, ctors))
     }
 }
 
@@ -105,7 +118,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             };
 
             match (name.as_str(), args.as_slice()) {
-                _ if env.contains_type(name) => apply_type_level_function(name, &args, env, &span),
+                _ if env.contains_type(name) => apply_type_function(name, &args, env, &span),
 
                 _ => Err(static_check_error!(
                     Some(span),
@@ -117,16 +130,16 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
     }
 }
 
-pub fn apply_type_level_function(
+pub fn apply_type_function(
     fn_name: &str,
-    args: &Vec<&CoreAtomicTypeExpr>,
+    arg_exprs: &Vec<&CoreAtomicTypeExpr>,
     env: &Environment,
     span: &Span,
 ) -> FogResult<Type> {
     let mut current = env.get_type(fn_name, span)?;
 
-    for &arg in args {
-        let Type::Function(param_type, return_type) = current else {
+    for &arg_expr in arg_exprs {
+        let Type::TypeConstructor(param, r#type) = current else {
             return Err(static_check_error!(
                 Some(*span),
                 "`{}` is not a valid type constructor",
@@ -134,20 +147,9 @@ pub fn apply_type_level_function(
             ));
         };
 
-        let arg_kind = eval_atomic_type_expr(arg, env)?;
+        let arg = eval_atomic_type_expr(arg_expr, env)?;
 
-        if arg_kind != *param_type {
-            return Err(static_check_error!(
-                Some(*span),
-                "type mismatch applying `{}`\n\
-                 expected `{}`, found `{}`",
-                fn_name,
-                param_type.to_string(),
-                arg_kind.to_string()
-            ));
-        }
-
-        current = *return_type;
+        current = (*r#type).substitute_var(&param, &arg);
     }
 
     Ok(current)

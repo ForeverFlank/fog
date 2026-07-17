@@ -68,8 +68,14 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     let mut data_ctors = Vec::new();
 
     for stmt in stmts {
-        if let CoreStatement::TypeDeclaration { name, expr, span } = stmt {
-            match check_type_declaration(name, expr, span, env) {
+        if let CoreStatement::TypeDeclaration {
+            name,
+            params,
+            expr,
+            span,
+        } = stmt
+        {
+            match check_type_declaration(name, params, expr, span, env) {
                 Ok(item) => data_ctors.push(item),
                 Err(error) => all_errors.push(error),
             }
@@ -122,7 +128,7 @@ fn check_type_declaration(
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<(Type, Vec<DataConstructor>, Span)> {
-    let (r#type, ctors) = eval_type_expr(name, expr, env)?;
+    let (r#type, ctors) = eval_type_expr(name, params, expr, env)?;
 
     if !env.types.contains_key(name) {
         env.annotate_kind(name, kind_of(&r#type), span)?;
@@ -548,10 +554,6 @@ fn unify_type(
             Ok(())
         }
 
-        // (_, Type::Variable(name)) => {
-        //     type_var_subst.insert(name.clone(), to);
-        //     Ok(())
-        // }
         (Type::Function(p1, r1), Type::Function(p2, r2)) => {
             unify_type(p1, p2, type_var_subst, span)?;
             unify_type(r1, r2, type_var_subst, span)
@@ -568,7 +570,7 @@ fn unify_type(
 
         _ => Err(static_check_error!(
             Some(*span),
-            "cannot unify type {} and {}",
+            "cannot unify type `{}` and `{}`",
             to,
             from
         )), // TODO error message here
