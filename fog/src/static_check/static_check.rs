@@ -18,6 +18,7 @@ use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
 use crate::static_check::r#type::DataConstructor;
+use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
 use crate::static_check_error;
@@ -127,7 +128,7 @@ fn check_type_declaration(
     expr: &CoreTypeExpr,
     span: &Span,
     env: &mut Environment,
-) -> FogResult<(Type, Vec<DataConstructor>, Span)> {
+) -> FogResult<(Monotype, Vec<DataConstructor>, Span)> {
     let (r#type, ctors) = eval_type_expr(name, params, expr, env)?;
 
     if !env.types.contains_key(name) {
@@ -142,7 +143,7 @@ fn check_type_declaration(
 
 fn register_data_constructors(
     env: &mut Environment,
-    parent_sum_type: &Type,
+    parent_sum_type: &Monotype,
     ctors: &Vec<DataConstructor>,
     span: &Span,
 ) -> FogResult<()> {
@@ -163,9 +164,9 @@ fn register_data_constructors(
     Ok(())
 }
 
-fn nest_function_types(field_types: &Vec<Type>, return_type: Type) -> Type {
+fn nest_function_types(field_types: &Vec<Monotype>, return_type: Monotype) -> Monotype {
     field_types.iter().rev().fold(return_type, |ret, ft| {
-        Type::Function(ft.clone().into(), ret.into())
+        Monotype::Function(ft.clone().into(), ret.into())
     })
 }
 
@@ -184,7 +185,7 @@ fn check_declaration(
     expr: &CoreExpr,
     span: &Span,
     env: &mut Environment,
-    type_var_subst: &mut HashMap<String, Type>,
+    type_var_subst: &mut HashMap<String, Monotype>,
 ) -> FogResult<()> {
     match pattern {
         CoreDeclPattern::Identifier { name, .. } => {
@@ -202,13 +203,13 @@ fn check_declaration(
 // like check_declaration, but it iterates through a possibly nested tuple
 fn bind_tuple_decl_pattern(
     items: &Vec<CoreTupleDeclPattern>,
-    expr_type: &Type,
+    expr_type: &Monotype,
     pattern: &CoreDeclPattern,
     expr: &CoreExpr,
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
-    let Type::Product(component_types) = expr_type else {
+    let Monotype::Product(component_types) = expr_type else {
         return Err(static_check_error!(
             Some(*span),
             "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
@@ -234,7 +235,7 @@ fn bind_tuple_decl_pattern(
 
 fn bind_tuple_decl_pattern_item(
     item: &CoreTupleDeclPattern,
-    expected_type: &Type,
+    expected_type: &Monotype,
     span: &Span,
     block_env: &mut Environment,
 ) -> FogResult<()> {
@@ -244,7 +245,7 @@ fn bind_tuple_decl_pattern_item(
         }
 
         CoreTupleDeclPattern::Tuple { items, .. } => {
-            let Type::Product(component_types) = expected_type else {
+            let Monotype::Product(component_types) = expected_type else {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple type, found `{expected_type}`"
@@ -273,8 +274,8 @@ fn bind_tuple_decl_pattern_item(
 pub fn expr_type_of(
     expr: &CoreExpr,
     env: &mut Environment,
-    type_var_subst: &mut HashMap<String, Type>,
-) -> FogResult<Type> {
+    type_var_subst: &mut HashMap<String, Monotype>,
+) -> FogResult<Monotype> {
     let span = expr.span();
 
     match expr {
@@ -285,10 +286,10 @@ pub fn expr_type_of(
         CoreExpr::Identifier { name, .. } => Ok(env.get_value_var(name, &span)?.r#type),
 
         CoreExpr::Literal { literal, .. } => match literal {
-            Literal::Int32(_) => Ok(Type::Int32),
-            Literal::Float32(_) => Ok(Type::Float32),
-            Literal::Char(_) => Ok(Type::Char),
-            Literal::String(_) => Ok(Type::String),
+            Literal::Int32(_) => Ok(Monotype::Int32),
+            Literal::Float32(_) => Ok(Monotype::Float32),
+            Literal::Char(_) => Ok(Monotype::Char),
+            Literal::String(_) => Ok(Monotype::String),
         },
 
         CoreExpr::Lambda {
@@ -304,13 +305,13 @@ pub fn expr_type_of(
 
             let return_type = expr_type_of(body, &mut body_env, type_var_subst)?;
 
-            Ok(Type::Function(param_type.into(), return_type.into()))
+            Ok(Monotype::Function(param_type.into(), return_type.into()))
         }
 
         CoreExpr::FunctionAppl { callee, arg, span } => {
             let callee_type = expr_type_of(callee, env, type_var_subst)?;
 
-            let Type::Function(param_type, return_type) = callee_type else {
+            let Monotype::Function(param_type, return_type) = callee_type else {
                 return Err(static_check_error!(
                     Some(*span),
                     "{} is not a function type",
@@ -325,11 +326,11 @@ pub fn expr_type_of(
             Ok(substitute_types(&return_type, type_var_subst))
         }
 
-        CoreExpr::Tuple { items, .. } => Ok(Type::Product(
+        CoreExpr::Tuple { items, .. } => Ok(Monotype::Product(
             items
                 .iter()
                 .map(|expr| expr_type_of(expr, env, type_var_subst))
-                .collect::<Result<Vec<Type>, FogError>>()?,
+                .collect::<Result<Vec<Monotype>, FogError>>()?,
         )),
 
         CoreExpr::Match {
@@ -373,23 +374,23 @@ pub fn expr_type_of(
 
 fn bind_match_arm_pattern(
     pattern: &CoreMatchArmPattern,
-    expected_type: &Type,
+    expected_scheme: &Type,
     env: &mut Environment,
 ) -> FogResult<()> {
     match pattern {
         CoreMatchArmPattern::Literal { literal, span } => {
             let literal_type = match literal {
-                Literal::Int32(_) => Type::Int32,
-                Literal::Float32(_) => Type::Float32,
-                Literal::Char(_) => Type::Char,
-                Literal::String(_) => Type::String,
+                Literal::Int32(_) => Monotype::Int32,
+                Literal::Float32(_) => Monotype::Float32,
+                Literal::Char(_) => Monotype::Char,
+                Literal::String(_) => Monotype::String,
             };
 
-            if literal_type != *expected_type {
+            if matches!(expected_scheme, Type::Mono(t) if literal_type == t) {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected type `{}`, found `{}`",
-                    expected_type,
+                    expected_scheme,
                     literal_type
                 ));
             }
@@ -403,36 +404,36 @@ fn bind_match_arm_pattern(
                 Ok(())
             } else if name.starts_with(|c: char| c.is_uppercase()) {
                 // nullary data constructor
-                let ctor_type = env.get_value_var(name, span)?.r#type;
+                let scheme = env.get_value_var(name, span)?.scheme;
 
-                if ctor_type != *expected_type {
+                if scheme != *expected_scheme {
                     return Err(static_check_error!(
                         Some(*span),
                         "expected type `{}`, found `{}`",
-                        expected_type,
-                        ctor_type
+                        expected_scheme,
+                        scheme
                     ));
                 }
 
                 Ok(())
             } else {
                 // bind value to identifier
-                env.declare_var(name, expected_type.clone(), span)
+                env.declare_var(name, expected_scheme.clone(), span)
             }
         }
 
         CoreMatchArmPattern::Tuple { items, span } => {
-            let Type::Product(component_types) = expected_type else {
+            let Monotype::Product(component_types) = expected_scheme else {
                 return Err(static_check_error!(
                     Some(*span),
-                    "expected a tuple type, found `{expected_type}`"
+                    "expected a tuple type, found `{expected_scheme}`"
                 ));
             };
 
             if items.len() != component_types.len() {
                 return Err(static_check_error!(
                     Some(*span),
-                    "expected a tuple of {} element(s), found `{expected_type}`",
+                    "expected a tuple of {} element(s), found `{expected_scheme}`",
                     items.len()
                 ));
             }
@@ -448,11 +449,11 @@ fn bind_match_arm_pattern(
             let ctor_type = env.get_value_var(name, span)?.r#type;
             let (param_types, return_type) = uncurry_function_type(&ctor_type, args.len());
 
-            if param_types.len() != args.len() || return_type != *expected_type {
+            if param_types.len() != args.len() || return_type != *expected_scheme {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected type `{}`, found `{}`",
-                    expected_type,
+                    expected_scheme,
                     return_type
                 ));
             }
@@ -466,13 +467,13 @@ fn bind_match_arm_pattern(
     }
 }
 
-fn uncurry_function_type(r#type: &Type, arity: usize) -> (Vec<Type>, Type) {
+fn uncurry_function_type(r#type: &Monotype, arity: usize) -> (Vec<Monotype>, Monotype) {
     let mut param_types = Vec::new();
     let mut current = r#type;
 
     for _ in 0..arity {
         match current {
-            Type::Function(param_type, return_type) => {
+            Monotype::Function(param_type, return_type) => {
                 param_types.push((**param_type).clone());
                 current = return_type.as_ref();
             }
@@ -486,9 +487,9 @@ fn uncurry_function_type(r#type: &Type, arity: usize) -> (Vec<Type>, Type) {
 fn block_expr_type_of(
     env: &Environment<'_>,
     statements: &Vec<CoreStatement>,
-    type_var_subst: &mut HashMap<String, Type>,
+    type_var_subst: &mut HashMap<String, Monotype>,
     span: Span,
-) -> FogResult<Type> {
+) -> FogResult<Monotype> {
     let mut block_env = Environment::new(Some(env));
 
     for stmt in statements {
@@ -530,13 +531,13 @@ fn block_expr_type_of(
 }
 
 fn unify_type(
-    to: &Type,
-    from: &Type,
-    type_var_subst: &mut HashMap<String, Type>,
+    to: &Monotype,
+    from: &Monotype,
+    type_var_subst: &mut HashMap<String, Monotype>,
     span: &Span,
 ) -> FogResult<()> {
-    if let Type::Variable(name_1) = to
-        && let Type::Variable(name_2) = from
+    if let Monotype::Variable(name_1) = to
+        && let Monotype::Variable(name_2) = from
         && name_1 == name_2
     {
         return Ok(());
@@ -546,17 +547,19 @@ fn unify_type(
     let from = substitute_types(from, type_var_subst);
 
     match (&to, &from) {
-        (Type::Variable(name), _) => {
+        (Monotype::Variable(name), _) => {
             type_var_subst.insert(name.clone(), from);
             Ok(())
         }
 
-        (Type::Function(p1, r1), Type::Function(p2, r2)) => {
+        (Monotype::Function(p1, r1), Monotype::Function(p2, r2)) => {
             unify_type(p1, p2, type_var_subst, span)?;
             unify_type(r1, r2, type_var_subst, span)
         }
 
-        (Type::Product(types_1), Type::Product(types_2)) if types_1.len() == types_2.len() => {
+        (Monotype::Product(types_1), Monotype::Product(types_2))
+            if types_1.len() == types_2.len() =>
+        {
             types_1
                 .iter()
                 .zip(types_2)
@@ -574,19 +577,19 @@ fn unify_type(
     }
 }
 
-fn substitute_types(r#type: &Type, type_var_subst: &HashMap<String, Type>) -> Type {
+fn substitute_types(r#type: &Monotype, type_var_subst: &HashMap<String, Monotype>) -> Monotype {
     match r#type {
-        Type::Variable(name) => type_var_subst
+        Monotype::Variable(name) => type_var_subst
             .get(name)
             .map(|t2| substitute_types(t2, type_var_subst))
             .unwrap_or_else(|| r#type.clone()),
 
-        Type::Function(p, r) => Type::function(
+        Monotype::Function(p, r) => Monotype::function(
             substitute_types(p, type_var_subst),
             substitute_types(r, type_var_subst),
         ),
 
-        Type::Product(ts) => Type::Product(
+        Monotype::Product(ts) => Monotype::Product(
             ts.iter()
                 .map(|t| substitute_types(t, type_var_subst))
                 .collect(),

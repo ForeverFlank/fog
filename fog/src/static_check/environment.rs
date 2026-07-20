@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::static_check::kind::Kind;
-use crate::static_check::r#type::Type;
+use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::kind_of;
 use crate::static_check::variable::TypeVariable;
 use crate::static_check::variable::ValueVariable;
@@ -61,7 +61,7 @@ impl<'a> Environment<'a> {
         ))
     }
 
-    pub fn get_type(&self, name: &str, span: &Span) -> FogResult<Type> {
+    pub fn get_type(&self, name: &str, span: &Span) -> FogResult<Monotype> {
         self.get_type_var(name, span)?.get_type()
     }
 
@@ -80,7 +80,7 @@ impl<'a> Environment<'a> {
     // --- setters ---
     // -- annotate
 
-    pub fn annotate_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
+    pub fn annotate_type(&mut self, name: &str, r#type: Monotype, span: &Span) -> FogResult<()> {
         if self.variables.contains_key(name) {
             return Err(static_check_error!(
                 Some(*span),
@@ -118,7 +118,7 @@ impl<'a> Environment<'a> {
 
     // -- declare
 
-    pub fn declare_var(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
+    pub fn declare_var(&mut self, name: &str, r#type: Monotype, span: &Span) -> FogResult<()> {
         if name == "_" {
             return Ok(());
         }
@@ -156,7 +156,7 @@ impl<'a> Environment<'a> {
         Ok(())
     }
 
-    pub fn declare_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
+    pub fn declare_type(&mut self, name: &str, r#type: Monotype, span: &Span) -> FogResult<()> {
         let kind_of_declared_type = {
             let r#type = self.get_type_var(name, span)?;
 

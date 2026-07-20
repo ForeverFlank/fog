@@ -4,20 +4,20 @@ use crate::interpreter;
 use crate::interpreter::value::Value;
 use crate::runtime_error;
 use crate::static_check;
-use crate::static_check::r#type::Type;
+use crate::static_check::r#type::Monotype;
 
 // TODO: refactor to consts
 
 struct BuiltInVariable {
     name: String,
-    r#type: Type,
+    r#type: Monotype,
     value: Value,
 }
 
 fn get_builtin_variables() -> Vec<BuiltInVariable> {
     let var_add_int32 = BuiltInVariable {
         name: "addInt32".to_string(),
-        r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
+        r#type: Monotype::function(Monotype::Int32, Monotype::function(Monotype::Int32, Monotype::Int32)),
         value: Value::NativeFunction {
             function: Rc::new(|a: Value| match a {
                 Value::Int32(lhs) => Ok(Value::NativeFunction {
@@ -33,7 +33,7 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
 
     let var_subtract_int32 = BuiltInVariable {
         name: "subtractInt32".to_string(),
-        r#type: Type::function(Type::Int32, Type::function(Type::Int32, Type::Int32)),
+        r#type: Monotype::function(Monotype::Int32, Monotype::function(Monotype::Int32, Monotype::Int32)),
         value: Value::NativeFunction {
             function: Rc::new(|a: Value| match a {
                 Value::Int32(lhs) => Ok(Value::NativeFunction {
@@ -49,7 +49,7 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
 
     let var_print_line = BuiltInVariable {
         name: "printLine".to_string(),
-        r#type: Type::function(Type::String, Type::IOUnit),
+        r#type: Monotype::function(Monotype::String, Monotype::IOUnit),
         value: Value::NativeFunction {
             function: Rc::new(|str: Value| match str {
                 Value::String(str) => Ok({
@@ -64,7 +64,7 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
     // HACK this will be implemented in prelude
     let var_to_string = BuiltInVariable {
         name: "toString".to_string(),
-        r#type: Type::function(Type::Int32, Type::String),
+        r#type: Monotype::function(Monotype::Int32, Monotype::String),
         value: Value::NativeFunction {
             function: Rc::new(|val: Value| match val {
                 Value::Int32(val) => Ok(Value::String(format!("{val}"))),
@@ -84,13 +84,13 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
 pub fn get_static_check_types() -> Vec<static_check::variable::TypeVariable> {
     let type_int32 = static_check::variable::TypeVariable {
         name: "Int32".to_string(),
-        r#type: Some(Type::Int32),
+        r#type: Some(Monotype::Int32),
         kind: static_check::kind::Kind::Type,
     };
 
     let type_unit = static_check::variable::TypeVariable {
         name: "Unit".to_string(),
-        r#type: Some(Type::Product(Vec::new())),
+        r#type: Some(Monotype::Product(Vec::new())),
         kind: static_check::kind::Kind::Type,
     };
 
