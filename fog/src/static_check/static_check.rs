@@ -131,14 +131,21 @@ fn check_type_declaration(
 ) -> FogResult<(Monotype, Vec<DataConstructor>, Span)> {
     let (r#type, ctors) = eval_type_expr(name, params, expr, env)?;
 
+    let Type::Mono(ref monotype) = r#type else {
+        return Err(static_check_error!(
+            Some(*span),
+            "declared type must be a monotype"
+        ));
+    };
+
     if !env.types.contains_key(name) {
         env.annotate_kind(name, kind_of(&r#type), span)?;
     }
 
-    env.declare_type(name, r#type.clone(), span)?;
+    env.declare_type(name, monotype.clone(), span)?;
     // register_data_constructors(env, &r#type, &ctors, span)?;
 
-    Ok((r#type, ctors, span.clone()))
+    Ok((monotype.clone(), ctors, span.clone()))
 }
 
 fn register_data_constructors(
@@ -157,8 +164,8 @@ fn register_data_constructors(
 
         let ctor_type = nest_function_types(&types, parent_sum_type.clone());
 
-        env.annotate_type(&ctor.tag, ctor_type.clone(), span)?;
-        env.declare_var(&ctor.tag, ctor_type, span)?;
+        // env.annotate_type(&ctor.tag, Type::Mono(ctor_type.clone()), span)?;
+        env.declare_var(&ctor.tag, Type::Mono(ctor_type), span)?;
     }
 
     Ok(())
@@ -177,7 +184,7 @@ fn check_type_annotation(
     env: &mut Environment,
 ) -> FogResult<()> {
     let r#type = eval_atomic_type_expr(expr, env)?;
-    env.annotate_type(name, r#type, span)
+    env.annotate_type(name, Type::Mono(r#type), span)
 }
 
 fn check_declaration(
@@ -190,7 +197,7 @@ fn check_declaration(
     match pattern {
         CoreDeclPattern::Identifier { name, .. } => {
             let expr_type = expr_type_of(expr, env, type_var_subst)?;
-            env.declare_var(name, expr_type, span)
+            env.declare_var(name, Type::Mono(expr_type), span)
         }
 
         CoreDeclPattern::Tuple { items, .. } => {
@@ -241,7 +248,7 @@ fn bind_tuple_decl_pattern_item(
 ) -> FogResult<()> {
     match item {
         CoreTupleDeclPattern::Identifier { name, .. } => {
-            block_env.declare_var(name, expected_type.clone(), span)
+            block_env.declare_var(name, Type::Mono(expected_type.clone()), span)
         }
 
         CoreTupleDeclPattern::Tuple { items, .. } => {
@@ -275,7 +282,7 @@ pub fn expr_type_of(
     expr: &CoreExpr,
     env: &mut Environment,
     type_var_subst: &mut HashMap<String, Monotype>,
-) -> FogResult<Monotype> {
+) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {
@@ -285,12 +292,12 @@ pub fn expr_type_of(
 
         CoreExpr::Identifier { name, .. } => Ok(env.get_value_var(name, &span)?.r#type),
 
-        CoreExpr::Literal { literal, .. } => match literal {
-            Literal::Int32(_) => Ok(Monotype::Int32),
-            Literal::Float32(_) => Ok(Monotype::Float32),
-            Literal::Char(_) => Ok(Monotype::Char),
-            Literal::String(_) => Ok(Monotype::String),
-        },
+        CoreExpr::Literal { literal, .. } => Ok(Type::Mono(match literal {
+            Literal::Int32(_) => Monotype::Int32,
+            Literal::Float32(_) => Monotype::Float32,
+            Literal::Char(_) => Monotype::Char,
+            Literal::String(_) => Monotype::String,
+        })),
 
         CoreExpr::Lambda {
             param_name,
@@ -301,11 +308,14 @@ pub fn expr_type_of(
             let param_type = eval_atomic_type_expr(param_type, env)?;
 
             let mut body_env = Environment::new(Some(env));
-            body_env.declare_var(param_name, param_type.clone(), &span)?;
+            body_env.declare_var(param_name, Type::Mono(param_type.clone()), &span)?;
 
             let return_type = expr_type_of(body, &mut body_env, type_var_subst)?;
 
-            Ok(Monotype::Function(param_type.into(), return_type.into()))
+            Ok(Type::Mono(Monotype::Function(
+                param_type.into(),
+                return_type.into(),
+            )))
         }
 
         CoreExpr::FunctionAppl { callee, arg, span } => {
@@ -404,7 +414,7 @@ fn bind_match_arm_pattern(
                 Ok(())
             } else if name.starts_with(|c: char| c.is_uppercase()) {
                 // nullary data constructor
-                let scheme = env.get_value_var(name, span)?.scheme;
+                let scheme = env.get_value_var(name, span)?.r#type;
 
                 if scheme != *expected_scheme {
                     return Err(static_check_error!(

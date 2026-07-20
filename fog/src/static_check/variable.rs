@@ -6,15 +6,15 @@ use crate::static_check_error;
 #[derive(Clone)]
 pub struct ValueVariable {
     pub name: String,
-    pub scheme: Type,
+    pub r#type: Type,
     pub declared: bool,
 }
 
 impl ValueVariable {
-    pub fn new(name: &str, scheme: Type, declared: bool) -> Self {
+    pub fn new(name: &str, r#type: Type, declared: bool) -> Self {
         ValueVariable {
             name: name.to_string(),
-            scheme,
+            r#type,
             declared,
         }
     }

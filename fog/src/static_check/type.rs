@@ -225,8 +225,12 @@ impl fmt::Display for DataConstructor {
 
 // --- functions ---
 
-pub fn kind_of(r#type: &Monotype) -> Kind {
-    match r#type {
+pub fn kind_of(r#type: &Type) -> Kind {
+    let monotype = match r#type {
+        Type::Mono(t) | Type::Poly(_, t) => t,
+    };
+
+    match monotype {
         Monotype::TypeConstructor(_, _) => Kind::Function(Kind::Type.into(), Kind::Type.into()),
         _ => Kind::Type,
     }

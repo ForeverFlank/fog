@@ -4,6 +4,7 @@ use crate::error::FogResult;
 use crate::error::Span;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::Monotype;
+use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
 use crate::static_check::variable::TypeVariable;
 use crate::static_check::variable::ValueVariable;
@@ -80,7 +81,7 @@ impl<'a> Environment<'a> {
     // --- setters ---
     // -- annotate
 
-    pub fn annotate_type(&mut self, name: &str, r#type: Monotype, span: &Span) -> FogResult<()> {
+    pub fn annotate_type(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
         if self.variables.contains_key(name) {
             return Err(static_check_error!(
                 Some(*span),
@@ -118,7 +119,7 @@ impl<'a> Environment<'a> {
 
     // -- declare
 
-    pub fn declare_var(&mut self, name: &str, r#type: Monotype, span: &Span) -> FogResult<()> {
+    pub fn declare_var(&mut self, name: &str, r#type: Type, span: &Span) -> FogResult<()> {
         if name == "_" {
             return Ok(());
         }
@@ -171,7 +172,7 @@ impl<'a> Environment<'a> {
             r#type.kind.clone()
         };
 
-        let kind_of_type = kind_of(&r#type);
+        let kind_of_type = kind_of(&Type::Mono(r#type.clone()));
 
         if kind_of_type != kind_of_declared_type {
             return Err(static_check_error!(
