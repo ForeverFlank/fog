@@ -19,11 +19,11 @@ pub enum Type {
 
     Function(Box<Type>, Box<Type>),
     Product(Vec<Type>),
-    Named(String, Vec<Type>), // sum type and stuff
+    Named(String, Vec<Type>),
 
-    // parametric polymorphism
     Variable(String),
 
+    ForAll(Vec<String>, Box<Type>),
     TypeConstructor(String, Box<Type>),
 }
 
@@ -128,6 +128,7 @@ impl fmt::Display for Type {
             Type::Char => write!(f, "Char"),
             Type::String => write!(f, "String"),
             Type::IOUnit => write!(f, "IO"),
+            Type::Variable(name) => write!(f, "{}", name),
 
             Type::Function(param_type, return_type) => {
                 fmt_parenthesized(f, param_type)?;
@@ -153,7 +154,9 @@ impl fmt::Display for Type {
                 Ok(())
             }
 
-            Type::Variable(name) => write!(f, "{}", name),
+            Type::ForAll(_, r#type) => {
+                write!(f, "{}", r#type)
+            }
 
             Type::TypeConstructor(param, body) => {
                 write!(f, "{} => {}", param, body)?;

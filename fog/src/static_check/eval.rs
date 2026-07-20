@@ -1,7 +1,6 @@
 use std::vec;
 
 use crate::error::FogResult;
-use crate::error::Span;
 use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreKindExpr;
@@ -58,16 +57,18 @@ pub fn eval_type_expr(
         }
     };
 
+    let wrapped_type = wrap_forall_type(&r#type, params);
+
     if params.is_empty() {
-        Ok((r#type, ctors))
+        Ok((wrapped_type, ctors))
     } else {
-        let mut r#type = r#type;
+        let mut res_type = wrapped_type;
 
         for param in params {
-            r#type = Type::TypeConstructor(param.to_string(), r#type.into())
+            res_type = Type::TypeConstructor(param.to_string(), res_type.into())
         }
 
-        Ok((r#type, ctors))
+        Ok((res_type, ctors))
     }
 }
 
@@ -76,6 +77,47 @@ fn eval_data_constructor(ctor: &CoreDataConstructor) -> FogResult<DataConstructo
         tag: ctor.tag.clone(),
         types: ctor.types.clone(),
     })
+}
+
+fn wrap_forall_type(r#type: &Type, params: &Vec<String>) -> Type {
+    let mut vars = Vec::new();
+    find_type_variables(r#type, &mut vars, params);
+
+    if vars.is_empty() {
+        r#type.clone()
+    } else {
+        Type::ForAll(vars, r#type.clone().into())
+    }
+}
+
+fn find_type_variables(r#type: &Type, vars: &mut Vec<String>, params: &Vec<String>) {
+    match r#type {
+        Type::Int32
+        | Type::Float32
+        | Type::Char
+        | Type::String
+        | Type::IOUnit
+        | Type::ForAll(_, _) => {}
+
+        Type::Variable(name) => {
+            if !params.contains(name) {
+                vars.push(name.to_string());
+            }
+        }
+
+        Type::Function(param_type, return_type) => {
+            find_type_variables(param_type, vars, params);
+            find_type_variables(return_type, vars, params);
+        }
+
+        Type::Product(types) | Type::Named(_, types) => types
+            .iter()
+            .for_each(|t| find_type_variables(t, vars, params)),
+
+        Type::TypeConstructor(_, r#type) => {
+            find_type_variables(r#type, vars, params);
+        }
+    }
 }
 
 pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> FogResult<Type> {
@@ -140,6 +182,7 @@ mod tests {
     use super::*;
 
     use crate::error::Pos;
+    use crate::error::Span;
     use crate::static_check::variable::TypeVariable;
 
     const SPAN: Span = Span {
