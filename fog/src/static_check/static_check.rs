@@ -33,7 +33,7 @@ pub fn check(stmts: &Vec<CoreStatement>) -> Vec<FogError> {
     all_errors
 }
 
-fn create_top_env() -> Environment<'static> {
+pub fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
 
     for r#type in get_static_check_types() {

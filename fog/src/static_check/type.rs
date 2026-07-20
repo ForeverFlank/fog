@@ -146,6 +146,7 @@ impl fmt::Display for Type {
                 write!(f, "{}", name)?;
 
                 for arg in args {
+                    write!(f, " ")?;
                     fmt_parenthesized(f, arg)?;
                 }
 

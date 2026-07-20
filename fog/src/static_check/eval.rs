@@ -41,12 +41,20 @@ pub fn eval_type_expr(
         CoreTypeExpr::Atomic(expr) => (eval_atomic_type_expr(expr, env)?, vec![]),
 
         CoreTypeExpr::Sum { ctors, .. } => {
+            let named_type = Type::Named(
+                name.to_string(),
+                params
+                    .iter()
+                    .map(|param| Type::Variable(param.to_string()))
+                    .collect(),
+            );
+
             let ctors = ctors
                 .iter()
                 .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            (Type::Named(name.to_string(), vec![]), ctors)
+            (named_type, ctors)
         }
     };
 
@@ -121,53 +129,8 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             let res_type = (*r#type).substitute_var(&param, &arg_type);
 
             Ok(res_type)
-
-            // let (head, args) = expr.uncurry();
-
-            // let CoreAtomicTypeExpr::Identifier { name, .. } = head else {
-            //     return Err(static_check_error!(
-            //         Some(span),
-            //         "cannot type annotate a value with data constructor `{}`",
-            //         expr.to_string()
-            //     ));
-            // };
-
-            // match (name.as_str(), args.as_slice()) {
-            //     _ if env.contains_type(name) => apply_type_function(name, &args, env, &span),
-
-            //     _ => Err(static_check_error!(
-            //         Some(span),
-            //         "cannot type annotate a value with data constructor `{}`",
-            //         expr.to_string()
-            //     )),
-            // }
         }
     }
-}
-
-pub fn apply_type_function(
-    fn_name: &str,
-    arg_exprs: &Vec<&CoreAtomicTypeExpr>,
-    env: &Environment,
-    span: &Span,
-) -> FogResult<Type> {
-    let mut current = env.get_type(fn_name, span)?;
-
-    for &arg_expr in arg_exprs {
-        let Type::TypeConstructor(param, r#type) = current else {
-            return Err(static_check_error!(
-                Some(*span),
-                "`{}` is not a valid type constructor",
-                current.to_string()
-            ));
-        };
-
-        let arg = eval_atomic_type_expr(arg_expr, env)?;
-
-        current = (*r#type).substitute_var(&param, &arg);
-    }
-
-    Ok(current)
 }
 
 // --- tests ---
@@ -175,7 +138,9 @@ pub fn apply_type_function(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::error::Pos;
+    use crate::static_check::variable::TypeVariable;
 
     const SPAN: Span = Span {
         start: Pos {
@@ -191,20 +156,145 @@ mod tests {
     #[test]
     fn test_eval_kind_expr() {
         let expr_1 = CoreKindExpr::Type { span: SPAN };
+        assert!(matches!(eval_kind_expr(&expr_1), Ok(Kind::Type)));
 
         let expr_2 = CoreKindExpr::Constraint { span: SPAN };
+        assert!(matches!(eval_kind_expr(&expr_2), Ok(Kind::Constraint)));
 
         let expr_3 = CoreKindExpr::Function {
             param_kind: CoreKindExpr::Type { span: SPAN }.into(),
             return_kind: CoreKindExpr::Type { span: SPAN }.into(),
             span: SPAN,
         };
-
-        assert!(matches!(eval_kind_expr(&expr_1), Ok(Kind::Type)));
-        assert!(matches!(eval_kind_expr(&expr_2), Ok(Kind::Constraint)));
         assert!(matches!(
             eval_kind_expr(&expr_3),
-            Ok(Kind::Function(p, r)) if *p == Kind::Type && *r == Kind::Type
+            Ok(Kind::Function(p, r))
+                if *p == Kind::Type &&
+                   *r == Kind::Type
+        ));
+    }
+
+    #[test]
+    fn test_eval_type_expr() {
+        let mut env = Environment::new(None);
+
+        env.types.insert(
+            "Int32".to_string(),
+            TypeVariable {
+                name: "Int32".to_string(),
+                r#type: Some(Type::Int32),
+                kind: Kind::Type,
+            },
+        );
+
+        env.types.insert(
+            "Unit".to_string(),
+            TypeVariable {
+                name: "Unit".to_string(),
+                r#type: Some(Type::Product(Vec::new())),
+                kind: Kind::Type,
+            },
+        );
+
+        // --------------------
+
+        // Option a = Some a | None
+        let expr_1 = CoreTypeExpr::Sum {
+            ctors: vec![
+                CoreDataConstructor {
+                    tag: "Some".to_string(),
+                    types: vec![CoreAtomicTypeExpr::Identifier {
+                        name: "a".to_string(),
+                        span: SPAN,
+                    }],
+                },
+                CoreDataConstructor {
+                    tag: "None".to_string(),
+                    types: vec![],
+                },
+            ],
+            span: SPAN,
+        };
+        let Ok((type_1, ctors_1)) = eval_type_expr("Option", &vec!["a".to_string()], &expr_1, &env)
+        else {
+            panic!()
+        };
+
+        assert!(matches!(type_1, Type::TypeConstructor(_, _)));
+        assert!(ctors_1.len() == 2);
+    }
+
+    #[test]
+    fn test_eval_atomic_type_expr() {
+        let mut env = Environment::new(None);
+
+        env.types.insert(
+            "Int32".to_string(),
+            TypeVariable {
+                name: "Int32".to_string(),
+                r#type: Some(Type::Int32),
+                kind: Kind::Type,
+            },
+        );
+
+        env.types.insert(
+            "Unit".to_string(),
+            TypeVariable {
+                name: "Unit".to_string(),
+                r#type: Some(Type::Product(Vec::new())),
+                kind: Kind::Type,
+            },
+        );
+
+        // --------------------
+
+        let expr_1 = CoreAtomicTypeExpr::Identifier {
+            name: "Int32".to_string(),
+            span: SPAN,
+        };
+        assert!(matches!(
+            eval_atomic_type_expr(&expr_1, &env),
+            Ok(Type::Int32)
+        ));
+
+        let expr_2 = CoreAtomicTypeExpr::Product {
+            types: vec![
+                CoreAtomicTypeExpr::Identifier {
+                    name: "Int32".to_string(),
+                    span: SPAN,
+                },
+                CoreAtomicTypeExpr::Identifier {
+                    name: "Unit".to_string(),
+                    span: SPAN,
+                },
+            ],
+            span: SPAN,
+        };
+        assert!(matches!(
+            eval_atomic_type_expr(&expr_2, &env),
+            Ok(Type::Product(types))
+                if types[0] == Type::Int32 &&
+                   types[1] == Type::Product(Vec::new())
+        ));
+
+        let expr_3 = CoreAtomicTypeExpr::Function {
+            param_type: CoreAtomicTypeExpr::Identifier {
+                name: "Unit".to_string(),
+                span: SPAN,
+            }
+            .into(),
+            return_type: CoreAtomicTypeExpr::Identifier {
+                name: "Int32".to_string(),
+                span: SPAN,
+            }
+            .into(),
+            span: SPAN,
+        };
+        assert!(matches!(
+            eval_atomic_type_expr(&expr_3, &env),
+            Ok(Type::Function(p, r))
+                if *p == Type::Product(Vec::new()) &&
+                   *r == Type::Int32
         ));
     }
 }
