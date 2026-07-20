@@ -80,7 +80,7 @@ fn eval_data_constructor(ctor: &CoreDataConstructor) -> FogResult<DataConstructo
     })
 }
 
-fn wrap_type_scheme(monotype: &Monotype, params: &Vec<String>) -> Type {
+pub fn wrap_type_scheme(monotype: &Monotype, params: &Vec<String>) -> Type {
     let mut vars = Vec::new();
     find_type_variables(monotype, &mut vars, params);
 
@@ -120,7 +120,7 @@ fn find_type_variables(r#type: &Monotype, vars: &mut Vec<String>, params: &Vec<S
     }
 }
 
-pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> FogResult<Monotype> {
+pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> FogResult<Type> {
     let span = expr.span();
 
     match expr {

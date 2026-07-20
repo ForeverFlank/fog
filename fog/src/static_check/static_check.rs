@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate::core::get_static_check_types;
 use crate::core::get_static_check_variables;
@@ -17,6 +18,7 @@ use crate::static_check::environment::Environment;
 use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
+use crate::static_check::r#type;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -312,16 +314,18 @@ pub fn expr_type_of(
 
             let return_type = expr_type_of(body, &mut body_env, type_var_subst)?;
 
-            Ok(Type::Mono(Monotype::Function(
-                param_type.into(),
-                return_type.into(),
-            )))
+            let fn_monotype = Monotype::Function(param_type.into(), return_type.monotype().into());
+
+            Ok(match return_type {
+                Type::Mono(return_monotype) => Type::Mono(fn_monotype),
+                Type::Poly(vars, return_monotype) => Type::Poly(vars, fn_monotype),
+            })
         }
 
         CoreExpr::FunctionAppl { callee, arg, span } => {
             let callee_type = expr_type_of(callee, env, type_var_subst)?;
 
-            let Monotype::Function(param_type, return_type) = callee_type else {
+            let Monotype::Function(param_type, return_type) = callee_type.monotype() else {
                 return Err(static_check_error!(
                     Some(*span),
                     "{} is not a function type",
@@ -336,12 +340,28 @@ pub fn expr_type_of(
             Ok(substitute_types(&return_type, type_var_subst))
         }
 
-        CoreExpr::Tuple { items, .. } => Ok(Monotype::Product(
-            items
-                .iter()
-                .map(|expr| expr_type_of(expr, env, type_var_subst))
-                .collect::<Result<Vec<Monotype>, FogError>>()?,
-        )),
+        CoreExpr::Tuple { items, .. } => {
+            let mut type_vars = HashSet::new();
+            let mut types = Vec::new();
+
+            for item in items {
+                let r#type = expr_type_of(expr, env, type_var_subst)?;
+
+                types.push(r#type.monotype());
+
+                if let Type::Poly(vars, _) = r#type {
+                    type_vars.extend(vars);
+                }
+            }
+
+            let prod_monotype = Monotype::Product(types);
+
+            if type_vars.is_empty() {
+                Ok(Type::Mono(prod_monotype))
+            } else {
+                Ok(Type::Poly(type_vars.into_iter().collect(), prod_monotype))
+            }
+        }
 
         CoreExpr::Match {
             scrutinee,
@@ -499,7 +519,7 @@ fn block_expr_type_of(
     statements: &Vec<CoreStatement>,
     type_var_subst: &mut HashMap<String, Monotype>,
     span: Span,
-) -> FogResult<Monotype> {
+) -> FogResult<Type> {
     let mut block_env = Environment::new(Some(env));
 
     for stmt in statements {

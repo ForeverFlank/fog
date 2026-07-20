@@ -167,6 +167,14 @@ pub enum Type {
     Poly(Vec<String>, Monotype),
 }
 
+impl Type {
+    pub fn monotype(&self) -> Monotype {
+        match self {
+            Type::Mono(t) | Type::Poly(_, t) => t.clone(),
+        }
+    }
+}
+
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
