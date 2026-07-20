@@ -535,20 +535,14 @@ fn unify_type(
     type_var_subst: &mut HashMap<String, Type>,
     span: &Span,
 ) -> FogResult<()> {
-    // println!(
-    //     "unifying {to} and {from} at {}:{}",
-    //     span.start.line, span.start.column
-    // );
-
     if let Type::Variable(name_1) = to
         && let Type::Variable(name_2) = from
         && name_1 == name_2
     {
-        // println!("lgtm");
         return Ok(());
     }
 
-    // let to = substitute_types(to, type_var_subst);
+    let to = substitute_types(to, type_var_subst);
     let from = substitute_types(from, type_var_subst);
 
     match (&to, &from) {
@@ -569,31 +563,22 @@ fn unify_type(
                 .try_for_each(|(a, b)| unify_type(a, b, type_var_subst, span))
         }
 
-        _ if *to == from => Ok(()),
+        _ if to == from => Ok(()),
 
         _ => Err(static_check_error!(
             Some(*span),
             "cannot unify type `{}` and `{}`",
             to,
             from
-        )), // TODO error message here
+        )),
     }
 }
 
 fn substitute_types(r#type: &Type, type_var_subst: &HashMap<String, Type>) -> Type {
-    // println!("subst'ing {}", r#type);
-    // for (k, v) in type_var_subst {
-    //     println!("  {} --> {}", k, v);
-    // }
-
     match r#type {
         Type::Variable(name) => type_var_subst
             .get(name)
-            .map(|t2| {
-                // println!(": t2");
-                substitute_types(t2, type_var_subst)
-                // r#type.clone()
-            })
+            .map(|t2| substitute_types(t2, type_var_subst))
             .unwrap_or_else(|| r#type.clone()),
 
         Type::Function(p, r) => Type::function(

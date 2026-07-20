@@ -92,12 +92,7 @@ fn wrap_forall_type(r#type: &Type, params: &Vec<String>) -> Type {
 
 fn find_type_variables(r#type: &Type, vars: &mut Vec<String>, params: &Vec<String>) {
     match r#type {
-        Type::Int32
-        | Type::Float32
-        | Type::Char
-        | Type::String
-        | Type::IOUnit
-        | Type::ForAll(_, _) => {}
+        Type::Int32 | Type::Float32 | Type::Char | Type::String | Type::IOUnit => {}
 
         Type::Variable(name) => {
             if !params.contains(name) {
@@ -264,7 +259,7 @@ mod tests {
         };
 
         assert!(matches!(type_1, Type::TypeConstructor(_, _)));
-        assert!(ctors_1.len() == 2);
+        assert_eq!(ctors_1.len(), 2);
     }
 
     #[test]
