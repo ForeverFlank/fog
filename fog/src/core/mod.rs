@@ -108,7 +108,7 @@ pub fn get_static_check_variables() -> Vec<static_check::variable::ValueVariable
         .iter()
         .map(|var| static_check::variable::ValueVariable {
             name: var.name.clone(),
-            r#type: var.r#type.clone(),
+            r#type: static_check::r#type::Type::mono(var.r#type.clone()),
             declared: true,
         })
         .collect()

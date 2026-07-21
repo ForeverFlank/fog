@@ -32,7 +32,7 @@ impl Display for Literal {
 pub fn parse_program(tokens: &Vec<Token>) -> (Vec<core_expr::CoreStatement>, Vec<FogError>) {
     let (parsed_stmts, parser_errors) = parser::parse(&tokens);
     let (resolved_stmts, resolver_errors) = resolver::resolve(parsed_stmts);
-    let (mut desugared_stmts, desugar_errors) = desugar::desugar(resolved_stmts);
+    let (desugared_stmts, desugar_errors) = desugar::desugar(resolved_stmts);
 
     let all_errors: Vec<FogError> = [
         &parser_errors[..],

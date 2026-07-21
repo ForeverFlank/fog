@@ -1,12 +1,12 @@
 use std::fmt;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, Debug)]
 pub struct Pos {
     pub line: usize,
     pub column: usize,
 }
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, Debug)]
 pub struct Span {
     pub start: Pos,
     pub end: Pos,
@@ -25,7 +25,7 @@ impl Span {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ErrorKind {
     Lex,
     Parse,
@@ -44,7 +44,7 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FogError {
     pub kind: ErrorKind,
     pub message: String,

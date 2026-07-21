@@ -8,9 +8,8 @@ use crate::anf::anf::ANFStatement;
 use crate::anf::anf::ANFValue;
 use crate::anf::anf::ANFVar;
 use crate::anf::scc;
-use crate::error::FogResult;
 use crate::error::Span;
-use crate::parse_error;
+// (no parse_error used here)
 use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;

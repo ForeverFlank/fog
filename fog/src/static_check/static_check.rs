@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use crate::core::get_static_check_types;
 use crate::core::get_static_check_variables;
@@ -340,9 +339,9 @@ pub fn expr_type_of(
 
             let arg_type = expr_type_of(arg, env, type_var_subst)?;
 
-            unify_type(&param_type, &arg_type, type_var_subst, span)?;
+            unify_type(&*param_type, &arg_type.monotype, type_var_subst, span)?;
 
-            Ok(substitute_types(&return_type, type_var_subst))
+            Ok(Type::mono(substitute_types(&*return_type, type_var_subst)))
         }
 
         CoreExpr::Tuple { items, .. } => {
@@ -407,7 +406,7 @@ fn bind_match_arm_pattern(
                 Literal::String(_) => Monotype::String,
             };
 
-            if matches!(expected_scheme, Type::Mono(t) if literal_type == t) {
+            if expected_scheme.monotype != literal_type {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected type `{}`, found `{}`",
@@ -444,7 +443,7 @@ fn bind_match_arm_pattern(
         }
 
         CoreMatchArmPattern::Tuple { items, span } => {
-            let Monotype::Product(types) = expected_scheme.monotype else {
+            let Monotype::Product(ref types) = expected_scheme.monotype else {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple type, found `{expected_scheme}`"
@@ -459,8 +458,8 @@ fn bind_match_arm_pattern(
                 ));
             }
 
-            for (item, component_type) in items.iter().zip(types) {
-                bind_match_arm_pattern(item, component_type, env)?;
+            for (item, component_type) in items.iter().zip(types.iter()) {
+                bind_match_arm_pattern(item, &Type::mono(component_type.clone()), env)?;
             }
 
             Ok(())
@@ -489,20 +488,20 @@ fn bind_match_arm_pattern(
 }
 
 fn uncurry_function_type(r#type: &Type, arity: usize) -> (Vec<Type>, Type) {
-    let mut param_types = Vec::new();
-    let mut current = r#type;
+    let mut param_types: Vec<Type> = Vec::new();
+    let mut current = r#type.clone();
 
     for _ in 0..arity {
         match current.monotype {
-            Monotype::Function(param_type, return_type) => {
-                param_types.push((*param_type).clone());
-                current = &Type::mono(*return_type);
+            Monotype::Function(ref param_type, ref return_type) => {
+                param_types.push(Type::mono((**param_type).clone()));
+                current = Type::mono((**return_type).clone());
             }
             _ => break,
         }
     }
 
-    (param_types, current.clone())
+    (param_types, current)
 }
 
 fn block_expr_type_of(

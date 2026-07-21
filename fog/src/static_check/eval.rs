@@ -37,8 +37,9 @@ pub fn eval_type_expr(
     expr: &CoreTypeExpr,
     env: &Environment,
 ) -> FogResult<(Type, Vec<DataConstructor>)> {
-    let (r#type, ctors) = match expr {
-        CoreTypeExpr::Atomic(expr) => (eval_atomic_type_expr(expr, env)?, vec![]),
+    // compute a base monotype and constructors
+    let (mut monotype, ctors) = match expr {
+        CoreTypeExpr::Atomic(expr) => (eval_atomic_type_expr(expr, env)?.monotype, vec![]),
 
         CoreTypeExpr::Sum { ctors, .. } => {
             let named_type = Monotype::Named(
@@ -54,21 +55,15 @@ pub fn eval_type_expr(
                 .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            (Type::mono(named_type), ctors)
+            (named_type, ctors)
         }
     };
 
-    let wrapped_type = if params.is_empty() {
-        wrap_type_scheme(&r#type, params)
-    } else {
-        let mut r#type = r#type;
+    for param in params {
+        monotype = Monotype::TypeConstructor(param.to_string(), monotype.into())
+    }
 
-        for param in params {
-            r#type = Monotype::TypeConstructor(param.to_string(), r#type.into())
-        }
-
-        wrap_type_scheme(&r#type, params)
-    };
+    let wrapped_type = wrap_type_scheme(&monotype, params);
 
     Ok((wrapped_type, ctors))
 }
@@ -127,7 +122,10 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             let first_ch = name.chars().next().unwrap();
 
             if first_ch.is_lowercase() {
-                Ok(Type::mono(Monotype::Variable(name.to_string())))
+                Ok(Type::poly(
+                    vec![name.to_string()],
+                    Monotype::Variable(name.to_string()),
+                ))
             } else if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
                 Ok(Type::mono(r#type))
             } else {
@@ -158,18 +156,17 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
         CoreAtomicTypeExpr::FunctionAppl { callee, arg, span } => {
             let callee_type = eval_atomic_type_expr(callee, env)?;
 
-            let Monotype::TypeConstructor(param, r#type) = callee_type else {
+            let Monotype::TypeConstructor(param, r#type) = callee_type.monotype else {
                 return Err(static_check_error!(
                     Some(*span),
                     "`{}` is not a valid type constructor",
                     callee_type.to_string()
                 ));
             };
-
             let arg_type = eval_atomic_type_expr(arg, env)?;
-            let res_type = (*r#type).substitute_var(&param, &arg_type);
+            let res_type = (*r#type).substitute_var(&param, &arg_type.monotype);
 
-            Ok(res_type)
+            Ok(Type::mono(res_type))
         }
     }
 }
@@ -257,15 +254,13 @@ mod tests {
             ],
             span: SPAN,
         };
-        let Ok((type_1, ctors_1)) = eval_type_expr("Option", &vec!["a".to_string()], &expr_1, &env)
-        else {
-            panic!()
-        };
+        let (type_1, ctors_1) =
+            match eval_type_expr("Option", &vec!["a".to_string()], &expr_1, &env) {
+                Ok(x) => x,
+                Err(e) => panic!("eval_type_expr failed: {}", e),
+            };
 
-        assert!(matches!(
-            type_1,
-            Type::Mono(Monotype::TypeConstructor(_, _))
-        ));
+        assert!(matches!(type_1.monotype, Monotype::TypeConstructor(_, _)));
         assert_eq!(ctors_1.len(), 2);
     }
 
@@ -297,10 +292,10 @@ mod tests {
             name: "Int32".to_string(),
             span: SPAN,
         };
-        assert!(matches!(
-            eval_atomic_type_expr(&expr_1, &env),
-            Ok(Monotype::Int32)
-        ));
+        assert_eq!(
+            eval_atomic_type_expr(&expr_1, &env).unwrap(),
+            Type::mono(Monotype::Int32)
+        );
 
         let expr_2 = CoreAtomicTypeExpr::Product {
             types: vec![
@@ -315,12 +310,14 @@ mod tests {
             ],
             span: SPAN,
         };
-        assert!(matches!(
-            eval_atomic_type_expr(&expr_2, &env),
-            Ok(Monotype::Product(types))
-                if types[0] == Monotype::Int32 &&
-                   types[1] == Monotype::Product(Vec::new())
-        ));
+        let t2 = eval_atomic_type_expr(&expr_2, &env).unwrap();
+        match t2.monotype {
+            Monotype::Product(ref types) => {
+                assert_eq!(types[0], Monotype::Int32);
+                assert_eq!(types[1], Monotype::Product(Vec::new()));
+            }
+            _ => panic!(),
+        }
 
         let expr_3 = CoreAtomicTypeExpr::Function {
             param_type: CoreAtomicTypeExpr::Identifier {
@@ -335,11 +332,13 @@ mod tests {
             .into(),
             span: SPAN,
         };
-        assert!(matches!(
-            eval_atomic_type_expr(&expr_3, &env),
-            Ok(Monotype::Function(p, r))
-                if *p == Monotype::Product(Vec::new()) &&
-                   *r == Monotype::Int32
-        ));
+        let t3 = eval_atomic_type_expr(&expr_3, &env).unwrap();
+        match t3.monotype {
+            Monotype::Function(ref p, ref r) => {
+                assert_eq!(**p, Monotype::Product(Vec::new()));
+                assert_eq!(**r, Monotype::Int32);
+            }
+            _ => panic!(),
+        }
     }
 }
