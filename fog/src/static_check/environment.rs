@@ -136,7 +136,15 @@ impl<'a> Environment<'a> {
                 ));
             }
 
-            if var.r#type != r#type {
+            let res = unify_type(
+                &r#type.monotype,
+                &var.r#type.monotype,
+                &mut HashMap::new(),
+                span,
+            );
+
+            // if var.r#type != r#type {
+            if res.is_err() {
                 return Err(static_check_error!(
                     Some(*span),
                     "type mismatch when declaring variable `{name}`\n\

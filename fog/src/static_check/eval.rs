@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+use std::env::var;
 use std::println;
 use std::vec;
 
@@ -45,7 +47,7 @@ pub fn eval_type_expr(
         }
 
         CoreTypeExpr::Sum { ctors, .. } => {
-            let named_type_monotype = Monotype::Named(
+            let named_monotype = Monotype::Named(
                 name.to_string(),
                 params
                     .iter()
@@ -58,7 +60,7 @@ pub fn eval_type_expr(
                 .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let mut type_constructor = named_type_monotype.clone();
+            let mut type_constructor = named_monotype.clone();
 
             for param in params {
                 type_constructor =
@@ -66,9 +68,11 @@ pub fn eval_type_expr(
             }
 
             let type_constructor = wrap_type_scheme(&type_constructor, params);
-            let named_type = wrap_type_scheme(&named_type_monotype, params);
+            // let named_type = wrap_type_scheme(&named_monotype, params);
+            // println!("1> {}", named_monotype);
+            // println!("2> {}", type_constructor);
 
-            Ok((type_constructor, named_type, ctors))
+            Ok((type_constructor, Type::mono(named_monotype), ctors))
         }
     }
 }
@@ -81,16 +85,16 @@ fn eval_data_constructor(ctor: &CoreDataConstructor) -> FogResult<DataConstructo
 }
 
 pub fn wrap_type_scheme(monotype: &Monotype, params: &Vec<String>) -> Type {
-    let mut vars = Vec::new();
+    let mut vars = BTreeSet::new();
     find_type_variables(monotype, &mut vars, params);
 
     Type {
-        vars,
+        vars: vars.into_iter().collect(),
         monotype: monotype.clone(),
     }
 }
 
-fn find_type_variables(r#type: &Monotype, vars: &mut Vec<String>, params: &Vec<String>) {
+fn find_type_variables(r#type: &Monotype, vars: &mut BTreeSet<String>, params: &Vec<String>) {
     match r#type {
         Monotype::Int32
         | Monotype::Float32
@@ -100,7 +104,7 @@ fn find_type_variables(r#type: &Monotype, vars: &mut Vec<String>, params: &Vec<S
 
         Monotype::Variable(name) => {
             if !params.contains(name) {
-                vars.push(name.to_string());
+                vars.insert(name.to_string());
             }
         }
 
@@ -127,10 +131,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             let first_ch = name.chars().next().unwrap();
 
             if first_ch.is_lowercase() {
-                Ok(Type::poly(
-                    vec![name.to_string()],
-                    Monotype::Variable(name.to_string()),
-                ))
+                Ok(Type::mono(Monotype::Variable(name.to_string())))
             } else if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
                 Ok(Type::mono(r#type))
             } else {

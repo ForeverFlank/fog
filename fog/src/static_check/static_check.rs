@@ -169,7 +169,8 @@ fn register_data_constructors(
             .collect::<Result<Vec<_>, _>>()?;
 
         let ctor_type = nest_function_types(&types, parent_named_type.clone());
-        // let ctor_type = wrap_type_scheme(&ctor_type.monotype, &mut Vec::new());
+        let ctor_type = wrap_type_scheme(&ctor_type.monotype, &mut Vec::new());
+        println!(":: {}", ctor_type);
 
         env.annotate_type(&ctor.tag, ctor_type.clone(), span)?;
         env.declare_var(&ctor.tag, ctor_type, span)?;
