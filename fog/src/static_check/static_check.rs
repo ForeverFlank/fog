@@ -18,7 +18,6 @@ use crate::static_check::environment::Environment;
 use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
-use crate::static_check::r#type;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -164,19 +163,20 @@ fn register_data_constructors(
             .map(|expr| eval_atomic_type_expr(&expr, env))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let ctor_type = nest_function_types(&types, parent_sum_type.clone());
+        let ctor_type = nest_function_types(&types, Type::mono(parent_sum_type.clone()));
 
         // env.annotate_type(&ctor.tag, Type::Mono(ctor_type.clone()), span)?;
-        env.declare_var(&ctor.tag, Type::Mono(ctor_type), span)?;
+        env.declare_var(&ctor.tag, ctor_type, span)?;
     }
 
     Ok(())
 }
 
-fn nest_function_types(field_types: &Vec<Monotype>, return_type: Monotype) -> Monotype {
-    field_types.iter().rev().fold(return_type, |ret, ft| {
-        Monotype::Function(ft.clone().into(), ret.into())
-    })
+fn nest_function_types(field_types: &Vec<Type>, return_type: Type) -> Type {
+    field_types
+        .iter()
+        .rev()
+        .fold(return_type, |ret, ft| Type::function(ft, &ret))
 }
 
 fn check_type_annotation(
@@ -199,7 +199,7 @@ fn check_declaration(
     match pattern {
         CoreDeclPattern::Identifier { name, .. } => {
             let expr_type = expr_type_of(expr, env, type_var_subst)?;
-            env.declare_var(name, r#type, span)
+            env.declare_var(name, expr_type, span)
         }
 
         CoreDeclPattern::Tuple { items, .. } => {
@@ -218,7 +218,7 @@ fn bind_tuple_decl_pattern(
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
-    let Monotype::Product(component_types) = expr_type.monotype else {
+    let Monotype::Product(ref types) = expr_type.monotype else {
         return Err(static_check_error!(
             Some(*span),
             "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
@@ -226,7 +226,7 @@ fn bind_tuple_decl_pattern(
         ));
     };
 
-    if items.len() != component_types.len() {
+    if items.len() != types.len() {
         return Err(static_check_error!(
             Some(*span),
             "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
@@ -235,10 +235,10 @@ fn bind_tuple_decl_pattern(
         ));
     }
 
-    for (item, component_type) in items.iter().zip(component_types) {
+    for (item, r#type) in items.iter().zip(types) {
         let expected_type = Type {
             vars: Vec::new(),
-            monotype: component_type,
+            monotype: r#type.clone(),
         };
 
         bind_tuple_decl_pattern_item(item, &expected_type, span, env)?;
@@ -259,14 +259,14 @@ fn bind_tuple_decl_pattern_item(
         }
 
         CoreTupleDeclPattern::Tuple { items, .. } => {
-            let Monotype::Product(ref component_types) = expected_type.monotype else {
+            let Monotype::Product(ref types) = expected_type.monotype else {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple type, found `{expected_type}`"
                 ));
             };
 
-            if items.len() != component_types.len() {
+            if items.len() != types.len() {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple of {} element(s), found `{expected_type}`",
@@ -274,10 +274,10 @@ fn bind_tuple_decl_pattern_item(
                 ));
             }
 
-            for (item, component_type) in items.iter().zip(component_types) {
+            for (item, r#type) in items.iter().zip(types) {
                 let expected_type = Type {
                     vars: Vec::new(),
-                    monotype: component_type.clone(),
+                    monotype: r#type.clone(),
                 };
 
                 bind_tuple_decl_pattern_item(item, &expected_type, span, block_env)?;
@@ -304,7 +304,7 @@ pub fn expr_type_of(
 
         CoreExpr::Identifier { name, .. } => Ok(env.get_value_var(name, &span)?.r#type),
 
-        CoreExpr::Literal { literal, .. } => Ok(Type::Mono(match literal {
+        CoreExpr::Literal { literal, .. } => Ok(Type::mono(match literal {
             Literal::Int32(_) => Monotype::Int32,
             Literal::Float32(_) => Monotype::Float32,
             Literal::Char(_) => Monotype::Char,
@@ -346,26 +346,12 @@ pub fn expr_type_of(
         }
 
         CoreExpr::Tuple { items, .. } => {
-            let mut type_vars = HashSet::new();
-            let mut types = Vec::new();
+            let types = items
+                .into_iter()
+                .map(|item| expr_type_of(item, env, type_var_subst))
+                .collect::<Result<Vec<_>, _>>()?;
 
-            for item in items {
-                let r#type = expr_type_of(expr, env, type_var_subst)?;
-
-                types.push(r#type.monotype);
-
-                if let Type::Poly(vars, _) = r#type {
-                    type_vars.extend(vars);
-                }
-            }
-
-            let prod_monotype = Monotype::Product(types);
-
-            if type_vars.is_empty() {
-                Ok(Type::Mono(prod_monotype))
-            } else {
-                Ok(Type::Poly(type_vars.into_iter().collect(), prod_monotype))
-            }
+            Ok(Type::product(&types))
         }
 
         CoreExpr::Match {
@@ -458,14 +444,14 @@ fn bind_match_arm_pattern(
         }
 
         CoreMatchArmPattern::Tuple { items, span } => {
-            let Monotype::Product(component_types) = expected_scheme else {
+            let Monotype::Product(types) = expected_scheme.monotype else {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple type, found `{expected_scheme}`"
                 ));
             };
 
-            if items.len() != component_types.len() {
+            if items.len() != types.len() {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple of {} element(s), found `{expected_scheme}`",
@@ -473,7 +459,7 @@ fn bind_match_arm_pattern(
                 ));
             }
 
-            for (item, component_type) in items.iter().zip(component_types) {
+            for (item, component_type) in items.iter().zip(types) {
                 bind_match_arm_pattern(item, component_type, env)?;
             }
 
@@ -502,15 +488,15 @@ fn bind_match_arm_pattern(
     }
 }
 
-fn uncurry_function_type(r#type: &Monotype, arity: usize) -> (Vec<Monotype>, Monotype) {
+fn uncurry_function_type(r#type: &Type, arity: usize) -> (Vec<Type>, Type) {
     let mut param_types = Vec::new();
     let mut current = r#type;
 
     for _ in 0..arity {
-        match current {
+        match current.monotype {
             Monotype::Function(param_type, return_type) => {
-                param_types.push((**param_type).clone());
-                current = return_type.as_ref();
+                param_types.push((*param_type).clone());
+                current = &Type::mono(*return_type);
             }
             _ => break,
         }

@@ -123,7 +123,7 @@ impl Monotype {
 }
 
 impl Display for Monotype {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Monotype::Int32 => write!(f, "Int32"),
             Monotype::Float32 => write!(f, "Float32"),
@@ -170,14 +170,14 @@ pub struct Type {
 }
 
 impl Type {
-    pub fn monotype(monotype: Monotype) -> Type {
+    pub fn mono(monotype: Monotype) -> Type {
         Type {
             vars: vec![],
             monotype,
         }
     }
 
-    pub fn polytype(vars: Vec<String>, monotype: Monotype) -> Type {
+    pub fn poly(vars: Vec<String>, monotype: Monotype) -> Type {
         Type { vars, monotype }
     }
 

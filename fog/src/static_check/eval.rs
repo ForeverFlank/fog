@@ -54,7 +54,7 @@ pub fn eval_type_expr(
                 .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            (named_type, ctors)
+            (Type::mono(named_type), ctors)
         }
     };
 
@@ -84,10 +84,9 @@ pub fn wrap_type_scheme(monotype: &Monotype, params: &Vec<String>) -> Type {
     let mut vars = Vec::new();
     find_type_variables(monotype, &mut vars, params);
 
-    if vars.is_empty() {
-        Type::Mono(monotype.clone())
-    } else {
-        Type::Poly(vars, monotype.clone())
+    Type {
+        vars,
+        monotype: monotype.clone(),
     }
 }
 
@@ -128,9 +127,9 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             let first_ch = name.chars().next().unwrap();
 
             if first_ch.is_lowercase() {
-                Ok(Type::monotype(Monotype::Variable(name.to_string())))
+                Ok(Type::mono(Monotype::Variable(name.to_string())))
             } else if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
-                Ok(Type::monotype(r#type))
+                Ok(Type::mono(r#type))
             } else {
                 Err(static_check_error!(Some(span), "undeclared type `{name}`"))
             }

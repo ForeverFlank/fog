@@ -172,7 +172,7 @@ impl<'a> Environment<'a> {
             r#type.kind.clone()
         };
 
-        let kind_of_type = kind_of(&Type::Mono(r#type.clone()));
+        let kind_of_type = kind_of(&Type::mono(r#type.clone()));
 
         if kind_of_type != kind_of_declared_type {
             return Err(static_check_error!(
