@@ -128,9 +128,9 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             let first_ch = name.chars().next().unwrap();
 
             if first_ch.is_lowercase() {
-                Ok(Monotype::Variable(name.to_string()))
+                Ok(Type::monotype(Monotype::Variable(name.to_string())))
             } else if let Some(r#type) = env.get_type_var(name, &span)?.r#type {
-                Ok(r#type)
+                Ok(Type::monotype(r#type))
             } else {
                 Err(static_check_error!(Some(span), "undeclared type `{name}`"))
             }
@@ -144,7 +144,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
             let param_type = eval_atomic_type_expr(param_type, env)?;
             let return_type = eval_atomic_type_expr(return_type, env)?;
 
-            Ok(Monotype::Function(param_type.into(), return_type.into()))
+            Ok(Type::function(&param_type, &return_type))
         }
 
         CoreAtomicTypeExpr::Product { types, .. } => {
@@ -153,7 +153,7 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
                 .map(|t| eval_atomic_type_expr(t, env))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(Monotype::Product(types))
+            Ok(Type::product(&types))
         }
 
         CoreAtomicTypeExpr::FunctionAppl { callee, arg, span } => {

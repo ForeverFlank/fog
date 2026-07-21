@@ -133,21 +133,21 @@ fn check_type_declaration(
 ) -> FogResult<(Monotype, Vec<DataConstructor>, Span)> {
     let (r#type, ctors) = eval_type_expr(name, params, expr, env)?;
 
-    let Type::Mono(ref monotype) = r#type else {
+    if !r#type.vars.is_empty() {
         return Err(static_check_error!(
             Some(*span),
             "declared type must be a monotype"
         ));
-    };
+    }
 
     if !env.types.contains_key(name) {
         env.annotate_kind(name, kind_of(&r#type), span)?;
     }
 
-    env.declare_type(name, monotype.clone(), span)?;
+    env.declare_type(name, r#type.monotype.clone(), span)?;
     // register_data_constructors(env, &r#type, &ctors, span)?;
 
-    Ok((monotype.clone(), ctors, span.clone()))
+    Ok((r#type.monotype, ctors, *span))
 }
 
 fn register_data_constructors(
@@ -186,7 +186,7 @@ fn check_type_annotation(
     env: &mut Environment,
 ) -> FogResult<()> {
     let r#type = eval_atomic_type_expr(expr, env)?;
-    env.annotate_type(name, Type::Mono(r#type), span)
+    env.annotate_type(name, r#type, span)
 }
 
 fn check_declaration(
@@ -199,7 +199,7 @@ fn check_declaration(
     match pattern {
         CoreDeclPattern::Identifier { name, .. } => {
             let expr_type = expr_type_of(expr, env, type_var_subst)?;
-            env.declare_var(name, Type::Mono(expr_type), span)
+            env.declare_var(name, r#type, span)
         }
 
         CoreDeclPattern::Tuple { items, .. } => {
@@ -212,13 +212,13 @@ fn check_declaration(
 // like check_declaration, but it iterates through a possibly nested tuple
 fn bind_tuple_decl_pattern(
     items: &Vec<CoreTupleDeclPattern>,
-    expr_type: &Monotype,
+    expr_type: &Type,
     pattern: &CoreDeclPattern,
     expr: &CoreExpr,
     span: &Span,
     env: &mut Environment,
 ) -> FogResult<()> {
-    let Monotype::Product(component_types) = expr_type else {
+    let Monotype::Product(component_types) = expr_type.monotype else {
         return Err(static_check_error!(
             Some(*span),
             "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
@@ -236,7 +236,12 @@ fn bind_tuple_decl_pattern(
     }
 
     for (item, component_type) in items.iter().zip(component_types) {
-        bind_tuple_decl_pattern_item(item, component_type, span, env)?;
+        let expected_type = Type {
+            vars: Vec::new(),
+            monotype: component_type,
+        };
+
+        bind_tuple_decl_pattern_item(item, &expected_type, span, env)?;
     }
 
     Ok(())
@@ -244,17 +249,17 @@ fn bind_tuple_decl_pattern(
 
 fn bind_tuple_decl_pattern_item(
     item: &CoreTupleDeclPattern,
-    expected_type: &Monotype,
+    expected_type: &Type,
     span: &Span,
     block_env: &mut Environment,
 ) -> FogResult<()> {
     match item {
         CoreTupleDeclPattern::Identifier { name, .. } => {
-            block_env.declare_var(name, Type::Mono(expected_type.clone()), span)
+            block_env.declare_var(name, expected_type.clone(), span)
         }
 
         CoreTupleDeclPattern::Tuple { items, .. } => {
-            let Monotype::Product(component_types) = expected_type else {
+            let Monotype::Product(ref component_types) = expected_type.monotype else {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected a tuple type, found `{expected_type}`"
@@ -270,7 +275,12 @@ fn bind_tuple_decl_pattern_item(
             }
 
             for (item, component_type) in items.iter().zip(component_types) {
-                bind_tuple_decl_pattern_item(item, component_type, span, block_env)?;
+                let expected_type = Type {
+                    vars: Vec::new(),
+                    monotype: component_type.clone(),
+                };
+
+                bind_tuple_decl_pattern_item(item, &expected_type, span, block_env)?;
             }
 
             Ok(())
@@ -310,22 +320,17 @@ pub fn expr_type_of(
             let param_type = eval_atomic_type_expr(param_type, env)?;
 
             let mut body_env = Environment::new(Some(env));
-            body_env.declare_var(param_name, Type::Mono(param_type.clone()), &span)?;
+            body_env.declare_var(param_name, param_type.clone(), &span)?;
 
             let return_type = expr_type_of(body, &mut body_env, type_var_subst)?;
 
-            let fn_monotype = Monotype::Function(param_type.into(), return_type.monotype().into());
-
-            Ok(match return_type {
-                Type::Mono(return_monotype) => Type::Mono(fn_monotype),
-                Type::Poly(vars, return_monotype) => Type::Poly(vars, fn_monotype),
-            })
+            Ok(Type::function(&param_type, &return_type))
         }
 
         CoreExpr::FunctionAppl { callee, arg, span } => {
             let callee_type = expr_type_of(callee, env, type_var_subst)?;
 
-            let Monotype::Function(param_type, return_type) = callee_type.monotype() else {
+            let Monotype::Function(param_type, return_type) = callee_type.monotype else {
                 return Err(static_check_error!(
                     Some(*span),
                     "{} is not a function type",
@@ -347,7 +352,7 @@ pub fn expr_type_of(
             for item in items {
                 let r#type = expr_type_of(expr, env, type_var_subst)?;
 
-                types.push(r#type.monotype());
+                types.push(r#type.monotype);
 
                 if let Type::Poly(vars, _) = r#type {
                     type_vars.extend(vars);

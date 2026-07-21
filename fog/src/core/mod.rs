@@ -17,7 +17,10 @@ struct BuiltInVariable {
 fn get_builtin_variables() -> Vec<BuiltInVariable> {
     let var_add_int32 = BuiltInVariable {
         name: "addInt32".to_string(),
-        r#type: Monotype::function(Monotype::Int32, Monotype::function(Monotype::Int32, Monotype::Int32)),
+        r#type: Monotype::function(
+            Monotype::Int32,
+            Monotype::function(Monotype::Int32, Monotype::Int32),
+        ),
         value: Value::NativeFunction {
             function: Rc::new(|a: Value| match a {
                 Value::Int32(lhs) => Ok(Value::NativeFunction {
@@ -33,7 +36,10 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
 
     let var_subtract_int32 = BuiltInVariable {
         name: "subtractInt32".to_string(),
-        r#type: Monotype::function(Monotype::Int32, Monotype::function(Monotype::Int32, Monotype::Int32)),
+        r#type: Monotype::function(
+            Monotype::Int32,
+            Monotype::function(Monotype::Int32, Monotype::Int32),
+        ),
         value: Value::NativeFunction {
             function: Rc::new(|a: Value| match a {
                 Value::Int32(lhs) => Ok(Value::NativeFunction {

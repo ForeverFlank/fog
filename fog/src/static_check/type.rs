@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::fmt::Display;
+use std::vec;
 
 use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::static_check::kind::Kind;
@@ -120,8 +122,8 @@ impl Monotype {
     }
 }
 
-impl fmt::Display for Monotype {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for Monotype {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Monotype::Int32 => write!(f, "Int32"),
             Monotype::Float32 => write!(f, "Float32"),
@@ -162,52 +164,76 @@ impl fmt::Display for Monotype {
 // --- type ---
 
 #[derive(Clone, Debug, Eq)]
-pub enum Type {
-    Mono(Monotype),
-    Poly(Vec<String>, Monotype),
+pub struct Type {
+    pub vars: Vec<String>,
+    pub monotype: Monotype,
 }
 
 impl Type {
-    pub fn monotype(&self) -> Monotype {
-        match self {
-            Type::Mono(t) | Type::Poly(_, t) => t.clone(),
+    pub fn monotype(monotype: Monotype) -> Type {
+        Type {
+            vars: vec![],
+            monotype,
+        }
+    }
+
+    pub fn polytype(vars: Vec<String>, monotype: Monotype) -> Type {
+        Type { vars, monotype }
+    }
+
+    pub fn function(param_type: &Type, return_type: &Type) -> Type {
+        let mut type_vars = BTreeSet::new();
+        type_vars.extend(param_type.vars.clone());
+        type_vars.extend(return_type.vars.clone());
+
+        Type {
+            vars: type_vars.into_iter().collect(),
+            monotype: Monotype::Function(
+                param_type.monotype.clone().into(),
+                return_type.monotype.clone().into(),
+            ),
+        }
+    }
+
+    pub fn product(types: &Vec<Type>) -> Type {
+        let mut type_vars = BTreeSet::new();
+        let mut monotypes = Vec::new();
+
+        for t in types {
+            type_vars.extend(t.vars.clone());
+            monotypes.push(t.monotype.clone());
+        }
+
+        Type {
+            vars: type_vars.into_iter().collect(),
+            monotype: Monotype::Product(monotypes),
         }
     }
 }
 
 impl PartialEq for Type {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Type::Mono(type_1), Type::Mono(type_2)) => type_1 == type_2,
-
-            (Type::Poly(vars_1, type_1), Type::Poly(vars_2, type_2)) => {
-                if vars_1.len() != vars_2.len() {
-                    return false;
-                }
-
-                let mut type_1 = type_1.clone();
-                let mut type_2 = type_2.clone();
-
-                for (i, (var_1, var_2)) in vars_1.iter().zip(vars_2.iter()).enumerate() {
-                    let substitute_var = Monotype::Variable(format!("$var{}", i));
-
-                    type_1 = type_1.substitute_var(var_1, &substitute_var);
-                    type_2 = type_2.substitute_var(var_2, &substitute_var);
-                }
-
-                type_1 == type_2
-            }
-
-            _ => false,
+        if self.vars.len() != other.vars.len() {
+            return false;
         }
+
+        let mut monotype_1 = self.monotype.clone();
+        let mut monotype_2 = other.monotype.clone();
+
+        for (i, (var_1, var_2)) in self.vars.iter().zip(other.vars.iter()).enumerate() {
+            let substitute_var = Monotype::Variable(format!("$var{}", i));
+
+            monotype_1 = monotype_1.substitute_var(var_1, &substitute_var);
+            monotype_2 = monotype_2.substitute_var(var_2, &substitute_var);
+        }
+
+        monotype_1 == monotype_2
     }
 }
 
 impl Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Type::Mono(r#type) | Type::Poly(_, r#type) => r#type.fmt(f),
-        }
+        self.monotype.fmt(f)
     }
 }
 
@@ -219,7 +245,7 @@ pub struct DataConstructor {
     pub types: Vec<CoreAtomicTypeExpr>,
 }
 
-impl fmt::Display for DataConstructor {
+impl Display for DataConstructor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.tag)?;
 
@@ -234,11 +260,7 @@ impl fmt::Display for DataConstructor {
 // --- functions ---
 
 pub fn kind_of(r#type: &Type) -> Kind {
-    let monotype = match r#type {
-        Type::Mono(t) | Type::Poly(_, t) => t,
-    };
-
-    match monotype {
+    match r#type.monotype {
         Monotype::TypeConstructor(_, _) => Kind::Function(Kind::Type.into(), Kind::Type.into()),
         _ => Kind::Type,
     }
@@ -248,19 +270,21 @@ pub fn kind_of(r#type: &Type) -> Kind {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
 
     #[test]
     fn test_alpha_equivalence() {
-        let left = Type::Poly(
-            vec!["a".to_string()],
-            Monotype::Variable("a".to_string()).into(),
-        );
-        let right = Type::Poly(
-            vec!["b".to_string()],
-            Monotype::Variable("b".to_string()).into(),
-        );
+        let a = Type {
+            vars: vec!["a".to_string()],
+            monotype: Monotype::Variable("a".to_string()),
+        };
+        let b = Type {
+            vars: vec!["b".to_string()],
+            monotype: Monotype::Variable("b".to_string()),
+        };
 
-        assert_eq!(left, right);
+        assert_eq!(a, b);
     }
 }
