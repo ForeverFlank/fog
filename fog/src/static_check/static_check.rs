@@ -19,6 +19,7 @@ use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
 use crate::static_check::eval::wrap_type_scheme;
+use crate::static_check::r#type;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -92,7 +93,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     }
 
     for (name, var) in env.variables.iter() {
-        println!("{} : {}", name, var.r#type);
+        // println!("{} : {}", name, var.r#type);
     }
 
     // -- variable type annotations
@@ -170,7 +171,7 @@ fn register_data_constructors(
 
         let ctor_type = nest_function_types(&types, parent_named_type.clone());
         let ctor_type = wrap_type_scheme(&ctor_type.monotype, &mut Vec::new());
-        println!(":: {}", ctor_type);
+        // println!(":: {}", ctor_type);
 
         env.annotate_type(&ctor.tag, ctor_type.clone(), span)?;
         env.declare_var(&ctor.tag, ctor_type, span)?;
@@ -434,7 +435,10 @@ fn bind_match_arm_pattern(
                 // nullary data constructor
                 let r#type = env.get_value_var(name, span)?.r#type;
 
-                if !can_unify(&expected_type.monotype, &r#type.monotype, span) {
+                // HACK
+                if !can_unify(&expected_type.monotype, &r#type.monotype, span)
+                    && !can_unify(&r#type.monotype, &expected_type.monotype, span)
+                {
                     return Err(static_check_error!(
                         Some(*span),
                         "expected type `{}`, found `{}`",
@@ -477,8 +481,18 @@ fn bind_match_arm_pattern(
             let ctor_type = env.get_value_var(name, span)?.r#type;
             let (param_types, return_type) = uncurry_function_type(&ctor_type, args.len());
 
-            if param_types.len() != args.len()
-                || !can_unify(&expected_type.monotype, &return_type.monotype, span)
+            // HACK
+            if param_types.len() != args.len() {
+                return Err(static_check_error!(
+                    Some(*span),
+                    "data constructor argument length mismatch"
+                ));
+            }
+
+            // println!("---");
+            // HACK too
+            if !can_unify(&return_type.monotype, &expected_type.monotype, span)
+                && !can_unify(&expected_type.monotype, &return_type.monotype, span)
             {
                 return Err(static_check_error!(
                     Some(*span),
@@ -570,7 +584,7 @@ pub fn unify_type(
     type_var_subst: &mut HashMap<String, Monotype>,
     span: &Span,
 ) -> bool {
-    println!("unifying {} and {}", to, from);
+    // println!("unifying {} and {}", to, from);
 
     if let Monotype::Variable(name_1) = to
         && let Monotype::Variable(name_2) = from
