@@ -347,7 +347,7 @@ pub fn expr_type_of(
 
             let arg_type = expr_type_of(arg, env, type_var_subst)?;
 
-            unify_type(&*param_type, &arg_type.monotype, type_var_subst, span)?;
+            unify_type(&*param_type, &arg_type.monotype, type_var_subst, span);
 
             Ok(Type::mono(substitute_types(&*return_type, type_var_subst)))
         }
@@ -378,11 +378,11 @@ pub fn expr_type_of(
                 match res_type {
                     None => res_type = Some(arm_type),
 
-                    Some(r#type) if r#type != arm_type => {
+                    Some(res_type) if !can_unify(&arm_type.monotype, &res_type.monotype, span) => {
                         return Err(static_check_error!(
                             Some(*span),
                             "expected type `{}`, found `{}`",
-                            r#type,
+                            res_type,
                             arm_type
                         ));
                     }
@@ -402,7 +402,7 @@ pub fn expr_type_of(
 
 fn bind_match_arm_pattern(
     pattern: &CoreMatchArmPattern,
-    expected_scheme: &Type,
+    expected_type: &Type,
     env: &mut Environment,
 ) -> FogResult<()> {
     match pattern {
@@ -414,11 +414,11 @@ fn bind_match_arm_pattern(
                 Literal::String(_) => Monotype::String,
             };
 
-            if expected_scheme.monotype != literal_type {
+            if !can_unify(&expected_type.monotype, &literal_type, span) {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected type `{}`, found `{}`",
-                    expected_scheme,
+                    expected_type,
                     literal_type
                 ));
             }
@@ -432,36 +432,36 @@ fn bind_match_arm_pattern(
                 Ok(())
             } else if name.starts_with(|c: char| c.is_uppercase()) {
                 // nullary data constructor
-                let scheme = env.get_value_var(name, span)?.r#type;
+                let r#type = env.get_value_var(name, span)?.r#type;
 
-                if scheme != *expected_scheme {
+                if !can_unify(&expected_type.monotype, &r#type.monotype, span) {
                     return Err(static_check_error!(
                         Some(*span),
                         "expected type `{}`, found `{}`",
-                        expected_scheme,
-                        scheme
+                        expected_type,
+                        r#type
                     ));
                 }
 
                 Ok(())
             } else {
                 // bind value to identifier
-                env.declare_var(name, expected_scheme.clone(), span)
+                env.declare_var(name, expected_type.clone(), span)
             }
         }
 
         CoreMatchArmPattern::Tuple { items, span } => {
-            let Monotype::Product(ref types) = expected_scheme.monotype else {
+            let Monotype::Product(ref types) = expected_type.monotype else {
                 return Err(static_check_error!(
                     Some(*span),
-                    "expected a tuple type, found `{expected_scheme}`"
+                    "expected a tuple type, found `{expected_type}`"
                 ));
             };
 
             if items.len() != types.len() {
                 return Err(static_check_error!(
                     Some(*span),
-                    "expected a tuple of {} element(s), found `{expected_scheme}`",
+                    "expected a tuple of {} element(s), found `{expected_type}`",
                     items.len()
                 ));
             }
@@ -477,11 +477,13 @@ fn bind_match_arm_pattern(
             let ctor_type = env.get_value_var(name, span)?.r#type;
             let (param_types, return_type) = uncurry_function_type(&ctor_type, args.len());
 
-            if param_types.len() != args.len() || return_type != *expected_scheme {
+            if param_types.len() != args.len()
+                || !can_unify(&expected_type.monotype, &return_type.monotype, span)
+            {
                 return Err(static_check_error!(
                     Some(*span),
                     "expected type `{}`, found `{}`",
-                    expected_scheme,
+                    expected_type,
                     return_type
                 ));
             }
@@ -558,19 +560,23 @@ fn block_expr_type_of(
     ))
 }
 
+pub fn can_unify(to: &Monotype, from: &Monotype, span: &Span) -> bool {
+    unify_type(to, from, &mut HashMap::new(), span)
+}
+
 pub fn unify_type(
     to: &Monotype,
     from: &Monotype,
     type_var_subst: &mut HashMap<String, Monotype>,
     span: &Span,
-) -> FogResult<()> {
+) -> bool {
     println!("unifying {} and {}", to, from);
 
     if let Monotype::Variable(name_1) = to
         && let Monotype::Variable(name_2) = from
         && name_1 == name_2
     {
-        return Ok(());
+        return true;
     }
 
     let to = substitute_types(to, type_var_subst);
@@ -579,12 +585,11 @@ pub fn unify_type(
     match (&to, &from) {
         (Monotype::Variable(name), _) => {
             type_var_subst.insert(name.clone(), from);
-            Ok(())
+            true
         }
 
         (Monotype::Function(p1, r1), Monotype::Function(p2, r2)) => {
-            unify_type(p1, p2, type_var_subst, span)?;
-            unify_type(r1, r2, type_var_subst, span)
+            unify_type(p1, p2, type_var_subst, span) && unify_type(r1, r2, type_var_subst, span)
         }
 
         (Monotype::Product(types_1), Monotype::Product(types_2))
@@ -593,7 +598,7 @@ pub fn unify_type(
             types_1
                 .iter()
                 .zip(types_2)
-                .try_for_each(|(a, b)| unify_type(a, b, type_var_subst, span))
+                .all(|(a, b)| unify_type(a, b, type_var_subst, span))
         }
 
         (Monotype::Named(name_1, types_1), Monotype::Named(name_2, types_2))
@@ -602,17 +607,12 @@ pub fn unify_type(
             types_1
                 .iter()
                 .zip(types_2)
-                .try_for_each(|(a, b)| unify_type(a, b, type_var_subst, span))
+                .all(|(a, b)| unify_type(a, b, type_var_subst, span))
         }
 
-        _ if to == from => Ok(()),
+        _ if to == from => true,
 
-        _ => Err(static_check_error!(
-            Some(*span),
-            "cannot unify type `{}` and `{}`",
-            to,
-            from
-        )),
+        _ => false,
     }
 }
 

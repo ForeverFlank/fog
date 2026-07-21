@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::static_check::kind::Kind;
+use crate::static_check::static_check::can_unify;
 use crate::static_check::static_check::unify_type;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -136,15 +137,8 @@ impl<'a> Environment<'a> {
                 ));
             }
 
-            let res = unify_type(
-                &r#type.monotype,
-                &var.r#type.monotype,
-                &mut HashMap::new(),
-                span,
-            );
-
             // if var.r#type != r#type {
-            if res.is_err() {
+            if !can_unify(&r#type.monotype, &var.r#type.monotype, span) {
                 return Err(static_check_error!(
                     Some(*span),
                     "type mismatch when declaring variable `{name}`\n\
