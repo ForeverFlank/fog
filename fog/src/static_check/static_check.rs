@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::println;
 
 use crate::core::get_static_check_types;
 use crate::core::get_static_check_variables;
@@ -562,6 +563,8 @@ pub fn unify_type(
     type_var_subst: &mut HashMap<String, Monotype>,
     span: &Span,
 ) -> FogResult<()> {
+    println!("unifying {} and {}", to, from);
+
     if let Monotype::Variable(name_1) = to
         && let Monotype::Variable(name_2) = from
         && name_1 == name_2
@@ -619,13 +622,22 @@ fn substitute_types(r#type: &Monotype, type_var_subst: &HashMap<String, Monotype
             .map(|t2| substitute_types(t2, type_var_subst))
             .unwrap_or_else(|| r#type.clone()),
 
-        Monotype::Function(p, r) => Monotype::function(
-            substitute_types(p, type_var_subst),
-            substitute_types(r, type_var_subst),
+        Monotype::Function(param_type, return_type) => Monotype::function(
+            substitute_types(param_type, type_var_subst),
+            substitute_types(return_type, type_var_subst),
         ),
 
-        Monotype::Product(ts) => Monotype::Product(
-            ts.iter()
+        Monotype::Product(types) => Monotype::Product(
+            types
+                .iter()
+                .map(|t| substitute_types(t, type_var_subst))
+                .collect(),
+        ),
+
+        Monotype::Named(name, types) => Monotype::Named(
+            name.clone(),
+            types
+                .iter()
                 .map(|t| substitute_types(t, type_var_subst))
                 .collect(),
         ),
