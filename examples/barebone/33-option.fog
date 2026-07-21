@@ -7,9 +7,13 @@ orElse : Option a -> Option a -> Option a
 orElse (Some item) _   = Some item
 orElse None        rhs = rhs
 
-
+a : Option Int32
 a = None
+
+b : Option Int32
 b = Some 20
+
+c : Option Int32
 c = orElse a b  -- Some 20
 
 

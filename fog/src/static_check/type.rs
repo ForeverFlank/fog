@@ -134,19 +134,23 @@ impl Display for Monotype {
 
             Monotype::Function(param_type, return_type) => {
                 fmt_parenthesized(f, param_type)?;
-                write!(f, " -> {}", return_type)
+                write!(f, " -> {}", return_type)?;
+
+                Ok(())
             }
 
             Monotype::Product(types) => {
                 if types.is_empty() {
-                    write!(f, "Unit")
+                    write!(f, "Unit")?;
                 } else {
-                    write!(f, "{}", format_joined(types, " * "))
+                    write!(f, "{}", format_joined(types, " * "))?;
                 }
+
+                Ok(())
             }
 
             Monotype::Named(name, args) => {
-                write!(f, "{}", name)?;
+                write!(f, "{}[named]", name)?;
 
                 for arg in args {
                     write!(f, " ")?;
@@ -233,7 +237,19 @@ impl PartialEq for Type {
 
 impl Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.monotype.fmt(f)
+        if !self.vars.is_empty() {
+            write!(f, "forall")?;
+
+            for var in self.vars.as_slice() {
+                write!(f, " {}", var)?;
+            }
+
+            write!(f, ". ")?;
+        }
+
+        write!(f, "{}", self.monotype)?;
+
+        Ok(())
     }
 }
 

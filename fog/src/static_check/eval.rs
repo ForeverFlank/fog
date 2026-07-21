@@ -1,3 +1,4 @@
+use std::println;
 use std::vec;
 
 use crate::error::FogResult;
@@ -36,13 +37,15 @@ pub fn eval_type_expr(
     params: &Vec<String>,
     expr: &CoreTypeExpr,
     env: &Environment,
-) -> FogResult<(Type, Vec<DataConstructor>)> {
-    // compute a base monotype and constructors
-    let (mut monotype, ctors) = match expr {
-        CoreTypeExpr::Atomic(expr) => (eval_atomic_type_expr(expr, env)?.monotype, vec![]),
+) -> FogResult<(Type, Type, Vec<DataConstructor>)> {
+    match expr {
+        CoreTypeExpr::Atomic(expr) => {
+            let r#type = eval_atomic_type_expr(expr, env)?;
+            Ok((r#type.clone(), r#type, vec![]))
+        }
 
         CoreTypeExpr::Sum { ctors, .. } => {
-            let named_type = Monotype::Named(
+            let named_type_monotype = Monotype::Named(
                 name.to_string(),
                 params
                     .iter()
@@ -55,17 +58,19 @@ pub fn eval_type_expr(
                 .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            (named_type, ctors)
+            let mut type_constructor = named_type_monotype.clone();
+
+            for param in params {
+                type_constructor =
+                    Monotype::TypeConstructor(param.to_string(), type_constructor.into())
+            }
+
+            let type_constructor = wrap_type_scheme(&type_constructor, params);
+            let named_type = wrap_type_scheme(&named_type_monotype, params);
+
+            Ok((type_constructor, named_type, ctors))
         }
-    };
-
-    for param in params {
-        monotype = Monotype::TypeConstructor(param.to_string(), monotype.into())
     }
-
-    let wrapped_type = wrap_type_scheme(&monotype, params);
-
-    Ok((wrapped_type, ctors))
 }
 
 fn eval_data_constructor(ctor: &CoreDataConstructor) -> FogResult<DataConstructor> {
@@ -163,10 +168,12 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
                     callee_type.to_string()
                 ));
             };
+
             let arg_type = eval_atomic_type_expr(arg, env)?;
             let res_type = (*r#type).substitute_var(&param, &arg_type.monotype);
+            let res_type = Type::poly(callee_type.vars, res_type);
 
-            Ok(Type::mono(res_type))
+            Ok(res_type)
         }
     }
 }
@@ -238,7 +245,7 @@ mod tests {
         // --------------------
 
         // Option a = Some a | None
-        let expr_1 = CoreTypeExpr::Sum {
+        let _expr_1 = CoreTypeExpr::Sum {
             ctors: vec![
                 CoreDataConstructor {
                     tag: "Some".to_string(),
@@ -254,14 +261,45 @@ mod tests {
             ],
             span: SPAN,
         };
-        let (type_1, ctors_1) =
-            match eval_type_expr("Option", &vec!["a".to_string()], &expr_1, &env) {
-                Ok(x) => x,
-                Err(e) => panic!("eval_type_expr failed: {}", e),
-            };
+    }
 
-        assert!(matches!(type_1.monotype, Monotype::TypeConstructor(_, _)));
-        assert_eq!(ctors_1.len(), 2);
+    #[test]
+    fn test_eval_type_expr_sum_uses_named_type() {
+        let mut env = Environment::new(None);
+
+        env.types.insert(
+            "Int32".to_string(),
+            TypeVariable {
+                name: "Int32".to_string(),
+                r#type: Some(Monotype::Int32),
+                kind: Kind::Type,
+            },
+        );
+
+        let expr = CoreTypeExpr::Sum {
+            ctors: vec![CoreDataConstructor {
+                tag: "Some".to_string(),
+                types: vec![CoreAtomicTypeExpr::Identifier {
+                    name: "a".to_string(),
+                    span: SPAN,
+                }],
+            }],
+            span: SPAN,
+        };
+
+        let (type_constructor, named_type, _) =
+            eval_type_expr("Option", &vec!["a".to_string()], &expr, &env).unwrap();
+
+        assert!(matches!(
+            type_constructor.monotype,
+            Monotype::TypeConstructor(_, _)
+        ));
+
+        assert!(matches!(
+            named_type.monotype,
+            Monotype::Named(ref name, ref args)
+                if name == "Option" && args.len() == 1 && args[0] == Monotype::Variable("a".to_string())
+        ));
     }
 
     #[test]

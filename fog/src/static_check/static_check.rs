@@ -17,6 +17,7 @@ use crate::static_check::environment::Environment;
 use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
+use crate::static_check::eval::wrap_type_scheme;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -83,10 +84,14 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
         }
     }
 
-    for (parent_sum_type, ctors, span) in data_ctors {
-        if let Err(error) = register_data_constructors(env, &parent_sum_type, &ctors, &span) {
+    for (parent_named_type, ctors, span) in data_ctors {
+        if let Err(error) = register_data_constructors(env, &parent_named_type, &ctors, &span) {
             all_errors.push(error);
         }
+    }
+
+    for (name, var) in env.variables.iter() {
+        println!("{} : {}", name, var.r#type);
     }
 
     // -- variable type annotations
@@ -128,10 +133,10 @@ fn check_type_declaration(
     expr: &CoreTypeExpr,
     span: &Span,
     env: &mut Environment,
-) -> FogResult<(Monotype, Vec<DataConstructor>, Span)> {
-    let (r#type, ctors) = eval_type_expr(name, params, expr, env)?;
+) -> FogResult<(Type, Vec<DataConstructor>, Span)> {
+    let (type_constructor, named_type, ctors) = eval_type_expr(name, params, expr, env)?;
 
-    if !r#type.vars.is_empty() {
+    if !type_constructor.vars.is_empty() {
         return Err(static_check_error!(
             Some(*span),
             "declared type must be a monotype"
@@ -139,18 +144,18 @@ fn check_type_declaration(
     }
 
     if !env.types.contains_key(name) {
-        env.annotate_kind(name, kind_of(&r#type), span)?;
+        env.annotate_kind(name, kind_of(&type_constructor), span)?;
     }
 
-    env.declare_type(name, r#type.monotype.clone(), span)?;
+    env.declare_type(name, type_constructor.monotype.clone(), span)?;
     // register_data_constructors(env, &r#type, &ctors, span)?;
 
-    Ok((r#type.monotype, ctors, *span))
+    Ok((named_type, ctors, *span))
 }
 
 fn register_data_constructors(
     env: &mut Environment,
-    parent_sum_type: &Monotype,
+    parent_named_type: &Type,
     ctors: &Vec<DataConstructor>,
     span: &Span,
 ) -> FogResult<()> {
@@ -162,9 +167,10 @@ fn register_data_constructors(
             .map(|expr| eval_atomic_type_expr(&expr, env))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let ctor_type = nest_function_types(&types, Type::mono(parent_sum_type.clone()));
+        let ctor_type = nest_function_types(&types, parent_named_type.clone());
+        // let ctor_type = wrap_type_scheme(&ctor_type.monotype, &mut Vec::new());
 
-        // env.annotate_type(&ctor.tag, Type::Mono(ctor_type.clone()), span)?;
+        env.annotate_type(&ctor.tag, ctor_type.clone(), span)?;
         env.declare_var(&ctor.tag, ctor_type, span)?;
     }
 
@@ -550,7 +556,7 @@ fn block_expr_type_of(
     ))
 }
 
-fn unify_type(
+pub fn unify_type(
     to: &Monotype,
     from: &Monotype,
     type_var_subst: &mut HashMap<String, Monotype>,
@@ -579,6 +585,15 @@ fn unify_type(
 
         (Monotype::Product(types_1), Monotype::Product(types_2))
             if types_1.len() == types_2.len() =>
+        {
+            types_1
+                .iter()
+                .zip(types_2)
+                .try_for_each(|(a, b)| unify_type(a, b, type_var_subst, span))
+        }
+
+        (Monotype::Named(name_1, types_1), Monotype::Named(name_2, types_2))
+            if name_1 == name_2 && types_1.len() == types_2.len() =>
         {
             types_1
                 .iter()

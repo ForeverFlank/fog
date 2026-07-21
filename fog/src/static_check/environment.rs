@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::static_check::kind::Kind;
+use crate::static_check::static_check::unify_type;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
