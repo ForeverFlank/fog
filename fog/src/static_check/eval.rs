@@ -62,7 +62,7 @@ pub fn eval_type_expr(
 
             let mut type_constructor = named_monotype.clone();
 
-            for param in params {
+            for param in params.iter().rev() {
                 type_constructor =
                     Monotype::TypeConstructor(param.to_string(), type_constructor.into())
             }

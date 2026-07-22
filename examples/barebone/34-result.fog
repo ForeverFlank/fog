@@ -7,3 +7,17 @@ Result t e = Ok t | Error e
 orElse : Result t e -> Result t e -> Result t e
 orElse (Ok t)    _    = Ok t
 orElse (Error _) item = item
+
+a : Result Int32 String
+a = Ok 12
+
+b : Result Int32 String
+b = Error "error!"
+
+c : Result Int32 String
+c = orElse a b  -- Ok 12
+
+main = match c {
+    Ok    num   => printLine (toString num)
+    Error error => printLine error
+}

@@ -146,7 +146,7 @@ fn check_type_declaration(
     }
 
     if !env.types.contains_key(name) {
-        env.annotate_kind(name, kind_of(&type_constructor), span)?;
+        env.annotate_kind(name, kind_of(&type_constructor.monotype), span)?;
     }
 
     env.declare_type(name, type_constructor.monotype.clone(), span)?;
@@ -630,12 +630,14 @@ pub fn unify_type(
     }
 }
 
+// TODO infinite recursion!
 fn substitute_types(r#type: &Monotype, type_var_subst: &HashMap<String, Monotype>) -> Monotype {
     match r#type {
         Monotype::Variable(name) => type_var_subst
             .get(name)
-            .map(|t2| substitute_types(t2, type_var_subst))
-            .unwrap_or_else(|| r#type.clone()),
+            // .map(|t2| substitute_types(t2, type_var_subst))
+            .unwrap_or(r#type)
+            .clone(),
 
         Monotype::Function(param_type, return_type) => Monotype::function(
             substitute_types(param_type, type_var_subst),

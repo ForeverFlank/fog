@@ -275,9 +275,11 @@ impl Display for DataConstructor {
 
 // --- functions ---
 
-pub fn kind_of(r#type: &Type) -> Kind {
-    match r#type.monotype {
-        Monotype::TypeConstructor(_, _) => Kind::Function(Kind::Type.into(), Kind::Type.into()),
+pub fn kind_of(monotype: &Monotype) -> Kind {
+    match monotype {
+        Monotype::TypeConstructor(_, t) => {
+            Kind::Function(Kind::Type.into(), kind_of(t.as_ref()).into())
+        }
         _ => Kind::Type,
     }
 }

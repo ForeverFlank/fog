@@ -79,12 +79,14 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         },
     };
 
-    vec![
+    let vars = vec![
         var_add_int32,
         var_subtract_int32,
         var_print_line,
         var_to_string,
-    ]
+    ];
+
+    vars
 }
 
 pub fn get_static_check_types() -> Vec<static_check::variable::TypeVariable> {
@@ -94,13 +96,21 @@ pub fn get_static_check_types() -> Vec<static_check::variable::TypeVariable> {
         kind: static_check::kind::Kind::Type,
     };
 
+    let type_string = static_check::variable::TypeVariable {
+        name: "String".to_string(),
+        r#type: Some(Monotype::String),
+        kind: static_check::kind::Kind::Type,
+    };
+
     let type_unit = static_check::variable::TypeVariable {
         name: "Unit".to_string(),
         r#type: Some(Monotype::Product(Vec::new())),
         kind: static_check::kind::Kind::Type,
     };
 
-    vec![type_int32, type_unit]
+    let types = vec![type_int32, type_string, type_unit];
+
+    types
 }
 
 pub fn get_static_check_variables() -> Vec<static_check::variable::ValueVariable> {
