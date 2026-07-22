@@ -79,11 +79,32 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         },
     };
 
+    // HACK this will be implemented in prelude
+    let var_concat_string = BuiltInVariable {
+        name: "concatString".to_string(),
+        r#type: Monotype::function(
+            Monotype::String,
+            Monotype::function(Monotype::String, Monotype::String),
+        ),
+        value: Value::NativeFunction {
+            function: Rc::new(|a: Value| match a {
+                Value::String(lhs) => Ok(Value::NativeFunction {
+                    function: Rc::new(move |b: Value| match b {
+                        Value::String(rhs) => Ok(Value::String(lhs.clone() + &rhs)),
+                        _ => Err(runtime_error!(None, "right operand is not a String")),
+                    }),
+                }),
+                _ => Err(runtime_error!(None, "left operand is not a String")),
+            }),
+        },
+    };
+
     let vars = vec![
         var_add_int32,
         var_subtract_int32,
         var_print_line,
         var_to_string,
+        var_concat_string,
     ];
 
     vars

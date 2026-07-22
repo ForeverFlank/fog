@@ -635,10 +635,9 @@ fn substitute_types(r#type: &Monotype, type_var_subst: &HashMap<String, Monotype
     match r#type {
         Monotype::Variable(name) => type_var_subst
             .get(name)
-            // .map(|t2| substitute_types(t2, type_var_subst))
-            .unwrap_or(r#type)
-            .clone(),
-
+            .map(|t2| substitute_types(t2, type_var_subst))
+            .unwrap_or(r#type.clone()),
+        // .clone(),
         Monotype::Function(param_type, return_type) => Monotype::function(
             substitute_types(param_type, type_var_subst),
             substitute_types(return_type, type_var_subst),
