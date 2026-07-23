@@ -4,66 +4,49 @@ Bool : Type
 Bool = True | False
 
 and : Bool -> Bool -> Bool
-and = b1 : Bool => b2 : Bool => match (b1, b2) {
-    (True, True) => True
-    _            => False
-}
+and True True = True
+and _    _    = False
 
 or : Bool -> Bool -> Bool
-or = b1 : Bool => b2 : Bool => match (b1, b2) {
-    (False, False) => False
-    _              => True
-}
+or False False = False
+or _     _     = True
 
 not : Bool -> Bool
-not = b : Bool => match b {
-    True  => False
-    False => True
-}
+not True  = False
+not False = True
 
 -- type classes
 
-Equatable : Type -> Constraint
-Equatable a = {
+Eq : Type -> Constraint
+Eq a = {
     equal    : a -> a -> Bool
     notEqual : a -> a -> Bool
 }
 
-Ordered : Type -> Constraint
-Ordered a = {
-    equatable   : Equatable a
+Ord : Type -> Constraint
+Ord a where Eq a = {
     lessOrEqual : a -> a -> Bool
 }
 
--- using the type classes
 
--- !! NOTE !! this might be a bad example,
--- version is just an alias of Int32 * Int32 in this case!
-
-Version : Type
-Version = Int32 * Int32     -- semantic version number, major and minor
-
-Equatable Version = {
-    equal = v1 : Version => v2 : Version => {
-        (maj1, min1) = v1
-        (maj2, min2) = v2
-
-        and (equalInt32 maj1 min1) (equalInt32 maj2 min2)
-    }
-
-    notEqual = v1 : Version => v2 : Version => not (equalInt32 v1 v2)
+Eq Int32 = {
+    equal    lhs rhs = equalInt32 lhs rhs
+    notEqual lhs rhs = not (equal lhs rhs)
 }
 
-Ordered Version = {
-    equatable = Equatable Version
+Ord Int32 = {
+    lessOrEqual lhs rhs = lessOrEqualInt32 lhs rhs
+}
 
-    lessOrEqual = v1 : Version => v2 : Version => {
-        -- M1.m1 <= M2.m2
-        -- iff M1 < M2 or M1 == M2 and m1 <= m2
-        
-        (maj1, min1) = v1
-        (maj2, min2) = v2
 
-        or (lessInt32 maj1 maj2) (and (equalInt32 maj1 maj2) (lessOrEqualInt32 min1 min2))
+CompareResult : Type
+CompareResult = Less | Equal | Greater
+
+compare : a -> a -> CompareResult where Ord a
+compare lhs rhs = match (equal lhs rhs) {
+    True  => Equal
+    False => match (lessOrEqual lhs rhs) {
+        True  => Less
+        False => Greater
     }
 }

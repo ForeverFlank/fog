@@ -5,16 +5,12 @@ Bool : Type
 Bool = True | False
 
 and : Bool -> Bool -> Bool
-and = b1 : Bool => b2 : Bool => match (b1, b2) {
-    (True, True) => True
-    _            => False
-}
+and True True = True
+and _    _    = False
 
 not : Bool -> Bool
-not = b : Bool => match b {
-    True  => False
-    False => True
-}
+not True  = False
+not False = True
 
 -- defining the Equatable type class
 
@@ -33,8 +29,10 @@ Option a = Some a | None
 -- to that type
 
 Equatable Point = {
-    equal (Some lhs) (Some rhs) = equal
-
+    -- value's type must also derive from Equatable!
+    equal (Some lhs) (Some rhs) = equal lhs rhs
+    equal None       None       = True
+    equal _          _          = False
 
     notEqual lhs rhs = not (equal lhs rhs)
 }

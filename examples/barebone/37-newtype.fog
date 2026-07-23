@@ -1,5 +1,6 @@
 Point : Type
-Point = | Point (Int32 * Int32) -- HACK
+Point = Point (Int32 * Int32) -- HACK
+
 
 addPoint : Point -> Point -> Point
 addPoint (Point (x1, y1)) (Point (x2, y2)) = Point ((addInt32 x1 x2), (addInt32 y1 y2))
