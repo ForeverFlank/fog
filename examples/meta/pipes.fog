@@ -1,17 +1,17 @@
 -- right pipe
-|> : forall a b. (a -> b) -> a -> b
+|> : (a -> b) -> a -> b
 x |> f = f x
 
 -- left pipe
-<| : forall a b. a -> (a -> b) -> b
+<| : a -> (a -> b) -> b
 f <| x = f x
 
 -- right composition
->> : forall a b c. (a -> b) -> (b -> c) -> (a -> c)
+>> : (a -> b) -> (b -> c) -> (a -> c)
 f >> g = x => g (f x)
 
 -- left composition
-<< : forall a b c. (b -> c) -> (a -> b) -> (a -> c)
+<< : (b -> c) -> (a -> b) -> (a -> c)
 f << g = x => f (g x)
 
 -- unfortunately, fog's left composition operator

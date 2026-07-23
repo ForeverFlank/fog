@@ -1,0 +1,7 @@
+Lazy : Type -> Type
+Lazy a = Unit -> a
+
+lazyFive : Lazy Int32
+lazyFive = _ : Unit => 5
+
+main = printLine (toString (lazyFive ()))

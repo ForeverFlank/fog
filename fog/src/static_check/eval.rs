@@ -42,7 +42,14 @@ pub fn eval_type_expr(
 ) -> FogResult<(Type, Type, Vec<DataConstructor>)> {
     match expr {
         CoreTypeExpr::Atomic(expr) => {
-            let r#type = eval_atomic_type_expr(expr, env)?;
+            let mut r#type = eval_atomic_type_expr(expr, env)?.monotype;
+
+            for param in params.iter().rev() {
+                r#type = Monotype::TypeConstructor(param.to_string(), r#type.into())
+            }
+
+            let r#type = wrap_type_scheme(&r#type, params);
+
             Ok((r#type.clone(), r#type, vec![]))
         }
 
@@ -60,19 +67,18 @@ pub fn eval_type_expr(
                 .map(|ctor| eval_data_constructor(ctor))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let mut type_constructor = named_monotype.clone();
+            let mut r#type = named_monotype.clone();
 
             for param in params.iter().rev() {
-                type_constructor =
-                    Monotype::TypeConstructor(param.to_string(), type_constructor.into())
+                r#type = Monotype::TypeConstructor(param.to_string(), r#type.into())
             }
 
-            let type_constructor = wrap_type_scheme(&type_constructor, params);
+            let r#type = wrap_type_scheme(&r#type, params);
             // let named_type = wrap_type_scheme(&named_monotype, params);
             // println!("1> {}", named_monotype);
-            // println!("2> {}", type_constructor);
+            // println!("2> {}", r#type);
 
-            Ok((type_constructor, Type::mono(named_monotype), ctors))
+            Ok((r#type, Type::mono(named_monotype), ctors))
         }
     }
 }

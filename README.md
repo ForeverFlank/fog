@@ -4,6 +4,8 @@ A general purpose, functional toy language made as a "fun" "side" project.
 
 ## Examples
 
+Examples can be found under `examples/`.
+
 Final state of the project should be able to run something like
 
 ```fog

@@ -1,21 +1,25 @@
 IO : Type -> Type
+IO a = Unit -> a    -- with a few extra impurities
 
-run : IO a -> a
-run = -- internal stuff
+unsafeRun : IO a -> a   -- impure!
+
+return : a -> IO a
+return value = () => value
 
 join : IO (IO a) -> IO a
-join action = -- internal stuff
+join action = () => unsafeRun (unsafeRun action)
 
 fmap : (a -> b) -> IO a -> IO b
-fmap f action = f (run action)
+fmap fn action = () => fn (unsafeRun action)
 
 bind : IO a -> (a -> IO b) -> IO b
-bind action f = join (fmap f action)
+bind action fn = join (fmap fn action)
 
 
-printLine = -- internal stuff
+printLine : String -> IO Unit
+printLine str = -- internal stuff
 
-main : IO ()
-main = do {
-    printLine "Hello fog!"
-}
+
+main : IO Unit
+main = printLine "Hello fog!"
+
