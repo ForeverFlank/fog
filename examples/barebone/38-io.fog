@@ -1,7 +1,8 @@
--- IO Monad
+-- IO monad
 
 -- then : IO a -> IO b -> IO b
 -- printLine : String -> IO Unit
 
 main : IO Unit
 main = then (printLine "Hello fog!") (printLine "IO monad is working.")
+

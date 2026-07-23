@@ -134,7 +134,7 @@ impl Display for Monotype {
             Monotype::Variable(name) => write!(f, "{}", name),
 
             Monotype::IO(t) => {
-                write!(f, "IO ");
+                write!(f, "IO ")?;
                 fmt_parenthesized(f, t)
             }
 
@@ -156,7 +156,7 @@ impl Display for Monotype {
             }
 
             Monotype::Named(name, args) => {
-                write!(f, "{}[named]", name)?;
+                write!(f, "{}", name)?;
 
                 for arg in args {
                     write!(f, " ")?;
@@ -244,7 +244,7 @@ impl PartialEq for Type {
 impl Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.vars.is_empty() {
-            write!(f, "forall")?;
+            write!(f, "∀")?;
 
             for var in self.vars.as_slice() {
                 write!(f, " {}", var)?;

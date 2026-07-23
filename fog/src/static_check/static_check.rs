@@ -52,37 +52,67 @@ pub fn create_top_env() -> Environment<'static> {
 }
 
 fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &mut Vec<FogError>) {
-    // TODO: the loops are like 5x inefficient
+    let mut kind_annotations = Vec::new();
+    let mut type_declarations = Vec::new();
+
+    let mut type_annotations = Vec::new();
+    let mut var_declarations = Vec::new();
+
+    let mut tailing_operand = None;
+
+    for stmt in stmts {
+        match stmt {
+            CoreStatement::KindAnnotation { .. } => kind_annotations.push(stmt),
+            CoreStatement::TypeDeclaration { .. } => type_declarations.push(stmt),
+
+            CoreStatement::TypeAnnotation { .. } => type_annotations.push(stmt),
+            CoreStatement::VarDeclaration { .. } => var_declarations.push(stmt),
+
+            CoreStatement::Expression { span, .. } => match tailing_operand {
+                None => tailing_operand = Some(stmt),
+                Some(_) => {
+                    all_errors.push(static_check_error!(
+                        Some(*span),
+                        "only one expression is allowed in a scope"
+                    ));
+                }
+            },
+        }
+    }
 
     // -- type kind annotations
-    for stmt in stmts {
-        if let CoreStatement::KindAnnotation { name, expr, span } = stmt {
-            match eval_kind_expr(expr) {
-                Ok(kind) => {
-                    if let Err(error) = env.annotate_kind(name, kind, span) {
-                        all_errors.push(error);
-                    }
+    for stmt in kind_annotations {
+        let CoreStatement::KindAnnotation { name, expr, span } = stmt else {
+            unreachable!()
+        };
+
+        match eval_kind_expr(expr) {
+            Ok(kind) => {
+                if let Err(error) = env.annotate_kind(name, kind, span) {
+                    all_errors.push(error);
                 }
-                Err(error) => all_errors.push(error),
             }
+            Err(error) => all_errors.push(error),
         }
     }
 
     // -- type declarations
     let mut data_ctors = Vec::new();
 
-    for stmt in stmts {
-        if let CoreStatement::TypeDeclaration {
+    for stmt in type_declarations {
+        let CoreStatement::TypeDeclaration {
             name,
             params,
             expr,
             span,
         } = stmt
-        {
-            match check_type_declaration(name, params, expr, span, env) {
-                Ok(item) => data_ctors.push(item),
-                Err(error) => all_errors.push(error),
-            }
+        else {
+            unreachable!()
+        };
+
+        match check_type_declaration(name, params, expr, span, env) {
+            Ok(item) => data_ctors.push(item),
+            Err(error) => all_errors.push(error),
         }
     }
 
@@ -92,39 +122,37 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
         }
     }
 
-    for (name, var) in env.variables.iter() {
-        // println!("{} : {}", name, var.r#type);
-    }
-
     // -- variable type annotations
-    for stmt in stmts {
-        if let CoreStatement::TypeAnnotation { name, expr, span } = stmt {
-            if let Err(error) = check_type_annotation(name, expr, span, env) {
-                all_errors.push(error);
-            }
+    for stmt in type_annotations {
+        let CoreStatement::TypeAnnotation { name, expr, span } = stmt else {
+            unreachable!();
+        };
+
+        if let Err(error) = check_type_annotation(name, expr, span, env) {
+            all_errors.push(error);
         }
     }
 
     // -- variable declarations
-    for stmt in stmts {
-        if let CoreStatement::VarDeclaration {
+    for stmt in var_declarations {
+        let CoreStatement::VarDeclaration {
             pattern,
             expr,
             span,
         } = stmt
-        {
-            if let Err(error) = check_declaration(pattern, expr, span, env, &mut HashMap::new()) {
-                all_errors.push(error);
-            }
+        else {
+            unreachable!();
+        };
+
+        if let Err(error) = check_declaration(pattern, expr, span, env, &mut HashMap::new()) {
+            all_errors.push(error);
         }
     }
 
     // -- expressions
-    for stmt in stmts {
-        if let CoreStatement::Expression { expr, .. } = stmt {
-            if let Err(error) = expr_type_of(expr, env, &mut HashMap::new()) {
-                all_errors.push(error);
-            }
+    if let Some(CoreStatement::Expression { expr, .. }) = tailing_operand {
+        if let Err(error) = expr_type_of(expr, env, &mut HashMap::new()) {
+            all_errors.push(error);
         }
     }
 }

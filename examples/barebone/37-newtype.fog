@@ -1,0 +1,20 @@
+Point : Type
+Point = | Point (Int32 * Int32) -- HACK
+
+addPoint : Point -> Point -> Point
+addPoint (Point (x1, y1)) (Point (x2, y2)) = Point ((addInt32 x1 x2), (addInt32 y1 y2))
+
+pointToString : Point -> String
+pointToString (Point (x, y)) = concatString (toString x) (concatString ", " (toString y))
+
+
+point1 : Point
+point1 = Point (2, 3)
+
+point2 : Point
+point2 = Point (4, 5)
+
+point3 = addPoint point1 point2
+
+
+main = printLine (pointToString point3)

@@ -1,9 +1,6 @@
 -- ad hoc polymorphism
 -- commonly known as interfaces
 
--- boilerplate Bool because
--- this is a barebone example
-
 Bool : Type
 Bool = True | False
 
@@ -29,19 +26,15 @@ Equatable a = {
 
 -- declating a type
 
-Point : Type
-Point = Int32 * Int32
+Option : Type -> Type
+Option a = Some a | None
 
 -- implementing the Equatable type class
 -- to that type
 
 Equatable Point = {
-    equal = lhs : Point => rhs : Point => {
-        (xl, yl) = lhs
-        (xr, yr) = rhs
+    equal (Some lhs) (Some rhs) = equal
 
-        and (equal xl yl) (equal xr yr)
-    }
 
-    notEqual = lhs : Point => rhs : Point => not (equal lhs rhs)
+    notEqual lhs rhs = not (equal lhs rhs)
 }

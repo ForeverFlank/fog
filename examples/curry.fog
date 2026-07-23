@@ -1,8 +1,11 @@
-multiply : Int32 -> Int32 -> Int32
-multiply a b = a * b
+add : Int32 -> Int32 -> Int32
+add a b = addInt32 a b
 
-doubleIt : Int32 -> Int32
-doubleIt = multiply 2
+addFive : Int32 -> Int32
+addFive = add 5
 
-ten : Int32
-ten = doubleIt 5
+eight : Int32
+eight = addFive 3
+
+
+main = printLine (toString eight)
