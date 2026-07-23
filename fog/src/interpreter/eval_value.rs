@@ -186,7 +186,7 @@ fn eval_tuple_items_declaration(
     Ok(())
 }
 
-fn eval_function_appl(function: Value, argument: Value) -> FogResult<Value> {
+pub fn eval_function_appl(function: Value, argument: Value) -> FogResult<Value> {
     match function {
         Value::Function {
             param,
@@ -203,7 +203,7 @@ fn eval_function_appl(function: Value, argument: Value) -> FogResult<Value> {
             eval_value(&body, &child_env)
         }
 
-        Value::NativeFunction { function, .. } => function(argument).map_err(|e| {
+        Value::NativeFunction(function) => function(argument).map_err(|e| {
             // if e.span.is_none() {
             // e.span = Some(*span);
             // }

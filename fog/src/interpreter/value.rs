@@ -13,24 +13,19 @@ pub enum Value {
     Char(char),
     String(String),
 
-    IOUnitUnit, // HACK super temporary; this is the only element of type IOUnit
-
     Function {
         param: String,
         body: Rc<ANFValue>,
         captured_env: Box<Environment<'static>>,
     },
-
-    NativeFunction {
-        function: Rc<dyn Fn(Value) -> FogResult<Value>>,
-    },
-
     Tuple(Vec<Value>),
-
     Constructor {
         tag: String,
         values: Vec<Value>,
     },
+
+    NativeFunction(Rc<dyn Fn(Value) -> FogResult<Value>>),
+    IO(Rc<dyn Fn() -> FogResult<Value>>),
 }
 
 impl fmt::Display for Value {
@@ -43,8 +38,6 @@ impl fmt::Display for Value {
 
             Value::Function { param, body, .. } => write!(f, "{param} => {body}"),
 
-            Value::NativeFunction { .. } => write!(f, "[native function]"),
-
             Value::Tuple(values) => write!(f, "({})", format_joined(values, ", ")),
 
             Value::Constructor { tag, values, .. } => {
@@ -55,7 +48,8 @@ impl fmt::Display for Value {
                 }
             }
 
-            Value::IOUnitUnit => write!(f, "IOUnitUnit"),
+            Value::NativeFunction(..) => write!(f, "[native function]"),
+            Value::IO(..) => write!(f, "[IO]"),
         }
     }
 }

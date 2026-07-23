@@ -16,7 +16,8 @@ pub enum Monotype {
     Float32,
     Char,
     String,
-    IOUnit, // HACK super temporary hack; to be replaced with actual IO monad!
+
+    IO(Box<Monotype>),
 
     Function(Box<Monotype>, Box<Monotype>),
     Product(Vec<Monotype>),
@@ -44,7 +45,8 @@ fn eq_monotype(type_1: &Monotype, type_2: &Monotype, counter: &mut i32) -> bool 
         (Monotype::Float32, Monotype::Float32) => true,
         (Monotype::Char, Monotype::Char) => true,
         (Monotype::String, Monotype::String) => true,
-        (Monotype::IOUnit, Monotype::IOUnit) => true,
+
+        (Monotype::IO(t1), Monotype::IO(t2)) => eq_monotype(t1, t2, counter),
 
         (Monotype::Function(p1, r1), Monotype::Function(p2, r2)) => {
             eq_monotype(p1, p2, counter) && eq_monotype(r1, r2, counter)
@@ -129,8 +131,12 @@ impl Display for Monotype {
             Monotype::Float32 => write!(f, "Float32"),
             Monotype::Char => write!(f, "Char"),
             Monotype::String => write!(f, "String"),
-            Monotype::IOUnit => write!(f, "IO"),
             Monotype::Variable(name) => write!(f, "{}", name),
+
+            Monotype::IO(t) => {
+                write!(f, "IO ");
+                fmt_parenthesized(f, t)
+            }
 
             Monotype::Function(param_type, return_type) => {
                 fmt_parenthesized(f, param_type)?;

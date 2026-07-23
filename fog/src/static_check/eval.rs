@@ -102,11 +102,9 @@ pub fn wrap_type_scheme(monotype: &Monotype, params: &Vec<String>) -> Type {
 
 fn find_type_variables(r#type: &Monotype, vars: &mut BTreeSet<String>, params: &Vec<String>) {
     match r#type {
-        Monotype::Int32
-        | Monotype::Float32
-        | Monotype::Char
-        | Monotype::String
-        | Monotype::IOUnit => {}
+        Monotype::Int32 | Monotype::Float32 | Monotype::Char | Monotype::String => {}
+
+        Monotype::IO(inner_type) => find_type_variables(inner_type, vars, params),
 
         Monotype::Variable(name) => {
             if !params.contains(name) {

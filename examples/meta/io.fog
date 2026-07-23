@@ -1,5 +1,4 @@
 IO : Type -> Type
-IO a = Unit -> a    -- with a few extra impurities
 
 unsafeRun : IO a -> a   -- impure!
 
