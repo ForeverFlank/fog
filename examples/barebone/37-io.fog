@@ -1,2 +1,3 @@
-main : IO Unit
+-- IO Monad
+
 main = then (printLine "Hello fog!") (printLine "IO monad is working.")

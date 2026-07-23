@@ -4,6 +4,8 @@ use crate::core::get_interpreter_variables;
 use crate::error::FogResult;
 use crate::interpreter::environment::Environment;
 use crate::interpreter::eval_value::eval_scope;
+use crate::interpreter::value::Value;
+use crate::runtime_error;
 
 fn create_top_env() -> Environment<'static> {
     let mut env = Environment::new(None);
@@ -29,7 +31,23 @@ pub fn interpret(anfs: &Vec<ANFStatement>, _anf_metadata: &ANFMetaData) -> FogRe
     // }
 
     let mut top_env = create_top_env();
-    eval_scope(anfs, &mut top_env)?;
+    let main = eval_scope(anfs, &mut top_env)?;
+
+    if let Some(value) = main {
+        if let Value::IO(io) = value {
+            let res = io()?;
+
+            if matches!(res, Value::Tuple(items) if items.is_empty()) {
+                Ok(())
+            } else {
+                Err(runtime_error!(None, "`main` is not of type `IO Unit`"))
+            }
+        } else {
+            Err(runtime_error!(None, "`main` is not of type `IO Unit`"))
+        }
+    } else {
+        Ok(())
+    }
 
     // let mut all_vars: Vec<ValueVariable> = top_env.variables.values().cloned().collect();
     // all_vars.sort_by(|a, b| a.name.cmp(&b.name));
@@ -46,6 +64,4 @@ pub fn interpret(anfs: &Vec<ANFStatement>, _anf_metadata: &ANFMetaData) -> FogRe
     //     );
     // }
     // println!();
-
-    Ok(())
 }

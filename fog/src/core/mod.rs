@@ -17,8 +17,6 @@ struct BuiltInVariable {
 }
 
 fn get_builtin_variables() -> Vec<BuiltInVariable> {
-    let unit_type = Monotype::Product(vec![]);
-
     let var_add_int32 = BuiltInVariable {
         name: "addInt32".to_string(),
         r#type: Type::mono(Monotype::function(
@@ -77,13 +75,6 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
 
     // --- IO ---
 
-    // impure IO run function
-    // IO a -> a
-    let unsafe_run_io = Value::NativeFunction(Rc::new(|str: Value| match str {
-        Value::IO(io) => io(),
-        _ => Err(runtime_error!(None, "argument is not an IO")),
-    }));
-
     let var_return = BuiltInVariable {
         name: "return".to_string(),
         // a -> IO a
@@ -110,10 +101,11 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
             ),
         ),
         value: Value::NativeFunction(Rc::new(|value: Value| match value {
-            Value::IO(io) => match io() {
-                Ok(Value::IO(io)) => io(),
-                _ => Err(runtime_error!(None, "argument is not an IO")),
-            },
+            Value::IO(io) => Ok(Value::IO(Rc::new(move || match io()? {
+                Value::IO(inner) => inner(),
+                _ => Err(runtime_error!(None, "argument did not produce an IO")),
+            }))),
+
             _ => Err(runtime_error!(None, "argument is not an IO")),
         })),
     };
@@ -134,23 +126,97 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
                 ),
             ),
         ),
-        value: Value::NativeFunction(Rc::new(move |func: Value| match func {
-            Value::Function { .. } => {
-                let unsafe_run_io = unsafe_run_io.clone();
+        value: Value::NativeFunction(Rc::new(|func: Value| match func {
+            Value::Function { .. } | Value::NativeFunction(_) => Ok(Value::NativeFunction(
+                Rc::new(move |action: Value| match action {
+                    Value::IO(io) => Ok(Value::IO(Rc::new({
+                        let func = func.clone();
+                        move || {
+                            let value = io()?;
+                            eval_function_appl(func.clone(), value)
+                        }
+                    }))),
 
-                Ok(Value::NativeFunction(Rc::new(
-                    move |action: Value| match action {
-                        Value::IO(_) => Ok(eval_function_appl(
-                            func.clone(),
-                            eval_function_appl(unsafe_run_io.clone(), action)?,
-                        )?),
-
-                        _ => Err(runtime_error!(None, "argument is not an IO")),
-                    },
-                )))
-            }
+                    _ => Err(runtime_error!(None, "argument is not an IO")),
+                }),
+            )),
 
             _ => Err(runtime_error!(None, "argument is not a function")),
+        })),
+    };
+
+    let var_bind = BuiltInVariable {
+        name: "bind".to_string(),
+        // IO a -> (a -> IO b) -> IO b
+        r#type: Type::poly(
+            vec!["a".to_string(), "b".to_string()],
+            Monotype::function(
+                Monotype::IO(Monotype::Variable("a".to_string()).into()),
+                Monotype::function(
+                    Monotype::function(
+                        Monotype::Variable("a".to_string()),
+                        Monotype::IO(Monotype::Variable("b".to_string()).into()),
+                    ),
+                    Monotype::IO(Monotype::Variable("b".to_string()).into()),
+                ),
+            ),
+        ),
+        value: Value::NativeFunction(Rc::new(|action: Value| match action {
+            Value::IO(io) => Ok(Value::NativeFunction(Rc::new(
+                move |func: Value| match func {
+                    Value::Function { .. } | Value::NativeFunction(_) => Ok(Value::IO(Rc::new({
+                        let io = io.clone();
+                        let func = func.clone();
+
+                        move || {
+                            let value = io()?;
+                            let next = eval_function_appl(func.clone(), value)?;
+
+                            match next {
+                                Value::IO(next_io) => next_io(),
+                                _ => Err(runtime_error!(None, "function must return an IO")),
+                            }
+                        }
+                    }))),
+
+                    _ => Err(runtime_error!(None, "argument is not a function")),
+                },
+            ))),
+
+            _ => Err(runtime_error!(None, "argument is not an IO")),
+        })),
+    };
+
+    let var_then = BuiltInVariable {
+        name: "then".to_string(),
+        // IO a -> IO b -> IO b
+        r#type: Type::poly(
+            vec!["a".to_string(), "b".to_string()],
+            Monotype::function(
+                Monotype::IO(Monotype::Variable("a".to_string()).into()),
+                Monotype::function(
+                    Monotype::IO(Monotype::Variable("b".to_string()).into()),
+                    Monotype::IO(Monotype::Variable("b".to_string()).into()),
+                ),
+            ),
+        ),
+        value: Value::NativeFunction(Rc::new(|io_a: Value| match io_a {
+            Value::IO(io_a) => Ok(Value::NativeFunction(Rc::new(
+                move |io_b: Value| match io_b {
+                    Value::IO(io_b) => {
+                        let io_a = io_a.clone();
+
+                        Ok(Value::IO(Rc::new(move || {
+                            io_a()?;
+                            io_b()
+                        })))
+                    }
+
+                    _ => Err(runtime_error!(None, "argument is not an IO")),
+                },
+            ))),
+
+            _ => Err(runtime_error!(None, "argument is not an IO")),
         })),
     };
 
@@ -159,7 +225,7 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         // String -> IO Unit
         r#type: Type::mono(Monotype::function(
             Monotype::String,
-            Monotype::IO(unit_type.clone().into()),
+            Monotype::IO(Monotype::Product(vec![]).into()),
         )),
         value: Value::NativeFunction(Rc::new(|value: Value| match value {
             Value::String(str) => Ok(Value::IO(Rc::new(move || {
@@ -178,6 +244,9 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         // IO
         var_return,
         var_join,
+        var_fmap,
+        var_bind,
+        var_then,
         var_print_line,
     ]
 }
