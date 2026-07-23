@@ -9,7 +9,6 @@ use crate::anf::anf::ANFValue;
 use crate::anf::anf::ANFVar;
 use crate::anf::scc;
 use crate::error::Span;
-// (no parse_error used here)
 use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreDeclPattern;
 use crate::parser::core_expr::CoreExpr;
@@ -105,11 +104,21 @@ fn collect_stmts_to_anf(
 ) {
     // -- name collection prepass
 
+    let mut main_span = None;
+
     for stmt in stmts {
         match stmt {
             CoreStatement::VarDeclaration { pattern, .. } => {
                 for name in pattern.all_identifiers() {
                     scope.register_name(name);
+                }
+
+                // check for main function
+                match pattern {
+                    CoreDeclPattern::Identifier { name, span } if name == "main" => {
+                        main_span = Some(*span);
+                    }
+                    _ => {}
                 }
             }
 
@@ -183,6 +192,17 @@ fn collect_stmts_to_anf(
     }
 
     reordered.extend(old_stmts.into_iter().flatten());
+
+    // insert main expr, if main were declared
+    if let Some(span) = main_span {
+        reordered.push(ANFStatement::Value(ANFValue::Atomic(ANFAtomic::Var {
+            var: ANFVar {
+                id: scope.get_id("main"),
+                name: "main".to_string(),
+            },
+            span,
+        })));
+    }
 
     *collected_anfs = reordered;
 }

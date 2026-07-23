@@ -624,6 +624,10 @@ pub fn unify_type(
                 .all(|(a, b)| unify_type(a, b, type_var_subst, span))
         }
 
+        (Monotype::IO(type_1), Monotype::IO(type_2)) => {
+            unify_type(&type_1, &type_2, type_var_subst, span)
+        }
+
         _ if to == from => true,
 
         _ => false,

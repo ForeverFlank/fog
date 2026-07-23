@@ -140,6 +140,7 @@ impl<'a> Environment<'a> {
             }
 
             // if var.r#type != r#type {
+            // HACK but why?
             if !can_unify(&r#type.monotype, &var.r#type.monotype, span) {
                 return Err(static_check_error!(
                     Some(*span),

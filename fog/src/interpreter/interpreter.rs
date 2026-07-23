@@ -33,8 +33,8 @@ pub fn interpret(anfs: &Vec<ANFStatement>, _anf_metadata: &ANFMetaData) -> FogRe
     let mut top_env = create_top_env();
     let main = eval_scope(anfs, &mut top_env)?;
 
-    if let Some(value) = main {
-        if let Value::IO(io) = value {
+    if let Some(var) = main {
+        if let Value::IO(io) = var {
             let res = io()?;
 
             if matches!(res, Value::Tuple(items) if items.is_empty()) {
@@ -46,7 +46,7 @@ pub fn interpret(anfs: &Vec<ANFStatement>, _anf_metadata: &ANFMetaData) -> FogRe
             Err(runtime_error!(None, "`main` is not of type `IO Unit`"))
         }
     } else {
-        Ok(())
+        Err(runtime_error!(None, "`main` not found"))
     }
 
     // let mut all_vars: Vec<ValueVariable> = top_env.variables.values().cloned().collect();
