@@ -24,7 +24,7 @@ Eq a = {
 }
 
 Ord : Type -> Constraint
-Ord a where Eq a = {
+Ord a = Eq a & {
     lessOrEqual : a -> a -> Bool
 }
 

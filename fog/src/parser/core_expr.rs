@@ -314,6 +314,13 @@ pub enum CoreAtomicTypeExpr {
         arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
+
+    // this is of kind Constraint!
+    // but should this really belong here?
+    Constraint {
+        type_annotations: Vec<(String, CoreAtomicTypeExpr)>,
+        span: Span,
+    },
 }
 
 impl CoreAtomicTypeExpr {
@@ -322,7 +329,8 @@ impl CoreAtomicTypeExpr {
             CoreAtomicTypeExpr::Identifier { span, .. }
             | CoreAtomicTypeExpr::Function { span, .. }
             | CoreAtomicTypeExpr::FunctionAppl { span, .. }
-            | CoreAtomicTypeExpr::Product { span, .. } => *span,
+            | CoreAtomicTypeExpr::Product { span, .. }
+            | CoreAtomicTypeExpr::Constraint { span, .. } => *span,
         }
     }
 
@@ -366,6 +374,18 @@ impl Display for CoreAtomicTypeExpr {
                 fmt_parenthesized(f, callee)?;
                 write!(f, " ")?;
                 fmt_parenthesized(f, arg)
+            }
+
+            CoreAtomicTypeExpr::Constraint {
+                type_annotations, ..
+            } => {
+                write!(f, "{{")?;
+
+                for (name, expr) in type_annotations {
+                    write!(f, "  {} : {}", name, expr)?;
+                }
+
+                write!(f, "}}")
             }
         }
     }

@@ -1,6 +1,7 @@
 use crate::error::FogError;
 use crate::parser::core_expr::CoreStatement;
 
+pub mod constraint;
 pub mod environment;
 pub mod eval;
 pub mod kind;

@@ -1,6 +1,7 @@
 f : Int32 -> Int32
 m : Int32 -> Int32
 
+-- TODO: forgive newlines
 (f, m) = (n : Int32 => match n {
         0 => 1
         n => subtractInt32 n (m (f (subtractInt32 n 1)))
