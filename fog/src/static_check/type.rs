@@ -5,6 +5,7 @@ use std::vec;
 
 use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::static_check::kind::Kind;
+use crate::static_check::type_class::Constraint;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 
@@ -26,8 +27,6 @@ pub enum Monotype {
     Variable(String),
 
     TypeConstructor(String, Box<Monotype>),
-
-    Constraint(String),
 }
 
 impl Monotype {
@@ -172,10 +171,6 @@ impl Display for Monotype {
             Monotype::TypeConstructor(param, body) => {
                 write!(f, "{} => {}", param, body)
             }
-
-            Monotype::Constraint(name) => {
-                write!(f, "{}", name)
-            }
         }
     }
 }
@@ -295,8 +290,6 @@ pub fn kind_of(monotype: &Monotype) -> Kind {
         Monotype::TypeConstructor(_, t) => {
             Kind::Function(Kind::Type.into(), kind_of(t.as_ref()).into())
         }
-
-        Monotype::Constraint => Kind::Constraint,
 
         _ => Kind::Type,
     }

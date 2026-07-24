@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
+use crate::static_check::variable::ValueVariable;
 
+#[derive(Clone, Debug)]
 pub enum Constraint {
     // constraint definition, i.e. { ... }
     Def(Vec<(String, Type)>),
@@ -21,5 +25,5 @@ pub struct TypeClass {
 pub struct TypeClassInstance {
     pub name: String,
     pub monotypes: Vec<Monotype>,
-    // store function definitions here
+    pub methods: HashMap<String, ValueVariable>,
 }

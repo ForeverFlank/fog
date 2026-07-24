@@ -11,3 +11,6 @@ opt-level = 3
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+[dependencies]
+either = "1.16.0"

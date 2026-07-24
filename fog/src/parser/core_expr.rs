@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fmt::Display;
 
+use either::Either;
+
 use crate::error::Span;
 use crate::parser::Literal;
 use crate::util::fmt_parenthesized;
@@ -211,7 +213,7 @@ impl Display for CoreMatchArmPattern {
     }
 }
 
-// --- expressions ---
+// --- kind expressions ---
 
 #[derive(Clone)]
 pub enum CoreKindExpr {
@@ -261,6 +263,8 @@ impl Display for CoreKindExpr {
         }
     }
 }
+
+// --- type expressions ---
 
 #[derive(Clone)]
 pub enum CoreTypeExpr {
@@ -314,13 +318,6 @@ pub enum CoreAtomicTypeExpr {
         arg: Box<CoreAtomicTypeExpr>,
         span: Span,
     },
-
-    // this is of kind Constraint!
-    // but should this really belong here?
-    Constraint {
-        type_annotations: Vec<(String, CoreAtomicTypeExpr)>,
-        span: Span,
-    },
 }
 
 impl CoreAtomicTypeExpr {
@@ -329,8 +326,7 @@ impl CoreAtomicTypeExpr {
             CoreAtomicTypeExpr::Identifier { span, .. }
             | CoreAtomicTypeExpr::Function { span, .. }
             | CoreAtomicTypeExpr::FunctionAppl { span, .. }
-            | CoreAtomicTypeExpr::Product { span, .. }
-            | CoreAtomicTypeExpr::Constraint { span, .. } => *span,
+            | CoreAtomicTypeExpr::Product { span, .. } => *span,
         }
     }
 
@@ -375,18 +371,6 @@ impl Display for CoreAtomicTypeExpr {
                 write!(f, " ")?;
                 fmt_parenthesized(f, arg)
             }
-
-            CoreAtomicTypeExpr::Constraint {
-                type_annotations, ..
-            } => {
-                write!(f, "{{")?;
-
-                for (name, expr) in type_annotations {
-                    write!(f, "  {} : {}", name, expr)?;
-                }
-
-                write!(f, "}}")
-            }
         }
     }
 }
@@ -408,6 +392,85 @@ impl Display for CoreDataConstructor {
         Ok(())
     }
 }
+
+// --- constraint expressions ---
+
+pub enum CoreConstraintExpr {
+    Identifier {
+        name: String,
+        span: Span,
+    },
+    Appl {
+        appl: CoreConstraintApplExpr,
+        span: Span,
+    },
+    Definition {
+        method_annotations: Vec<(String, CoreTypeExpr)>,
+        span: Span,
+    },
+    And {
+        lhs: Box<CoreConstraintExpr>,
+        rhs: Box<CoreConstraintExpr>,
+        span: Span,
+    },
+}
+
+pub enum CoreConstraintApplExpr {
+    Named {
+        callee: String,
+        arg: Box<CoreConstraintApplExpr>,
+    },
+    Curried {
+        callee: Box<CoreConstraintApplExpr>,
+        arg: Box<CoreConstraintApplExpr>,
+    },
+}
+
+impl Display for CoreConstraintExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CoreConstraintExpr::Identifier { name, .. } => {
+                write!(f, "{}", name)
+            }
+
+            CoreConstraintExpr::Appl { appl, .. } => {
+                write!(f, "{}", appl)
+            }
+
+            CoreConstraintExpr::Definition {
+                method_annotations, ..
+            } => {
+                writeln!(f, "{{")?;
+
+                for (name, r#type) in method_annotations {
+                    writeln!(f, "{} : {}", name, r#type)?;
+                }
+
+                write!(f, "}}")
+            }
+
+            CoreConstraintExpr::And { lhs, rhs, .. } => {
+                write!(f, "{} & {}", lhs, rhs)
+            }
+        }
+    }
+}
+
+impl Display for CoreConstraintApplExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CoreConstraintApplExpr::Named { callee, arg } => {
+                write!(f, "{} {}", callee, arg)
+            }
+            CoreConstraintApplExpr::Curried { callee, arg } => {
+                fmt_parenthesized(f, callee)?;
+                write!(f, " {}", arg)
+            }
+        }
+    }
+}
+
+// --- value expressions ---
 
 #[derive(Clone)]
 pub enum CoreExpr {
