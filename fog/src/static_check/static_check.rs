@@ -53,7 +53,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     let mut kind_annos = Vec::new();
     let mut type_decls = Vec::new();
 
-    let mut typeclass_decls = Vec::new();
+    // let mut typeclass_decls = Vec::new();
     let mut instance_decl = Vec::new();
 
     let mut type_annos = Vec::new();
@@ -66,7 +66,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
             CoreStatement::KindAnnotation { .. } => kind_annos.push(stmt),
             CoreStatement::TypeDeclaration { .. } => type_decls.push(stmt),
 
-            CoreStatement::TypeClassDeclaration { .. } => typeclass_decls.push(stmt),
+            // CoreStatement::TypeClassDeclaration { .. } => typeclass_decls.push(stmt),
             CoreStatement::InstanceDeclaration { .. } => instance_decl.push(stmt),
 
             CoreStatement::TypeAnnotation { .. } => type_annos.push(stmt),
@@ -598,13 +598,12 @@ fn block_expr_type_of(
                 return expr_type_of(expr, &mut block_env, type_var_subst);
             }
 
-            CoreStatement::TypeClassDeclaration { span, .. } => {
-                return Err(static_check_error!(
-                    Some(*span),
-                    "type class declarations aren't allowed in block statement"
-                ));
-            }
-
+            // CoreStatement::TypeClassDeclaration { span, .. } => {
+            //     return Err(static_check_error!(
+            //         Some(*span),
+            //         "type class declarations aren't allowed in block statement"
+            //     ));
+            // }
             CoreStatement::InstanceDeclaration { span, .. } => {
                 return Err(static_check_error!(
                     Some(*span),

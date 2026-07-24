@@ -39,10 +39,12 @@ Ord Int32 = {
 }
 
 
-CompareResult : Type
-CompareResult = Less | Equal | Greater
+Ordering : Type
+Ordering = Less | Equal | Greater
 
-compare : a -> a -> CompareResult where Ord a
+compare : a -> a -> Ordering
+    where Ord a
+
 compare lhs rhs = match (equal lhs rhs) {
     True  => Equal
     False => match (lessOrEqual lhs rhs) {

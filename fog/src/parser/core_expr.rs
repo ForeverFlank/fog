@@ -22,12 +22,6 @@ pub enum CoreStatement {
         expr: CoreTypeExpr,
         span: Span,
     },
-    TypeClassDeclaration {
-        name: String,
-        params: Vec<String>,
-        expr: CoreConstraintExpr,
-        span: Span,
-    },
     InstanceDeclaration {
         constraint: CoreConstraintApplExpr,
         methods: Vec<(String, CoreExpr)>,
@@ -60,9 +54,9 @@ impl Display for CoreStatement {
             CoreStatement::TypeDeclaration { name, expr, .. } => {
                 write!(f, "{} = {}", name, expr) // TODO
             }
-            CoreStatement::TypeClassDeclaration { .. } => {
-                todo!()
-            }
+            // CoreStatement::TypeClassDeclaration { .. } => {
+            //     todo!()
+            // }
             CoreStatement::InstanceDeclaration { .. } => {
                 todo!()
             }
@@ -286,6 +280,17 @@ pub enum CoreTypeExpr {
         ctors: Vec<CoreDataConstructor>,
         span: Span,
     },
+
+    ConstraintAppl(CoreConstraintApplExpr),
+    ConstraintDefinition {
+        methods: Vec<(String, CoreTypeExpr)>,
+        span: Span,
+    },
+    ConstraintAnd {
+        lhs: Box<CoreConstraintExpr>,
+        rhs: Box<CoreConstraintExpr>,
+        span: Span,
+    },
 }
 
 impl CoreTypeExpr {
@@ -407,6 +412,7 @@ impl Display for CoreDataConstructor {
 }
 
 // --- constraint expressions ---
+// TODO: consider merging this with type expr
 
 #[derive(Clone, Debug)]
 pub enum CoreConstraintExpr {
@@ -434,10 +440,12 @@ pub enum CoreConstraintApplExpr {
     Named {
         callee: String,
         arg: Box<CoreConstraintApplExpr>,
+        span: Span,
     },
     Curried {
         callee: Box<CoreConstraintApplExpr>,
         arg: Box<CoreConstraintApplExpr>,
+        span: Span,
     },
 }
 

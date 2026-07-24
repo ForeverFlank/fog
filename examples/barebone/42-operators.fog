@@ -1,0 +1,19 @@
+Point : Type
+Point = Point (Int32 * Int32)
+
+Multiply : Type -> Type -> Type -> Constraint
+Multiply lhs rhs ret = {
+    multiply : lhs -> rhs -> ret
+}
+
+Scale : Type -> Constraint
+Scale a = Multiply Int32 a
+
+Scale Point = {
+    multiply scalar (Point (x, y)) = Point (multiplyInt32 scalar x, multiplyInt32 scalar y)
+}
+
+
+p1 = Point (2, 3)
+p2 = multiply 10 p1     -- Point (20, 30)
+

@@ -1,7 +1,5 @@
-use crate::error::FogResult;
 use crate::static_check::kind::Kind;
 use crate::static_check::r#type::{Monotype, Type};
-use crate::static_check_error;
 
 #[derive(Clone)]
 pub struct ValueVariable {
