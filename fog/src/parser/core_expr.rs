@@ -1,8 +1,6 @@
 use std::fmt;
 use std::fmt::Display;
 
-use either::Either;
-
 use crate::error::Span;
 use crate::parser::Literal;
 use crate::util::fmt_parenthesized;
@@ -22,6 +20,17 @@ pub enum CoreStatement {
         name: String,
         params: Vec<String>,
         expr: CoreTypeExpr,
+        span: Span,
+    },
+    TypeClassDeclaration {
+        name: String,
+        params: Vec<String>,
+        expr: CoreConstraintExpr,
+        span: Span,
+    },
+    InstanceDeclaration {
+        constraint: CoreConstraintApplExpr,
+        methods: Vec<(String, CoreExpr)>,
         span: Span,
     },
 
@@ -48,15 +57,19 @@ impl Display for CoreStatement {
             CoreStatement::KindAnnotation { name, expr, .. } => {
                 write!(f, "{} : {}", name, expr)
             }
-
             CoreStatement::TypeDeclaration { name, expr, .. } => {
-                write!(f, "{} = {}", name, expr)
+                write!(f, "{} = {}", name, expr) // TODO
+            }
+            CoreStatement::TypeClassDeclaration { .. } => {
+                todo!()
+            }
+            CoreStatement::InstanceDeclaration { .. } => {
+                todo!()
             }
 
             CoreStatement::TypeAnnotation { name, expr, .. } => {
                 write!(f, "{} : {}", name, expr)
             }
-
             CoreStatement::VarDeclaration { pattern, expr, .. } => {
                 write!(f, "{} = {}", pattern, expr)
             }
@@ -266,7 +279,7 @@ impl Display for CoreKindExpr {
 
 // --- type expressions ---
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum CoreTypeExpr {
     Atomic(CoreAtomicTypeExpr),
     Sum {
@@ -298,7 +311,7 @@ impl Display for CoreTypeExpr {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum CoreAtomicTypeExpr {
     Identifier {
         name: String,
@@ -375,7 +388,7 @@ impl Display for CoreAtomicTypeExpr {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CoreDataConstructor {
     pub tag: String,
     pub types: Vec<CoreAtomicTypeExpr>,
@@ -395,6 +408,7 @@ impl Display for CoreDataConstructor {
 
 // --- constraint expressions ---
 
+#[derive(Clone, Debug)]
 pub enum CoreConstraintExpr {
     Identifier {
         name: String,
@@ -405,7 +419,7 @@ pub enum CoreConstraintExpr {
         span: Span,
     },
     Definition {
-        method_annotations: Vec<(String, CoreTypeExpr)>,
+        methods: Vec<(String, CoreTypeExpr)>,
         span: Span,
     },
     And {
@@ -415,6 +429,7 @@ pub enum CoreConstraintExpr {
     },
 }
 
+#[derive(Clone, Debug)]
 pub enum CoreConstraintApplExpr {
     Named {
         callee: String,
@@ -438,7 +453,8 @@ impl Display for CoreConstraintExpr {
             }
 
             CoreConstraintExpr::Definition {
-                method_annotations, ..
+                methods: method_annotations,
+                ..
             } => {
                 writeln!(f, "{{")?;
 

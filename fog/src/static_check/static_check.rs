@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::println;
 
 use crate::core::get_static_check_types;
 use crate::core::get_static_check_variables;
@@ -19,7 +18,6 @@ use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
 use crate::static_check::eval::wrap_type_scheme;
-use crate::static_check::r#type;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -52,24 +50,30 @@ pub fn create_top_env() -> Environment<'static> {
 }
 
 fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &mut Vec<FogError>) {
-    let mut kind_annotations = Vec::new();
-    let mut type_declarations = Vec::new();
+    let mut kind_annos = Vec::new();
+    let mut type_decls = Vec::new();
 
-    let mut type_annotations = Vec::new();
-    let mut var_declarations = Vec::new();
+    let mut typeclass_decls = Vec::new();
+    let mut instance_decl = Vec::new();
 
-    let mut tailing_operand = None;
+    let mut type_annos = Vec::new();
+    let mut var_decls = Vec::new();
+
+    let mut tailing_opnd = None;
 
     for stmt in stmts {
         match stmt {
-            CoreStatement::KindAnnotation { .. } => kind_annotations.push(stmt),
-            CoreStatement::TypeDeclaration { .. } => type_declarations.push(stmt),
+            CoreStatement::KindAnnotation { .. } => kind_annos.push(stmt),
+            CoreStatement::TypeDeclaration { .. } => type_decls.push(stmt),
 
-            CoreStatement::TypeAnnotation { .. } => type_annotations.push(stmt),
-            CoreStatement::VarDeclaration { .. } => var_declarations.push(stmt),
+            CoreStatement::TypeClassDeclaration { .. } => typeclass_decls.push(stmt),
+            CoreStatement::InstanceDeclaration { .. } => instance_decl.push(stmt),
 
-            CoreStatement::Expression { span, .. } => match tailing_operand {
-                None => tailing_operand = Some(stmt),
+            CoreStatement::TypeAnnotation { .. } => type_annos.push(stmt),
+            CoreStatement::VarDeclaration { .. } => var_decls.push(stmt),
+
+            CoreStatement::Expression { span, .. } => match tailing_opnd {
+                None => tailing_opnd = Some(stmt),
                 Some(_) => {
                     all_errors.push(static_check_error!(
                         Some(*span),
@@ -81,7 +85,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     }
 
     // -- type kind annotations
-    for stmt in kind_annotations {
+    for stmt in kind_annos {
         let CoreStatement::KindAnnotation { name, expr, span } = stmt else {
             unreachable!()
         };
@@ -99,7 +103,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     // -- type declarations
     let mut data_ctors = Vec::new();
 
-    for stmt in type_declarations {
+    for stmt in type_decls {
         let CoreStatement::TypeDeclaration {
             name,
             params,
@@ -123,7 +127,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     }
 
     // -- variable type annotations
-    for stmt in type_annotations {
+    for stmt in type_annos {
         let CoreStatement::TypeAnnotation { name, expr, span } = stmt else {
             unreachable!();
         };
@@ -134,7 +138,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     }
 
     // -- variable declarations
-    for stmt in var_declarations {
+    for stmt in var_decls {
         let CoreStatement::VarDeclaration {
             pattern,
             expr,
@@ -150,7 +154,7 @@ fn check_scope(stmts: &Vec<CoreStatement>, env: &mut Environment, all_errors: &m
     }
 
     // -- expressions
-    if let Some(CoreStatement::Expression { expr, .. }) = tailing_operand {
+    if let Some(CoreStatement::Expression { expr, .. }) = tailing_opnd {
         if let Err(error) = expr_type_of(expr, env, &mut HashMap::new()) {
             all_errors.push(error);
         }
@@ -592,6 +596,20 @@ fn block_expr_type_of(
 
             CoreStatement::Expression { expr, .. } => {
                 return expr_type_of(expr, &mut block_env, type_var_subst);
+            }
+
+            CoreStatement::TypeClassDeclaration { span, .. } => {
+                return Err(static_check_error!(
+                    Some(*span),
+                    "type class declarations aren't allowed in block statement"
+                ));
+            }
+
+            CoreStatement::InstanceDeclaration { span, .. } => {
+                return Err(static_check_error!(
+                    Some(*span),
+                    "instance declarations aren't allowed in block statement"
+                ));
             }
         }
     }
