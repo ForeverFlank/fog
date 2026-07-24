@@ -26,11 +26,3 @@ pub struct TypeVariable {
     pub r#type: Option<Monotype>,
     pub kind: Kind,
 }
-
-impl TypeVariable {
-    pub fn get_type(&self) -> FogResult<Monotype> {
-        self.r#type
-            .clone()
-            .ok_or_else(|| static_check_error!(None, "unassigned type `{}`", self.name))
-    }
-}

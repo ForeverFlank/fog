@@ -5,7 +5,6 @@ use std::vec;
 
 use crate::parser::core_expr::CoreAtomicTypeExpr;
 use crate::static_check::kind::Kind;
-use crate::static_check::type_class::Constraint;
 use crate::util::fmt_parenthesized;
 use crate::util::format_joined;
 

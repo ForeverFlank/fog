@@ -1,6 +1,4 @@
 use std::collections::BTreeSet;
-use std::env::var;
-use std::println;
 use std::vec;
 
 use crate::error::FogResult;

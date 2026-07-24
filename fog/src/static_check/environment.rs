@@ -1,12 +1,9 @@
 use std::collections::HashMap;
-use std::println;
 
 use crate::error::FogResult;
 use crate::error::Span;
 use crate::static_check::kind::Kind;
 use crate::static_check::static_check::can_unify;
-use crate::static_check::static_check::unify_type;
-use crate::static_check::r#type;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
 use crate::static_check::r#type::kind_of;
@@ -64,22 +61,6 @@ impl<'a> Environment<'a> {
             "type `{}` not found in the current scope",
             name
         ))
-    }
-
-    pub fn get_type(&self, name: &str, span: &Span) -> FogResult<Monotype> {
-        self.get_type_var(name, span)?.get_type()
-    }
-
-    pub fn contains_type(&self, name: &str) -> bool {
-        if self.types.contains_key(name) {
-            return true;
-        }
-
-        if let Some(parent) = &self.parent {
-            return parent.contains_type(name);
-        }
-
-        false
     }
 
     // --- setters ---

@@ -264,9 +264,7 @@ fn collect_stmt_to_anf(
             parse_expr_to_anf(expr, scope, collected_anfs);
         }
 
-        CoreStatement::KindAnnotation { .. }
-        | CoreStatement::TypeDeclaration { .. }
-        | CoreStatement::TypeAnnotation { .. } => {}
+        _ => {}
     };
 }
 
