@@ -1,12 +1,12 @@
 use crate::error::FogError;
 use crate::parser::core_expr::CoreStatement;
 
-pub mod constraint;
 pub mod environment;
 pub mod eval;
 pub mod kind;
 pub mod static_check;
 pub mod r#type;
+pub mod type_class;
 pub mod variable;
 
 pub fn static_check(stmts: &Vec<CoreStatement>) -> Vec<FogError> {

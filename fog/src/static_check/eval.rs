@@ -124,6 +124,8 @@ fn find_type_variables(r#type: &Monotype, vars: &mut BTreeSet<String>, params: &
         Monotype::TypeConstructor(_, r#type) => {
             find_type_variables(r#type, vars, params);
         }
+
+        Monotype::Constraint { .. } => {}
     }
 }
 
@@ -180,6 +182,11 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
 
             Ok(res_type)
         }
+
+        CoreAtomicTypeExpr::Constraint {
+            type_annotations,
+            span,
+        } => {}
     }
 }
 

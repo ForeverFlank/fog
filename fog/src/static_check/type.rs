@@ -24,7 +24,10 @@ pub enum Monotype {
     Named(String, Vec<Monotype>),
 
     Variable(String),
+
     TypeConstructor(String, Box<Monotype>),
+
+    Constraint(String),
 }
 
 impl Monotype {
@@ -166,12 +169,18 @@ impl Display for Monotype {
                 Ok(())
             }
 
-            Monotype::TypeConstructor(param, body) => write!(f, "{} => {}", param, body),
+            Monotype::TypeConstructor(param, body) => {
+                write!(f, "{} => {}", param, body)
+            }
+
+            Monotype::Constraint(name) => {
+                write!(f, "{}", name)
+            }
         }
     }
 }
 
-// --- type ---
+// --- scheme ---
 
 #[derive(Clone, Debug, Eq)]
 pub struct Type {
@@ -286,6 +295,9 @@ pub fn kind_of(monotype: &Monotype) -> Kind {
         Monotype::TypeConstructor(_, t) => {
             Kind::Function(Kind::Type.into(), kind_of(t.as_ref()).into())
         }
+
+        Monotype::Constraint => Kind::Constraint,
+
         _ => Kind::Type,
     }
 }

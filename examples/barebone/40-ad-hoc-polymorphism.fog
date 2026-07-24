@@ -12,24 +12,24 @@ not : Bool -> Bool
 not True  = False
 not False = True
 
--- defining the Equatable type class
+-- defining the Eq type class
 
-Equatable : Type -> Constraint
-Equatable a = {
+Eq : Type -> Constraint
+Eq a = {
     equal    : a -> a -> Bool
     notEqual : a -> a -> Bool
 }
 
--- declating a type
+-- declaring a type
 
 Option : Type -> Type
 Option a = Some a | None
 
--- implementing the Equatable type class
+-- implementing the Eq type class
 -- to that type
 
-Equatable Point = {
-    -- value's type must also derive from Equatable!
+Eq Point = {
+    -- value's type must also derive from Eq!
     equal (Some lhs) (Some rhs) = equal lhs rhs
     equal None       None       = True
     equal _          _          = False
