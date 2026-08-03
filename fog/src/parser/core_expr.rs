@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Display;
+use std::fmt::write;
 
 use crate::error::Span;
 use crate::parser::Literal;
@@ -286,18 +287,17 @@ pub enum CoreTypeExpr {
         methods: Vec<(String, CoreTypeExpr)>,
         span: Span,
     },
-    ConstraintAnd {
-        lhs: Box<CoreConstraintExpr>,
-        rhs: Box<CoreConstraintExpr>,
-        span: Span,
-    },
 }
 
 impl CoreTypeExpr {
     pub fn span(&self) -> Span {
         match self {
             CoreTypeExpr::Atomic(expr) => expr.span(),
-            CoreTypeExpr::Sum { span, .. } => *span,
+            CoreTypeExpr::ConstraintAppl(expr) => expr.span(),
+
+            CoreTypeExpr::Sum { span, .. } | CoreTypeExpr::ConstraintDefinition { span, .. } => {
+                *span
+            }
         }
     }
 }
@@ -306,11 +306,25 @@ impl Display for CoreTypeExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CoreTypeExpr::Atomic(expr) => {
-                write!(f, "{expr}")
+                write!(f, "{}", expr)
             }
 
             CoreTypeExpr::Sum { ctors, .. } => {
                 write!(f, "{}", format_joined(ctors, " + "))
+            }
+
+            CoreTypeExpr::ConstraintAppl(core_constraint_appl_expr) => {
+                write!(f, "{}", core_constraint_appl_expr)
+            }
+
+            CoreTypeExpr::ConstraintDefinition { methods, .. } => {
+                writeln!(f, "{{")?;
+
+                for (name, r#type) in methods {
+                    writeln!(f, "{} : {}", name, r#type)?;
+                }
+
+                write!(f, "}}")
             }
         }
     }
@@ -435,20 +449,6 @@ pub enum CoreConstraintExpr {
     },
 }
 
-#[derive(Clone, Debug)]
-pub enum CoreConstraintApplExpr {
-    Named {
-        callee: String,
-        arg: Box<CoreConstraintApplExpr>,
-        span: Span,
-    },
-    Curried {
-        callee: Box<CoreConstraintApplExpr>,
-        arg: Box<CoreConstraintApplExpr>,
-        span: Span,
-    },
-}
-
 impl Display for CoreConstraintExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -480,13 +480,36 @@ impl Display for CoreConstraintExpr {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum CoreConstraintApplExpr {
+    Named {
+        callee: String,
+        arg: Box<CoreConstraintApplExpr>,
+        span: Span,
+    },
+    Curried {
+        callee: Box<CoreConstraintApplExpr>,
+        arg: Box<CoreConstraintApplExpr>,
+        span: Span,
+    },
+}
+
+impl CoreConstraintApplExpr {
+    fn span(&self) -> Span {
+        match self {
+            CoreConstraintApplExpr::Named { span, .. }
+            | CoreConstraintApplExpr::Curried { span, .. } => *span,
+        }
+    }
+}
+
 impl Display for CoreConstraintApplExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreConstraintApplExpr::Named { callee, arg } => {
+            CoreConstraintApplExpr::Named { callee, arg, .. } => {
                 write!(f, "{} {}", callee, arg)
             }
-            CoreConstraintApplExpr::Curried { callee, arg } => {
+            CoreConstraintApplExpr::Curried { callee, arg, .. } => {
                 fmt_parenthesized(f, callee)?;
                 write!(f, " {}", arg)
             }

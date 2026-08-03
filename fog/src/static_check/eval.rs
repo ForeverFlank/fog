@@ -78,6 +78,9 @@ pub fn eval_type_expr(
 
             Ok((r#type, Type::mono(named_monotype), ctors))
         }
+
+        CoreTypeExpr::ConstraintAppl(core_constraint_appl_expr) => todo!(),
+        CoreTypeExpr::ConstraintDefinition { methods, span } => todo!(),
     }
 }
 

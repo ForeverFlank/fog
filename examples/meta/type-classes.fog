@@ -1,0 +1,48 @@
+Add : Type -> Type -> Type -> Constraint
+Add lhs rhs res = {
+    + : lhs -> rhs -> res
+}
+
+ClosedAdd : Type -> Constraint
+ClosedAdd a = Add a a a
+
+
+Multiply : Type -> Type -> Type -> Constraint
+Multiply lhs rhs res = {
+    * : lhs -> rhs -> res
+}
+
+Scale : Type -> Constraint
+Scale a = Multiply Number a a 
+
+
+
+
+PartialEq : Type -> Constraint
+PartialEq a = {
+    == : a -> a -> Bool
+    != : a -> a -> Bool
+}
+
+Eq : Type -> Constraint
+Eq a where PartialEq a = PartialEq a
+
+
+PartialOrd : Type -> Constraint
+PartialOrd a = {
+    <  : a -> a -> Bool
+    >  : a -> a -> Bool
+    <= : a -> a -> Bool
+    >= : a -> a -> Bool
+}
+
+Ord : Type -> Constraint
+Ord a where PartialOrd a = PartialOrd a
+
+
+Monad : Type -> Constraint
+Monad m = {
+    return : a -> m a
+    bind   : m a -> (a -> m b) -> m b
+    then   : m a -> m b -> m b
+}
