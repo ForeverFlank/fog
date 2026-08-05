@@ -1,3 +1,10 @@
--- main = bind readLine (str : String => (printLine (concatString "Hello, " str)))
+-- printPrompt : IO Unit
+printPrompt = printLine "Enter your name: "
 
-main = bind readLine printLine
+displayName = str : String => printLine (concatString "Hello, " str)
+
+main = then printPrompt (bind readLine displayName)
+
+-- main = then (printLine "Enter your name: ") (bind readLine printLine)
+
+-- main = bind readLine printLine

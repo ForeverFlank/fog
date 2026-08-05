@@ -212,11 +212,11 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
                         })))
                     }
 
-                    _ => Err(runtime_error!(None, "argument is not an IO")),
+                    _ => Err(runtime_error!(None, "argument `{}` is not an IO", io_b)),
                 },
             ))),
 
-            _ => Err(runtime_error!(None, "argument is not an IO")),
+            _ => Err(runtime_error!(None, "argument `{}` is not an IO", io_a)),
         })),
     };
 
