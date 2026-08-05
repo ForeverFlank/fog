@@ -12,9 +12,12 @@ Multiply lhs rhs res = {
     * : lhs -> rhs -> res
 }
 
+ClosedMultiply : Type -> Constraint
+ClosedMultiply a = Multiply a a a
+
+
 Scale : Type -> Constraint
 Scale a = Multiply Number a a 
-
 
 
 
@@ -46,3 +49,19 @@ Monad m = {
     bind   : m a -> (a -> m b) -> m b
     then   : m a -> m b -> m b
 }
+
+
+
+Collection : Type -> Constraint
+Collection a = ...
+
+Enumerable : Type -> Constraint
+Enumerable a = ...
+
+Set : Type -> Constraint
+Set a = ...
+
+
+
+
+

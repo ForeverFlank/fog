@@ -3,6 +3,7 @@ use std::vec;
 
 use crate::error::FogResult;
 use crate::parser::core_expr::CoreAtomicTypeExpr;
+use crate::parser::core_expr::CoreConstraintApplExpr;
 use crate::parser::core_expr::CoreDataConstructor;
 use crate::parser::core_expr::CoreKindExpr;
 use crate::parser::core_expr::CoreTypeExpr;
@@ -11,6 +12,7 @@ use crate::static_check::kind::Kind;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
+use crate::static_check::type_class::Constraint;
 use crate::static_check_error;
 
 // --- kind ---
@@ -30,6 +32,15 @@ pub fn eval_kind_expr(expr: &CoreKindExpr) -> FogResult<Kind> {
             eval_kind_expr(&return_kind)?.into(),
         )),
     }
+}
+
+// --- type ---
+
+pub struct EvalTypeExprResult {
+    // type 1
+    // type 2
+    // ctors
+    // kind
 }
 
 pub fn eval_type_expr(
@@ -79,8 +90,8 @@ pub fn eval_type_expr(
             Ok((r#type, Type::mono(named_monotype), ctors))
         }
 
-        CoreTypeExpr::ConstraintAppl(core_constraint_appl_expr) => todo!(),
-        CoreTypeExpr::ConstraintDefinition { methods, span } => todo!(),
+        CoreTypeExpr::ConstraintAppl(expr) => todo!(),
+        CoreTypeExpr::ConstraintDefinition { methods, .. } => todo!(),
     }
 }
 
@@ -184,6 +195,13 @@ pub fn eval_atomic_type_expr(expr: &CoreAtomicTypeExpr, env: &Environment) -> Fo
     }
 }
 
+pub fn eval_constraint_appl_expr(expr: &CoreConstraintApplExpr) -> FogResult<Constraint> {
+    match expr {
+        CoreConstraintApplExpr::Named { name, span } => Ok(todo!()),
+        CoreConstraintApplExpr::Curried { callee, arg, span } => todo!(),
+    }
+}
+
 // --- tests ---
 
 #[cfg(test)]
@@ -251,7 +269,7 @@ mod tests {
         // --------------------
 
         // Option a = Some a | None
-        let _expr_1 = CoreTypeExpr::Sum {
+        let expr_1 = CoreTypeExpr::Sum {
             ctors: vec![
                 CoreDataConstructor {
                     tag: "Some".to_string(),
@@ -267,34 +285,9 @@ mod tests {
             ],
             span: SPAN,
         };
-    }
-
-    #[test]
-    fn test_eval_type_expr_sum_uses_named_type() {
-        let mut env = Environment::new(None);
-
-        env.types.insert(
-            "Int32".to_string(),
-            TypeVariable {
-                name: "Int32".to_string(),
-                r#type: Some(Monotype::Int32),
-                kind: Kind::Type,
-            },
-        );
-
-        let expr = CoreTypeExpr::Sum {
-            ctors: vec![CoreDataConstructor {
-                tag: "Some".to_string(),
-                types: vec![CoreAtomicTypeExpr::Identifier {
-                    name: "a".to_string(),
-                    span: SPAN,
-                }],
-            }],
-            span: SPAN,
-        };
 
         let (type_constructor, named_type, _) =
-            eval_type_expr("Option", &vec!["a".to_string()], &expr, &env).unwrap();
+            eval_type_expr("Option", &vec!["a".to_string()], &expr_1, &env).unwrap();
 
         assert!(matches!(
             type_constructor.monotype,
@@ -332,6 +325,7 @@ mod tests {
 
         // --------------------
 
+        // Int32
         let expr_1 = CoreAtomicTypeExpr::Identifier {
             name: "Int32".to_string(),
             span: SPAN,
@@ -341,6 +335,7 @@ mod tests {
             Type::mono(Monotype::Int32)
         );
 
+        // Int32 * Unit
         let expr_2 = CoreAtomicTypeExpr::Product {
             types: vec![
                 CoreAtomicTypeExpr::Identifier {
@@ -363,6 +358,7 @@ mod tests {
             _ => panic!(),
         }
 
+        // Unit -> Int32
         let expr_3 = CoreAtomicTypeExpr::Function {
             param_type: CoreAtomicTypeExpr::Identifier {
                 name: "Unit".to_string(),

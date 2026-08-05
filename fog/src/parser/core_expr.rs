@@ -483,8 +483,8 @@ impl Display for CoreConstraintExpr {
 #[derive(Clone, Debug)]
 pub enum CoreConstraintApplExpr {
     Named {
-        callee: String,
-        arg: Box<CoreConstraintApplExpr>,
+        name: String,
+        // arg: Box<CoreConstraintApplExpr>,
         span: Span,
     },
     Curried {
@@ -506,8 +506,8 @@ impl CoreConstraintApplExpr {
 impl Display for CoreConstraintApplExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CoreConstraintApplExpr::Named { callee, arg, .. } => {
-                write!(f, "{} {}", callee, arg)
+            CoreConstraintApplExpr::Named { name, .. } => {
+                write!(f, "{}", name)
             }
             CoreConstraintApplExpr::Curried { callee, arg, .. } => {
                 fmt_parenthesized(f, callee)?;

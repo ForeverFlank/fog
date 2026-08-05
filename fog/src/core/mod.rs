@@ -236,6 +236,17 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         })),
     };
 
+    let var_read_line = BuiltInVariable {
+        name: "readLine".to_string(),
+        // IO String
+        r#type: Type::mono(Monotype::IO(Monotype::String.into())),
+        value: Value::IO(Rc::new(|| {
+            let mut line = String::new();
+            std::io::stdin().read_line(&mut line).unwrap();
+            Ok(Value::String(line))
+        })),
+    };
+
     vec![
         var_add_int32,
         var_subtract_int32,
@@ -248,6 +259,7 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         var_bind,
         var_then,
         var_print_line,
+        var_read_line,
     ]
 }
 

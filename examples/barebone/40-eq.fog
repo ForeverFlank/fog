@@ -1,6 +1,8 @@
 -- ad hoc polymorphism
 -- commonly known as interfaces
 
+-- declaring Bool
+
 Bool : Type
 Bool = True | False
 
@@ -20,19 +22,12 @@ Eq a = {
     notEqual : a -> a -> Bool
 }
 
--- declaring a type
+-- implementing Eq to Bool
 
-Option : Type -> Type
-Option a = Some a | None
-
--- implementing the Eq type class
--- to that type
-
-Eq Point = {
-    -- value's type must also derive from Eq!
-    equal (Some lhs) (Some rhs) = equal lhs rhs
-    equal None       None       = True
-    equal _          _          = False
+Eq Bool = {
+    equal True  True  = True
+    equal False False = True
+    equal _     _     = False
 
     notEqual lhs rhs = not (equal lhs rhs)
 }

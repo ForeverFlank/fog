@@ -1,0 +1,48 @@
+Bool : Type
+Bool = True | False
+
+and : Bool -> Bool -> Bool
+and True True = True
+and _    _    = False
+
+or : Bool -> Bool -> Bool
+or False False = False
+or _     _     = True
+
+not : Bool -> Bool
+not True  = False
+not False = True
+
+
+-- PartialEq type class
+-- this assumes
+--   - if a == b, then b == a               (symmetric)
+--   - if a == b and b == c, then a == c    (transitive)
+
+PartialEq : Type -> Constraint
+PartialEq a = {
+    equal    : a -> a -> Bool
+    notEqual : a -> a -> Bool
+}
+
+-- Eq type class
+-- this assumes
+--   - a == a (reflexive)
+--   - what PartialEq assumes
+
+Eq : Type -> Constraint
+Eq a where PartialEq a = PartialEq a
+
+
+-- implementing the type classes to Eq
+
+PartialEq Bool = {
+    equal True  True  = True
+    equal False False = True
+    equal _     _     = False
+
+    notEqual lhs rhs = not (equal lhs rhs)
+}
+
+Eq Bool = PartialEq Bool    -- ??
+

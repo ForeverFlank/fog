@@ -1,0 +1,3 @@
+-- main = bind readLine (str : String => (printLine (concatString "Hello, " str)))
+
+main = bind readLine printLine

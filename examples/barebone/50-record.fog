@@ -1,0 +1,14 @@
+Person : Type
+Person = {
+    name : String
+    age  : Int32
+}
+
+alice : Person
+alice = { name = "Alice", age = 20 }
+
+bob : Person
+bob = {
+    name = "Bob"
+    age = 20
+}
