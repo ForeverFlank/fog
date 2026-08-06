@@ -222,11 +222,12 @@ impl ParsedValueExpr {
             ParsedValueExpr::Identifier { .. }
             | ParsedValueExpr::Literal { .. }
             | ParsedValueExpr::Tuple { .. }
-            | ParsedValueExpr::Collection { .. } => true,
+            | ParsedValueExpr::Collection { .. }
+            | ParsedValueExpr::Lambda { .. } => true,
 
             ParsedValueExpr::Op { kind, .. } => matches!(kind, OpKind::Minus),
 
-            _ => false,
+            ParsedValueExpr::Block { .. } | ParsedValueExpr::Match { .. } => false,
         }
     }
 

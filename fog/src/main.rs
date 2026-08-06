@@ -11,7 +11,6 @@ mod core;
 mod error;
 mod interpreter;
 mod lexer;
-mod optimizer;
 mod parser;
 mod static_check;
 mod util;

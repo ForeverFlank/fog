@@ -257,6 +257,24 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         })),
     };
 
+    let var_print = BuiltInVariable {
+        name: "print".to_string(),
+        // String -> IO Unit
+        r#type: Type::mono(Monotype::function(
+            Monotype::String,
+            Monotype::IO(Monotype::Product(vec![]).into()),
+        )),
+        value: Value::NativeFunction(Rc::new(|value: Value| match value {
+            Value::String(str) => Ok(Value::IO(Rc::new(move || {
+                print!("{}", str);
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+
+                Ok(Value::Tuple(vec![]))
+            }))),
+            _ => Err(runtime_error!(None, "`print`: argument is not a String")),
+        })),
+    };
+
     let var_print_line = BuiltInVariable {
         name: "printLine".to_string(),
         // String -> IO Unit
@@ -266,7 +284,8 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         )),
         value: Value::NativeFunction(Rc::new(|value: Value| match value {
             Value::String(str) => Ok(Value::IO(Rc::new(move || {
-                println!("{str}");
+                println!("{}", str);
+
                 Ok(Value::Tuple(vec![]))
             }))),
             _ => Err(runtime_error!(
@@ -282,7 +301,16 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         r#type: Type::mono(Monotype::IO(Monotype::String.into())),
         value: Value::IO(Rc::new(|| {
             let mut line = String::new();
+
             std::io::stdin().read_line(&mut line).unwrap();
+
+            if let Some('\n') = line.chars().next_back() {
+                line.pop();
+            }
+            if let Some('\r') = line.chars().next_back() {
+                line.pop();
+            }
+
             Ok(Value::String(line))
         })),
     };
@@ -298,6 +326,7 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         var_fmap,
         var_bind,
         var_then,
+        var_print,
         var_print_line,
         var_read_line,
     ]

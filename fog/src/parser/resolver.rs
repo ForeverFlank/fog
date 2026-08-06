@@ -322,6 +322,7 @@ impl Resolver {
             ParsedValueExpr::Identifier { name, span } => {
                 Ok(ResolvedExpr::Identifier { name, span })
             }
+
             ParsedValueExpr::Op { .. } => unreachable!(),
 
             ParsedValueExpr::Literal { literal, span } => {
@@ -337,12 +338,8 @@ impl Resolver {
 
             ParsedValueExpr::Tuple { items, span } => self.resolve_tuple(items, span),
 
-            ParsedValueExpr::Collection {
-                items: args,
-                span: _,
-            } => {
-                let mut index = 0;
-                self.resolve_collection(&args, i32::MIN, &mut index)
+            ParsedValueExpr::Collection { items, .. } => {
+                self.resolve_collection(&items, i32::MIN, &mut 0)
             }
 
             ParsedValueExpr::Match {

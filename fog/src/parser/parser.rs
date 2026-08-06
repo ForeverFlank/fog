@@ -225,24 +225,24 @@ impl Parser<'_> {
     }
 
     // --- expressions ---
-    // -- normal expressions
+    // -- value expressions
 
     fn parse_expr(&mut self) -> FogResult<ParsedValueExpr> {
-        let mut args = Vec::new();
+        let mut items = Vec::new();
         let start_span = self.peek().span;
 
         loop {
             let atom = self.parse_atomic()?;
-            args.push(atom);
+            items.push(atom);
 
             let token = self.peek();
 
             if let Some(kind) = OpKind::from_token(token) {
-                let op_span = token.span;
-                args.push(ParsedValueExpr::Op {
+                items.push(ParsedValueExpr::Op {
                     kind,
-                    span: op_span,
+                    span: token.span,
                 });
+
                 self.next();
             } else if token.kind.is_primary_starter() {
                 continue;
@@ -251,11 +251,11 @@ impl Parser<'_> {
             }
         }
 
-        if args.len() == 1 {
-            Ok(args[0].clone())
+        if items.len() == 1 {
+            Ok(items[0].clone())
         } else {
-            let span = Span::merge(start_span, args.last().unwrap().span());
-            Ok(ParsedValueExpr::Collection { items: args, span })
+            let span = Span::merge(start_span, items.last().unwrap().span());
+            Ok(ParsedValueExpr::Collection { items, span })
         }
     }
 

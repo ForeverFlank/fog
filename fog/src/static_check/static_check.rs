@@ -18,7 +18,6 @@ use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
 use crate::static_check::eval::wrap_type_scheme;
-use crate::static_check::r#type;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -227,7 +226,7 @@ fn check_type_annotation(
     env: &mut Environment,
 ) -> FogResult<()> {
     let r#type = eval_atomic_type_expr(expr, env)?;
-    println!("annotating {name} : {expr}  -- {type}");
+
     env.annotate_type(name, r#type, span)
 }
 
@@ -433,6 +432,9 @@ pub fn expr_type_of(
             }
         }
     }
+    // if let Ok(res) = res.clone() {
+    //     println!("type of {expr} is {res}");
+    // }
 }
 
 fn bind_match_arm_pattern(
@@ -631,10 +633,10 @@ pub fn unify_type(
     type_var_subst: &mut HashMap<String, Monotype>,
     span: &Span,
 ) -> bool {
-    println!("unifying {} and {}", to, from);
-    for (k, v) in type_var_subst.iter() {
-        println!("{k} --> {v}");
-    }
+    // println!("unifying {} and {}", to, from);
+    // for (k, v) in type_var_subst.iter() {
+    //     println!("{k} --> {v}");
+    // }
 
     // if let Monotype::Variable(name_1) = to
     //     && let Monotype::Variable(name_2) = from

@@ -580,18 +580,20 @@ impl Display for CoreExpr {
         match self {
             CoreExpr::Block { statements, .. } => {
                 write!(f, "{{\n")?;
+
                 for stmt in statements {
                     write!(f, "{}\n", indent(&stmt.to_string()))?;
                 }
+
                 write!(f, "}}")
             }
 
             CoreExpr::Identifier { name, .. } => {
-                write!(f, "{name}")
+                write!(f, "{}", name)
             }
 
             CoreExpr::Literal { literal, .. } => {
-                write!(f, "{literal}")
+                write!(f, "{}", literal)
             }
 
             CoreExpr::Tuple { items, .. } => {
@@ -601,7 +603,7 @@ impl Display for CoreExpr {
             CoreExpr::Lambda {
                 param_name, body, ..
             } => {
-                write!(f, "{param_name} => {body}")
+                write!(f, "{} => {}", param_name, body)
             }
 
             CoreExpr::FunctionAppl { callee, arg, .. } => {
