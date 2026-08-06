@@ -11,6 +11,7 @@ concat (Cons x xs) rhs = Cons x (concat xs rhs)
 
 -- map each element of the list by a function
 -- time complexity: O(n)
+-- FIXME static check fail!
 map : (a -> b) -> List a -> List b
 map fn Nil         = Nil
 map fn (Cons x xs) = Cons (fn x) (map fn xs)

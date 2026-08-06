@@ -226,7 +226,6 @@ fn check_type_annotation(
     env: &mut Environment,
 ) -> FogResult<()> {
     let r#type = eval_atomic_type_expr(expr, env)?;
-
     env.annotate_type(name, r#type, span)
 }
 

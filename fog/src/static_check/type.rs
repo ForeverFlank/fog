@@ -122,7 +122,7 @@ impl Monotype {
 
             Monotype::IO(inner) => Monotype::IO(inner.substitute_var(name, r#type).into()),
 
-            _ => r#type.clone(),
+            _ => self.clone(),
         }
     }
 }
