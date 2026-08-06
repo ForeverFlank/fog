@@ -226,6 +226,7 @@ fn check_type_annotation(
     env: &mut Environment,
 ) -> FogResult<()> {
     let r#type = eval_atomic_type_expr(expr, env)?;
+    println!("annotating {name} : {expr}  -- {type}");
     env.annotate_type(name, r#type, span)
 }
 
@@ -261,7 +262,7 @@ fn bind_tuple_decl_pattern(
     let Monotype::Product(ref types) = expr_type.monotype else {
         return Err(static_check_error!(
             Some(*span),
-            "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
+            "type mismatch when declaring variable `{expr}` with `{pattern}`\n\
              expected a tuple type, found `{expr_type}`"
         ));
     };
@@ -269,7 +270,7 @@ fn bind_tuple_decl_pattern(
     if items.len() != types.len() {
         return Err(static_check_error!(
             Some(*span),
-            "type mismatch when assigning variable `{expr}` with `{pattern}`\n\
+            "type mismatch when declaring variable `{expr}` with `{pattern}`\n\
              expected a tuple of {} element(s), found `{expr_type}`",
             items.len()
         ));
@@ -629,12 +630,17 @@ pub fn unify_type(
     type_var_subst: &mut HashMap<String, Monotype>,
     span: &Span,
 ) -> bool {
-    // println!("unifying {} and {}", to, from);
+    println!("unifying {} and {}", to, from);
+    for (k, v) in type_var_subst.iter() {
+        println!("{k} --> {v}");
+    }
 
     if let Monotype::Variable(name_1) = to
         && let Monotype::Variable(name_2) = from
         && name_1 == name_2
     {
+        // FIXME: cause of infinite recursion!
+        // type_var_subst.insert(name_1.to_string(), from.clone());
         return true;
     }
 
@@ -642,9 +648,13 @@ pub fn unify_type(
     let from = substitute_types(from, type_var_subst);
 
     match (&to, &from) {
-        (Monotype::Variable(name), _) => {
-            type_var_subst.insert(name.clone(), from);
-            true
+        (Monotype::Variable(name), other) | (other, Monotype::Variable(name)) => {
+            if type_var_subst.contains_key(name) {
+                false
+            } else {
+                type_var_subst.insert(name.clone(), other.clone());
+                true
+            }
         }
 
         (Monotype::Function(p1, r1), Monotype::Function(p2, r2)) => {

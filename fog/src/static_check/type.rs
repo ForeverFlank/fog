@@ -95,7 +95,7 @@ fn eq_monotype(type_1: &Monotype, type_2: &Monotype, counter: &mut i32) -> bool 
 impl Monotype {
     pub fn substitute_var(&self, name: &str, r#type: &Monotype) -> Monotype {
         match self {
-            Monotype::Variable(name_2) if name_2 == name => r#type.clone(),
+            Monotype::Variable(var_name) if var_name == name => r#type.clone(),
 
             Monotype::Function(param_type, return_type) => Monotype::function(
                 param_type.substitute_var(name, r#type),
@@ -120,7 +120,9 @@ impl Monotype {
                 Monotype::TypeConstructor(param.clone(), body.substitute_var(name, r#type).into())
             }
 
-            _ => self.clone(),
+            Monotype::IO(inner) => Monotype::IO(inner.substitute_var(name, r#type).into()),
+
+            _ => r#type.clone(),
         }
     }
 }

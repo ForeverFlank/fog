@@ -26,9 +26,15 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         value: Value::NativeFunction(Rc::new(|a: Value| match a {
             Value::Int32(lhs) => Ok(Value::NativeFunction(Rc::new(move |b: Value| match b {
                 Value::Int32(rhs) => Ok(Value::Int32(lhs + rhs)),
-                _ => Err(runtime_error!(None, "right operand is not an Int32")),
+                _ => Err(runtime_error!(
+                    None,
+                    "`addInt32`: right operand is not an Int32"
+                )),
             }))),
-            _ => Err(runtime_error!(None, "left operand is not an Int32")),
+            _ => Err(runtime_error!(
+                None,
+                "`addInt32`: left operand is not an Int32"
+            )),
         })),
     };
 
@@ -41,9 +47,15 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         value: Value::NativeFunction(Rc::new(|a: Value| match a {
             Value::Int32(lhs) => Ok(Value::NativeFunction(Rc::new(move |b: Value| match b {
                 Value::Int32(rhs) => Ok(Value::Int32(lhs - rhs)),
-                _ => Err(runtime_error!(None, "right operand is not an Int32")),
+                _ => Err(runtime_error!(
+                    None,
+                    "`subtractInt32`: right operand is not an Int32"
+                )),
             }))),
-            _ => Err(runtime_error!(None, "left operand is not an Int32")),
+            _ => Err(runtime_error!(
+                None,
+                "`subtractInt32`: left operand is not an Int32"
+            )),
         })),
     };
 
@@ -53,7 +65,10 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         r#type: Type::mono(Monotype::function(Monotype::Int32, Monotype::String)),
         value: Value::NativeFunction(Rc::new(|val: Value| match val {
             Value::Int32(val) => Ok(Value::String(format!("{val}"))),
-            _ => Err(runtime_error!(None, "argument is not a String")),
+            _ => Err(runtime_error!(
+                None,
+                "`toString`: argument cannot be converted to String"
+            )),
         })),
     };
 
@@ -67,9 +82,15 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         value: Value::NativeFunction(Rc::new(|a: Value| match a {
             Value::String(lhs) => Ok(Value::NativeFunction(Rc::new(move |b: Value| match b {
                 Value::String(rhs) => Ok(Value::String(lhs.clone() + &rhs)),
-                _ => Err(runtime_error!(None, "right operand is not a String")),
+                _ => Err(runtime_error!(
+                    None,
+                    "`concatString`: right operand is not a String"
+                )),
             }))),
-            _ => Err(runtime_error!(None, "left operand is not a String")),
+            _ => Err(runtime_error!(
+                None,
+                "`concatString`: left operand is not a String"
+            )),
         })),
     };
 
@@ -103,10 +124,13 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
         value: Value::NativeFunction(Rc::new(|value: Value| match value {
             Value::IO(io) => Ok(Value::IO(Rc::new(move || match io()? {
                 Value::IO(inner) => inner(),
-                _ => Err(runtime_error!(None, "argument did not produce an IO")),
+                _ => Err(runtime_error!(
+                    None,
+                    "`join`: argument did not produce an IO"
+                )),
             }))),
 
-            _ => Err(runtime_error!(None, "argument is not an IO")),
+            _ => Err(runtime_error!(None, "`join`: argument is not an IO")),
         })),
     };
 
@@ -137,11 +161,11 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
                         }
                     }))),
 
-                    _ => Err(runtime_error!(None, "argument is not an IO")),
+                    _ => Err(runtime_error!(None, "`fmap`: argument is not an IO")),
                 }),
             )),
 
-            _ => Err(runtime_error!(None, "argument is not a function")),
+            _ => Err(runtime_error!(None, "`fmap`: argument is not a function")),
         })),
     };
 
@@ -174,16 +198,21 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
 
                             match next {
                                 Value::IO(next_io) => next_io(),
-                                _ => Err(runtime_error!(None, "function must return an IO")),
+                                _ => {
+                                    Err(runtime_error!(None, "`bind`: function must return an IO"))
+                                }
                             }
                         }
                     }))),
 
-                    _ => Err(runtime_error!(None, "argument is not a function")),
+                    _ => Err(runtime_error!(
+                        None,
+                        "`bind`: second argument is not a function"
+                    )),
                 },
             ))),
 
-            _ => Err(runtime_error!(None, "argument is not an IO")),
+            _ => Err(runtime_error!(None, "`bind`: first argument is not an IO")),
         })),
     };
 
@@ -212,11 +241,19 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
                         })))
                     }
 
-                    _ => Err(runtime_error!(None, "argument `{}` is not an IO", io_b)),
+                    _ => Err(runtime_error!(
+                        None,
+                        "`then`: second argument `{}` is not an IO",
+                        io_b
+                    )),
                 },
             ))),
 
-            _ => Err(runtime_error!(None, "argument `{}` is not an IO", io_a)),
+            _ => Err(runtime_error!(
+                None,
+                "`then`: first argument `{}` is not an IO",
+                io_a
+            )),
         })),
     };
 
@@ -232,7 +269,10 @@ fn get_builtin_variables() -> Vec<BuiltInVariable> {
                 println!("{str}");
                 Ok(Value::Tuple(vec![]))
             }))),
-            _ => Err(runtime_error!(None, "argument is not a String")),
+            _ => Err(runtime_error!(
+                None,
+                "`printLine`: argument is not a String"
+            )),
         })),
     };
 
