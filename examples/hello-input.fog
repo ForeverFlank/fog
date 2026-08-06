@@ -2,9 +2,6 @@ x : String -> IO Unit
 x = str : String => printLine (concatString "Hello, " str)
 
 thing : IO Unit
-thing = bind readLine x
-
-y : IO a -> (a -> IO a) -> IO b
-y = bind
+thing = bind readLine (str : String => printLine (concatString "Hello, " str))
 
 main = then (printLine "Enter your name: ") thing

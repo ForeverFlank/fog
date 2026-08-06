@@ -18,6 +18,7 @@ use crate::static_check::eval::eval_atomic_type_expr;
 use crate::static_check::eval::eval_kind_expr;
 use crate::static_check::eval::eval_type_expr;
 use crate::static_check::eval::wrap_type_scheme;
+use crate::static_check::r#type;
 use crate::static_check::r#type::DataConstructor;
 use crate::static_check::r#type::Monotype;
 use crate::static_check::r#type::Type;
@@ -635,22 +636,22 @@ pub fn unify_type(
         println!("{k} --> {v}");
     }
 
-    if let Monotype::Variable(name_1) = to
-        && let Monotype::Variable(name_2) = from
-        && name_1 == name_2
-    {
-        // FIXME: cause of infinite recursion!
-        // type_var_subst.insert(name_1.to_string(), from.clone());
-        return true;
-    }
+    // if let Monotype::Variable(name_1) = to
+    //     && let Monotype::Variable(name_2) = from
+    //     && name_1 == name_2
+    // {
+    // FIXME: cause of infinite recursion!
+    // type_var_subst.insert(name_1.to_string(), from.clone());
+    // return true;
+    // }
 
     let to = substitute_types(to, type_var_subst);
     let from = substitute_types(from, type_var_subst);
 
     match (&to, &from) {
         (Monotype::Variable(name), other) | (other, Monotype::Variable(name)) => {
-            if type_var_subst.contains_key(name) {
-                false
+            if let Some(subst_type) = type_var_subst.get(name) {
+                other == subst_type
             } else {
                 type_var_subst.insert(name.clone(), other.clone());
                 true
@@ -692,10 +693,9 @@ pub fn unify_type(
 // TODO infinite recursion!
 fn substitute_types(r#type: &Monotype, type_var_subst: &HashMap<String, Monotype>) -> Monotype {
     match r#type {
-        Monotype::Variable(name) => type_var_subst
-            .get(name)
-            .map(|t2| substitute_types(t2, type_var_subst))
-            .unwrap_or(r#type.clone()),
+        Monotype::Variable(name) => type_var_subst.get(name).unwrap_or(r#type).clone(),
+        // .map(|t2| substitute_types(t2, type_var_subst))
+        // .unwrap_or(r#type.clone()),
         // .clone(),
         Monotype::Function(param_type, return_type) => Monotype::function(
             substitute_types(param_type, type_var_subst),
